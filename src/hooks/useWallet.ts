@@ -43,7 +43,7 @@ export const useWallet = () => {
 
     try {
       const chainId = await window.ethereum.request({ method: 'eth_chainId' });
-      setIsCorrectNetwork(chainId === BASE_TESTNET_CHAIN_ID);
+      setIsCorrectNetwork(chainId.toLowerCase() === BASE_TESTNET_CHAIN_ID.toLowerCase());
     } catch (error) {
       console.error('Error checking network:', error);
     }
