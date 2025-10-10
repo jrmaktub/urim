@@ -55,14 +55,26 @@ const MatchBet = () => {
       setPlayer1(p1);
       setPlayer2(p2);
       setContractStake(parseFloat(formatUnits(stake, 6)).toString());
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error loading contract data:', error);
+      // Set default state if contract isn't initialized yet
+      if (error.code === 'CALL_EXCEPTION') {
+        setContractStatus(BetStatus.AWAITING_JOIN);
+        toast({
+          title: "Contract Not Initialized",
+          description: "The match bet contract is ready for players to join.",
+          variant: "default",
+        });
+      }
     }
   };
 
   useEffect(() => {
     if (address && isCorrectNetwork) {
       loadContractData();
+    } else if (address) {
+      // Even if wrong network, show default state
+      setContractStatus(BetStatus.AWAITING_JOIN);
     }
   }, [address, isCorrectNetwork]);
 
@@ -304,9 +316,9 @@ const MatchBet = () => {
             </CardHeader>
             
             <CardContent className="space-y-6">
-              {/* Contract Info */}
-              {contractStatus !== null && (
-                <div className="p-4 rounded-lg bg-muted/50 border border-border space-y-2">
+              {/* Contract Info - Only show if we have loaded data */}
+              {contractStatus !== null && player1 && player2 && (
+                <div className="p-4 rounded-lg bg-muted/50 border border-border space-y-2 animate-fade-in">
                   <div className="grid grid-cols-2 gap-2 text-sm">
                     <div>
                       <p className="text-muted-foreground">Player 1:</p>
@@ -324,8 +336,9 @@ const MatchBet = () => {
                 </div>
               )}
 
-              {contractStatus === BetStatus.AWAITING_JOIN && (
-                <div className="space-y-4">
+              {/* Always show UI based on status, default to AWAITING_JOIN */}
+              {(contractStatus === BetStatus.AWAITING_JOIN || contractStatus === null) && (
+                <div className="space-y-4 animate-fade-in">
                   <div>
                     <label className="text-sm font-medium mb-2 block">Stake Amount (PYUSD)</label>
                     <Input
@@ -379,7 +392,7 @@ const MatchBet = () => {
               )}
 
               {contractStatus === BetStatus.READY_TO_RESOLVE && (
-                <div className="space-y-4">
+                <div className="space-y-4 animate-fade-in">
                   <div className="grid gap-4">
                     <div>
                       <label className="text-sm font-medium mb-2 block flex items-center gap-2">
@@ -443,8 +456,8 @@ const MatchBet = () => {
               )}
 
               {contractStatus === BetStatus.RESOLVED && txHash && (
-                <div className="space-y-4">
-                  <div className="p-6 rounded-lg bg-gradient-to-br from-green-500/10 to-primary/10 border border-green-500/30 text-center">
+                <div className="space-y-4 animate-fade-in">
+                  <div className="p-6 rounded-lg bg-gradient-to-br from-green-500/10 to-primary/10 border border-green-500/30 text-center animate-scale-in">
                     <Trophy className="w-12 h-12 text-green-500 mx-auto mb-4" />
                     <h3 className="text-xl font-bold mb-2">Bet Resolved!</h3>
                     <p className="text-muted-foreground mb-4">Winner</p>
@@ -476,6 +489,17 @@ const MatchBet = () => {
                   >
                     Refresh Status
                   </Button>
+                </div>
+              )}
+
+              {/* No wallet connected state */}
+              {!address && (
+                <div className="p-6 rounded-lg bg-muted/30 border border-border text-center animate-fade-in">
+                  <Wallet className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+                  <h3 className="text-lg font-semibold mb-2">Connect Your Wallet</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Connect your wallet to start creating or joining match bets
+                  </p>
                 </div>
               )}
             </CardContent>
