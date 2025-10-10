@@ -2,7 +2,7 @@ import { useState } from "react";
 import { X, ExternalLink, AlertCircle } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
-import { useWallet } from "@/hooks/useWallet";
+import { useAccount, useChainId, useBalance } from 'wagmi';
 
 interface BetModalProps {
   outcomeName: string;
@@ -11,7 +11,11 @@ interface BetModalProps {
 
 const BetModal = ({ outcomeName, onClose }: BetModalProps) => {
   const [amount, setAmount] = useState("");
-  const { address, balance, isCorrectNetwork } = useWallet();
+  const { address, isConnected } = useAccount();
+  const chainId = useChainId();
+  const isCorrectNetwork = chainId === 11155111; // Sepolia
+  const { data: balanceData } = useBalance({ address });
+  const balance = balanceData ? parseFloat(balanceData.formatted).toFixed(4) : '0.0000';
   const [txHash, setTxHash] = useState<string | null>(null);
 
   const handleConfirm = () => {

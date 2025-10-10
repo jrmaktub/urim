@@ -1,13 +1,13 @@
 import { useState, useEffect } from "react";
-import { Swords, Upload, Trophy, AlertCircle, Wallet, Loader2, LogOut } from "lucide-react";
+import { Swords, Upload, Trophy, Wallet, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { useSepoliaWallet } from "@/hooks/useSepoliaWallet";
 import { useToast } from "@/hooks/use-toast";
 import Navigation from "@/components/Navigation";
 import { BrowserProvider, Contract, parseUnits } from "ethers";
+import { useAccount, useChainId } from 'wagmi';
 import UrimMatchBetABI from "@/contracts/UrimMatchBet.json";
 import ERC20ABI from "@/contracts/ERC20.json";
 
@@ -21,7 +21,9 @@ enum BetStatus {
 }
 
 const MatchBet = () => {
-  const { address, balance, isConnecting, isCorrectNetwork, connect, disconnect, switchToSepolia } = useSepoliaWallet();
+  const { address, isConnected } = useAccount();
+  const chainId = useChainId();
+  const isCorrectNetwork = chainId === 11155111; // Sepolia chain ID
   const { toast } = useToast();
   
   const [stakeAmount, setStakeAmount] = useState("");
@@ -100,7 +102,7 @@ const MatchBet = () => {
   }, [address, isCorrectNetwork, stakeAmount, stakeRequired]);
 
   const handleApprove = async () => {
-    if (!address || !isCorrectNetwork) {
+    if (!isConnected || !address || !isCorrectNetwork) {
       toast({
         title: "Wallet Error",
         description: "Please connect to Ethereum Sepolia",
@@ -151,7 +153,7 @@ const MatchBet = () => {
   };
 
   const handleJoinBet = async () => {
-    if (!address || !isCorrectNetwork) {
+    if (!isConnected || !address || !isCorrectNetwork) {
       toast({
         title: "Wallet Error",
         description: "Please connect to Ethereum Sepolia",
