@@ -1,14 +1,16 @@
 import { Sparkles } from "lucide-react";
-
 const Footer = () => {
-  const navigation = [
-    { name: "Markets", href: "/markets" },
-    { name: "Create", href: "/create" },
-    { name: "Docs", href: "#" },
-  ];
-
-  return (
-    <footer className="relative border-t border-border/50 py-12 px-6">
+  const navigation = [{
+    name: "Markets",
+    href: "/markets"
+  }, {
+    name: "Create",
+    href: "/create"
+  }, {
+    name: "Docs",
+    href: "#"
+  }];
+  return <footer className="relative border-t border-border/50 py-12 px-6">
       {/* Background Glow */}
       <div className="absolute inset-0 bg-gradient-to-t from-primary/5 to-transparent pointer-events-none" />
 
@@ -23,15 +25,9 @@ const Footer = () => {
 
           {/* Navigation */}
           <nav className="flex flex-wrap justify-center gap-8">
-            {navigation.map((item) => (
-              <a
-                key={item.name}
-                href={item.href}
-                className="text-muted-foreground hover:text-foreground transition-colors duration-200 text-sm font-medium"
-              >
+            {navigation.map(item => <a key={item.name} href={item.href} className="text-muted-foreground hover:text-foreground transition-colors duration-200 text-sm font-medium">
                 {item.name}
-              </a>
-            ))}
+              </a>)}
           </nav>
 
           {/* ETHGlobal Badge */}
@@ -44,13 +40,9 @@ const Footer = () => {
 
         {/* Bottom Section */}
         <div className="mt-8 pt-8 border-t border-border/30 text-center text-sm text-muted-foreground">
-          <p>
-            © 2025 Urim. All quantum states reserved. Testnet only - for demonstration purposes.
-          </p>
+          <p>© 2025 Urim. All quantum states reserved.</p>
         </div>
       </div>
-    </footer>
-  );
+    </footer>;
 };
-
 export default Footer;
