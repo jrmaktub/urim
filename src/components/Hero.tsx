@@ -34,20 +34,29 @@ const Hero = () => {
           <span className="text-sm font-medium tracking-wider">URIM</span>
         </div>
 
+        {/* Quantum Wave Animation */}
+        <div className="absolute inset-0 -z-5 overflow-hidden">
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px]">
+            <div className="absolute inset-0 border border-primary/20 rounded-full animate-orbit" />
+            <div className="absolute inset-[10%] border border-secondary/20 rounded-full animate-orbit-reverse" style={{ animationDelay: '0.5s' }} />
+            <div className="absolute inset-[20%] border border-accent/20 rounded-full animate-orbit" style={{ animationDelay: '1s' }} />
+          </div>
+        </div>
+
         {/* Main Headline */}
         <h1 className="text-6xl md:text-7xl lg:text-8xl font-bold tracking-tight">
           <span className="bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent animate-shimmer">
-            Simulate Every
+            Quantum Prediction
           </span>
           <br />
           <span className="bg-gradient-to-r from-accent via-primary to-secondary bg-clip-text text-transparent">
-            Possible Future
+            Markets
           </span>
         </h1>
 
         {/* Subheadline */}
         <p className="text-xl md:text-2xl text-muted-foreground max-w-2xl mx-auto font-light leading-relaxed">
-          Visualize all quantum paths of your decisions. Predict outcomes. Bet on futures.
+          Trade on the outcomes your choices create.
         </p>
 
         {/* CTA Buttons */}
@@ -56,7 +65,7 @@ const Hero = () => {
             size="lg" 
             className="text-lg px-8 py-6 rounded-full bg-gradient-to-r from-primary to-secondary hover:opacity-90 glow-primary transition-all duration-300 hover:scale-105"
           >
-            Start Simulation
+            Create Decision
           </Button>
           <Button 
             size="lg" 

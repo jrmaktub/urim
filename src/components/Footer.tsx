@@ -2,10 +2,9 @@ import { Sparkles } from "lucide-react";
 
 const Footer = () => {
   const navigation = [
-    { name: "Home", href: "#" },
-    { name: "Market", href: "#" },
+    { name: "Markets", href: "/markets" },
+    { name: "Create", href: "/create" },
     { name: "Docs", href: "#" },
-    { name: "Team", href: "#" },
   ];
 
   return (
@@ -38,7 +37,7 @@ const Footer = () => {
           {/* ETHGlobal Badge */}
           <div className="glass-card px-4 py-2 rounded-full border border-primary/30">
             <span className="text-xs font-semibold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-              Built for ETHGlobal 2025
+              Built for ETHGlobal 2025 • Base testnet
             </span>
           </div>
         </div>

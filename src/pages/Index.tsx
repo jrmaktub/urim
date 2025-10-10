@@ -1,3 +1,4 @@
+import Navigation from "@/components/Navigation";
 import Hero from "@/components/Hero";
 import DecisionFlow from "@/components/DecisionFlow";
 import Footer from "@/components/Footer";
@@ -5,6 +6,7 @@ import Footer from "@/components/Footer";
 const Index = () => {
   return (
     <div className="min-h-screen w-full">
+      <Navigation />
       <Hero />
       <DecisionFlow />
       <Footer />
