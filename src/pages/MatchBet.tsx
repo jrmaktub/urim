@@ -284,51 +284,6 @@ const MatchBet = () => {
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
               Two players stake, both sign, the chain decides.
             </p>
-            
-            {/* Wallet Connection */}
-            <div className="flex justify-center mt-6 gap-3">
-              {!address ? (
-                <Button 
-                  onClick={connect}
-                  disabled={isConnecting}
-                  size="lg"
-                  className="rounded-full animate-fade-in"
-                >
-                  <Wallet className="w-4 h-4 mr-2" />
-                  {isConnecting ? 'Connecting...' : 'Connect Wallet'}
-                </Button>
-              ) : !isCorrectNetwork ? (
-                <Button 
-                  onClick={switchToSepolia}
-                  variant="outline"
-                  size="lg"
-                  className="rounded-full border-destructive/50 text-destructive hover:bg-destructive/10 animate-fade-in"
-                >
-                  <AlertCircle className="w-4 h-4 mr-2" />
-                  Switch to Ethereum Sepolia
-                </Button>
-              ) : (
-                <div className="flex items-center gap-3 animate-fade-in">
-                  <div className="glass-card px-6 py-3 rounded-full border border-primary/30">
-                    <div className="text-sm">
-                      <div className="font-medium">{balance} ETH</div>
-                      <div className="text-xs text-muted-foreground">
-                        {address.slice(0, 6)}...{address.slice(-4)}
-                      </div>
-                    </div>
-                  </div>
-                  <Button 
-                    onClick={disconnect}
-                    variant="outline"
-                    size="icon"
-                    className="rounded-full hover-scale"
-                    title="Disconnect Wallet"
-                  >
-                    <LogOut className="w-4 h-4" />
-                  </Button>
-                </div>
-              )}
-            </div>
           </div>
 
           {/* Main Bet Interface */}
