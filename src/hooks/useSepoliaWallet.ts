@@ -71,6 +71,12 @@ export const useSepoliaWallet = () => {
     }
   };
 
+  const disconnect = () => {
+    setAddress("");
+    setBalance("0");
+    setIsCorrectNetwork(false);
+  };
+
   const switchToSepolia = async () => {
     if (typeof window.ethereum === 'undefined') return;
 
@@ -142,6 +148,7 @@ export const useSepoliaWallet = () => {
     isConnecting,
     isCorrectNetwork,
     connect,
+    disconnect,
     switchToSepolia
   };
 };

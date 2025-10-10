@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Swords, Upload, Trophy, AlertCircle, Wallet, Loader2 } from "lucide-react";
+import { Swords, Upload, Trophy, AlertCircle, Wallet, Loader2, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,7 +21,7 @@ enum BetStatus {
 }
 
 const MatchBet = () => {
-  const { address, balance, isConnecting, isCorrectNetwork, connect, switchToSepolia } = useSepoliaWallet();
+  const { address, balance, isConnecting, isCorrectNetwork, connect, disconnect, switchToSepolia } = useSepoliaWallet();
   const { toast } = useToast();
   
   const [stakeAmount, setStakeAmount] = useState("");
@@ -243,13 +243,13 @@ const MatchBet = () => {
             </p>
             
             {/* Wallet Connection */}
-            <div className="flex justify-center mt-6">
+            <div className="flex justify-center mt-6 gap-3">
               {!address ? (
                 <Button 
                   onClick={connect}
                   disabled={isConnecting}
                   size="lg"
-                  className="rounded-full"
+                  className="rounded-full animate-fade-in"
                 >
                   <Wallet className="w-4 h-4 mr-2" />
                   {isConnecting ? 'Connecting...' : 'Connect Wallet'}
@@ -259,19 +259,30 @@ const MatchBet = () => {
                   onClick={switchToSepolia}
                   variant="outline"
                   size="lg"
-                  className="rounded-full border-destructive/50 text-destructive hover:bg-destructive/10"
+                  className="rounded-full border-destructive/50 text-destructive hover:bg-destructive/10 animate-fade-in"
                 >
                   <AlertCircle className="w-4 h-4 mr-2" />
                   Switch to Ethereum Sepolia
                 </Button>
               ) : (
-                <div className="glass-card px-6 py-3 rounded-full border border-primary/30">
-                  <div className="text-sm">
-                    <div className="font-medium">{balance} ETH</div>
-                    <div className="text-xs text-muted-foreground">
-                      {address.slice(0, 6)}...{address.slice(-4)}
+                <div className="flex items-center gap-3 animate-fade-in">
+                  <div className="glass-card px-6 py-3 rounded-full border border-primary/30">
+                    <div className="text-sm">
+                      <div className="font-medium">{balance} ETH</div>
+                      <div className="text-xs text-muted-foreground">
+                        {address.slice(0, 6)}...{address.slice(-4)}
+                      </div>
                     </div>
                   </div>
+                  <Button 
+                    onClick={disconnect}
+                    variant="outline"
+                    size="icon"
+                    className="rounded-full hover-scale"
+                    title="Disconnect Wallet"
+                  >
+                    <LogOut className="w-4 h-4" />
+                  </Button>
                 </div>
               )}
             </div>
