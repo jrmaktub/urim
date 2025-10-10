@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 
-const BASE_TESTNET_CHAIN_ID = '0x14A34'; // Base Sepolia testnet
+const ETHEREUM_SEPOLIA_CHAIN_ID = '0xaa36a7'; // Ethereum Sepolia testnet
 
 export const useWallet = () => {
   const [address, setAddress] = useState<string | null>(null);
@@ -43,7 +43,7 @@ export const useWallet = () => {
 
     try {
       const chainId = await window.ethereum.request({ method: 'eth_chainId' });
-      setIsCorrectNetwork(chainId.toLowerCase() === BASE_TESTNET_CHAIN_ID.toLowerCase());
+      setIsCorrectNetwork(chainId.toLowerCase() === ETHEREUM_SEPOLIA_CHAIN_ID.toLowerCase());
     } catch (error) {
       console.error('Error checking network:', error);
     }
@@ -97,13 +97,13 @@ export const useWallet = () => {
     }
   };
 
-  const switchToBaseTestnet = async () => {
+  const switchToEthereumSepolia = async () => {
     if (!window.ethereum) return;
 
     try {
       await window.ethereum.request({
         method: 'wallet_switchEthereumChain',
-        params: [{ chainId: BASE_TESTNET_CHAIN_ID }],
+        params: [{ chainId: ETHEREUM_SEPOLIA_CHAIN_ID }],
       });
     } catch (error: any) {
       if (error.code === 4902) {
@@ -112,15 +112,15 @@ export const useWallet = () => {
             method: 'wallet_addEthereumChain',
             params: [
               {
-                chainId: BASE_TESTNET_CHAIN_ID,
-                chainName: 'Base Sepolia Testnet',
+                chainId: ETHEREUM_SEPOLIA_CHAIN_ID,
+                chainName: 'Ethereum Sepolia Testnet',
                 nativeCurrency: {
                   name: 'Ethereum',
                   symbol: 'ETH',
                   decimals: 18,
                 },
-                rpcUrls: ['https://sepolia.base.org'],
-                blockExplorerUrls: ['https://sepolia.basescan.org'],
+                rpcUrls: ['https://eth-sepolia.g.alchemy.com/v2/27SvVEbGAVC2VSJ8rPss0zVQWGzPA0wt'],
+                blockExplorerUrls: ['https://sepolia.etherscan.io'],
               },
             ],
           });
@@ -137,7 +137,7 @@ export const useWallet = () => {
     isConnecting,
     isCorrectNetwork,
     connect,
-    switchToBaseTestnet,
+    switchToEthereumSepolia,
   };
 };
 

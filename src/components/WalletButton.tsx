@@ -3,18 +3,18 @@ import { Button } from "./ui/button";
 import { useWallet } from "@/hooks/useWallet";
 
 const WalletButton = () => {
-  const { address, balance, isConnecting, isCorrectNetwork, connect, switchToBaseTestnet } = useWallet();
+  const { address, balance, isConnecting, isCorrectNetwork, connect, switchToEthereumSepolia } = useWallet();
 
   if (!isCorrectNetwork && address) {
     return (
       <Button 
         size="sm" 
         variant="outline"
-        onClick={switchToBaseTestnet}
+        onClick={switchToEthereumSepolia}
         className="rounded-full border-destructive/50 text-destructive hover:bg-destructive/10"
       >
         <AlertCircle className="w-4 h-4 mr-2" />
-        Switch to Base
+        Switch to Ethereum Sepolia
       </Button>
     );
   }

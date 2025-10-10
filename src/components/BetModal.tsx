@@ -51,7 +51,7 @@ const BetModal = ({ outcomeName, onClose }: BetModalProps) => {
         {address && !isCorrectNetwork && (
           <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-4 flex items-start gap-3">
             <AlertCircle className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
-            <p className="text-sm text-destructive">Please switch to Base Sepolia testnet.</p>
+            <p className="text-sm text-destructive">Please switch to Ethereum Sepolia testnet.</p>
           </div>
         )}
 
@@ -67,12 +67,12 @@ const BetModal = ({ outcomeName, onClose }: BetModalProps) => {
               </div>
 
               <a
-                href={`https://sepolia.basescan.org/tx/${txHash}`}
+                href={`https://sepolia.etherscan.io/tx/${txHash}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center justify-center gap-2 text-sm text-primary hover:underline"
               >
-                View on Base Explorer
+                View on Etherscan
                 <ExternalLink className="w-4 h-4" />
               </a>
             </div>
@@ -134,7 +134,7 @@ const BetModal = ({ outcomeName, onClose }: BetModalProps) => {
             </Button>
 
             <p className="text-xs text-center text-muted-foreground">
-              Base Sepolia testnet • No real funds
+              Ethereum Sepolia testnet • No real funds
             </p>
           </>
         )}

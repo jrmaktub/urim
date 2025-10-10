@@ -71,7 +71,7 @@ const CreateDecision = () => {
             </Button>
 
             <p className="text-xs text-center text-muted-foreground">
-              Your decision will create a prediction market on Base testnet
+              Your decision will create a prediction market on Ethereum Sepolia
             </p>
           </div>
         </div>

@@ -84,12 +84,12 @@ const DecisionDetail = () => {
                   <span>Contract</span>
                 </div>
                 <a 
-                  href="https://sepolia.basescan.org" 
+                  href="https://sepolia.etherscan.io" 
                   target="_blank" 
                   rel="noopener noreferrer"
                   className="text-sm font-medium text-primary hover:underline"
                 >
-                  View on Base
+                  View on Etherscan
                 </a>
               </div>
             </div>
