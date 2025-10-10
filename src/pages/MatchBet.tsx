@@ -1,75 +1,163 @@
-import { useState } from "react";
-import { Swords, Upload, Trophy, AlertCircle, Wallet } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Swords, Upload, Trophy, AlertCircle, Wallet, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { useArbitrumWallet } from "@/hooks/useArbitrumWallet";
+import { useSepoliaWallet } from "@/hooks/useSepoliaWallet";
 import { useToast } from "@/hooks/use-toast";
 import Navigation from "@/components/Navigation";
-import Footer from "@/components/Footer";
+import { BrowserProvider, Contract, parseUnits } from "ethers";
+import UrimMatchBetABI from "@/contracts/UrimMatchBet.json";
+import ERC20ABI from "@/contracts/ERC20.json";
+
+const CONTRACT_ADDRESS = UrimMatchBetABI.address;
+const PYUSD_ADDRESS = "0x6c3ea9036406852006290770BEdFcAbA0e23A0e8";
+
+enum BetStatus {
+  AWAITING_JOIN = 0,
+  READY_TO_RESOLVE = 1,
+  RESOLVED = 2
+}
 
 const MatchBet = () => {
-  const { address, balance, isConnecting, isCorrectNetwork, connect, switchToArbitrumSepolia } = useArbitrumWallet();
+  const { address, balance, isConnecting, isCorrectNetwork, connect, switchToSepolia } = useSepoliaWallet();
   const { toast } = useToast();
   
-  const [opponentAddress, setOpponentAddress] = useState("");
   const [stakeAmount, setStakeAmount] = useState("");
-  const [betStatus, setBetStatus] = useState<"none" | "awaiting" | "ready" | "resolved">("none");
+  const [contractStatus, setContractStatus] = useState<BetStatus | null>(null);
   const [sig1, setSig1] = useState("");
   const [sig2, setSig2] = useState("");
   const [winnerAddress, setWinnerAddress] = useState("");
   const [txHash, setTxHash] = useState("");
-  const [resolvedWinner, setResolvedWinner] = useState("");
+  const [isApproving, setIsApproving] = useState(false);
+  const [isJoining, setIsJoining] = useState(false);
+  const [isResolving, setIsResolving] = useState(false);
+  const [player1, setPlayer1] = useState("");
+  const [player2, setPlayer2] = useState("");
+  const [contractStake, setContractStake] = useState("");
 
-  const handleCreateBet = async () => {
+  const loadContractData = async () => {
+    if (!window.ethereum || !isCorrectNetwork) return;
+
+    try {
+      const provider = new BrowserProvider(window.ethereum);
+      const contract = new Contract(CONTRACT_ADDRESS, UrimMatchBetABI.abi, provider);
+
+      const [status, p1, p2, stake] = await Promise.all([
+        contract.status(),
+        contract.player1(),
+        contract.player2(),
+        contract.stake()
+      ]);
+
+      setContractStatus(Number(status));
+      setPlayer1(p1);
+      setPlayer2(p2);
+      setContractStake(parseFloat(formatUnits(stake, 6)).toString());
+    } catch (error) {
+      console.error('Error loading contract data:', error);
+    }
+  };
+
+  useEffect(() => {
+    if (address && isCorrectNetwork) {
+      loadContractData();
+    }
+  }, [address, isCorrectNetwork]);
+
+  const handleApprove = async () => {
     if (!address || !isCorrectNetwork) {
       toast({
         title: "Wallet Error",
-        description: "Please connect to Arbitrum Sepolia",
+        description: "Please connect to Ethereum Sepolia",
         variant: "destructive",
       });
       return;
     }
 
-    if (!opponentAddress || !stakeAmount) {
+    if (!stakeAmount || parseFloat(stakeAmount) <= 0) {
       toast({
-        title: "Missing Information",
-        description: "Please provide opponent address and stake amount",
+        title: "Invalid Amount",
+        description: "Please enter a valid stake amount",
         variant: "destructive",
       });
       return;
     }
 
-    // Mock contract deployment
-    toast({
-      title: "Creating Bet",
-      description: "Deploying MatchBet contract...",
-    });
+    setIsApproving(true);
+    try {
+      const provider = new BrowserProvider(window.ethereum);
+      const signer = await provider.getSigner();
+      const pyusdContract = new Contract(PYUSD_ADDRESS, ERC20ABI.abi, signer);
 
-    setTimeout(() => {
-      setBetStatus("awaiting");
-      setTxHash("0x" + Math.random().toString(16).slice(2, 66));
+      const amount = parseUnits(stakeAmount, 6);
+      const tx = await pyusdContract.approve(CONTRACT_ADDRESS, amount);
+
       toast({
-        title: "Bet Created",
-        description: `Contract deployed. Waiting for ${opponentAddress.slice(0, 6)}... to join.`,
+        title: "Approving PYUSD",
+        description: "Transaction submitted...",
       });
-    }, 2000);
+
+      await tx.wait();
+      
+      toast({
+        title: "Approved!",
+        description: `Successfully approved ${stakeAmount} PYUSD`,
+      });
+    } catch (error: any) {
+      console.error('Approval error:', error);
+      toast({
+        title: "Approval Failed",
+        description: error.message || "Failed to approve PYUSD",
+        variant: "destructive",
+      });
+    } finally {
+      setIsApproving(false);
+    }
   };
 
   const handleJoinBet = async () => {
-    toast({
-      title: "Joining Bet",
-      description: "Sending matching stake...",
-    });
-
-    setTimeout(() => {
-      setBetStatus("ready");
+    if (!address || !isCorrectNetwork) {
       toast({
-        title: "Bet Joined",
-        description: "Both players staked. Ready to resolve.",
+        title: "Wallet Error",
+        description: "Please connect to Ethereum Sepolia",
+        variant: "destructive",
       });
-    }, 2000);
+      return;
+    }
+
+    setIsJoining(true);
+    try {
+      const provider = new BrowserProvider(window.ethereum);
+      const signer = await provider.getSigner();
+      const contract = new Contract(CONTRACT_ADDRESS, UrimMatchBetABI.abi, signer);
+
+      const tx = await contract.join();
+      setTxHash(tx.hash);
+
+      toast({
+        title: "Joining Bet",
+        description: "Transaction submitted...",
+      });
+
+      await tx.wait();
+      await loadContractData();
+
+      toast({
+        title: "Joined!",
+        description: "Successfully joined the bet",
+      });
+    } catch (error: any) {
+      console.error('Join error:', error);
+      toast({
+        title: "Join Failed",
+        description: error.message || "Failed to join bet",
+        variant: "destructive",
+      });
+    } finally {
+      setIsJoining(false);
+    }
   };
 
   const handleResolve = async () => {
@@ -82,33 +170,61 @@ const MatchBet = () => {
       return;
     }
 
-    toast({
-      title: "Resolving Bet",
-      description: "Verifying signatures and transferring funds...",
-    });
+    setIsResolving(true);
+    try {
+      const provider = new BrowserProvider(window.ethereum);
+      const signer = await provider.getSigner();
+      const contract = new Contract(CONTRACT_ADDRESS, UrimMatchBetABI.abi, signer);
 
-    setTimeout(() => {
-      setBetStatus("resolved");
-      setResolvedWinner(winnerAddress);
-      setTxHash("0x" + Math.random().toString(16).slice(2, 66));
+      const tx = await contract.resolve(sig1, sig2, winnerAddress);
+      setTxHash(tx.hash);
+
+      toast({
+        title: "Resolving Bet",
+        description: "Verifying signatures and transferring funds...",
+      });
+
+      await tx.wait();
+      await loadContractData();
+
       toast({
         title: "Bet Resolved",
         description: `Winner: ${winnerAddress.slice(0, 6)}...${winnerAddress.slice(-4)}`,
       });
-    }, 2000);
+    } catch (error: any) {
+      console.error('Resolve error:', error);
+      toast({
+        title: "Resolution Failed",
+        description: error.message || "Failed to resolve bet",
+        variant: "destructive",
+      });
+    } finally {
+      setIsResolving(false);
+    }
   };
 
   const getStatusBadge = () => {
-    switch (betStatus) {
-      case "awaiting":
+    if (contractStatus === null) return null;
+    
+    switch (contractStatus) {
+      case BetStatus.AWAITING_JOIN:
         return <Badge variant="outline" className="bg-yellow-500/10 text-yellow-500 border-yellow-500/30">Awaiting Join</Badge>;
-      case "ready":
+      case BetStatus.READY_TO_RESOLVE:
         return <Badge variant="outline" className="bg-blue-500/10 text-blue-500 border-blue-500/30">Ready to Resolve</Badge>;
-      case "resolved":
+      case BetStatus.RESOLVED:
         return <Badge variant="outline" className="bg-green-500/10 text-green-500 border-green-500/30">Resolved</Badge>;
       default:
         return null;
     }
+  };
+
+  const formatUnits = (value: bigint, decimals: number) => {
+    const str = value.toString();
+    const len = str.length;
+    if (len <= decimals) {
+      return '0.' + '0'.repeat(decimals - len) + str;
+    }
+    return str.slice(0, len - decimals) + '.' + str.slice(len - decimals);
   };
 
   return (
@@ -140,13 +256,13 @@ const MatchBet = () => {
                 </Button>
               ) : !isCorrectNetwork ? (
                 <Button 
-                  onClick={switchToArbitrumSepolia}
+                  onClick={switchToSepolia}
                   variant="outline"
                   size="lg"
                   className="rounded-full border-destructive/50 text-destructive hover:bg-destructive/10"
                 >
                   <AlertCircle className="w-4 h-4 mr-2" />
-                  Switch to Arbitrum Sepolia
+                  Switch to Ethereum Sepolia
                 </Button>
               ) : (
                 <div className="glass-card px-6 py-3 rounded-full border border-primary/30">
@@ -177,23 +293,33 @@ const MatchBet = () => {
             </CardHeader>
             
             <CardContent className="space-y-6">
-              {betStatus === "none" && (
+              {/* Contract Info */}
+              {contractStatus !== null && (
+                <div className="p-4 rounded-lg bg-muted/50 border border-border space-y-2">
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div>
+                      <p className="text-muted-foreground">Player 1:</p>
+                      <p className="font-mono text-xs">{player1.slice(0, 6)}...{player1.slice(-4)}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Player 2:</p>
+                      <p className="font-mono text-xs">{player2.slice(0, 6)}...{player2.slice(-4)}</p>
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Stake:</p>
+                    <p className="font-semibold">{contractStake} PYUSD</p>
+                  </div>
+                </div>
+              )}
+
+              {contractStatus === BetStatus.AWAITING_JOIN && (
                 <div className="space-y-4">
                   <div>
-                    <label className="text-sm font-medium mb-2 block">Opponent Address</label>
-                    <Input
-                      placeholder="0x..."
-                      value={opponentAddress}
-                      onChange={(e) => setOpponentAddress(e.target.value)}
-                      className="glass-card"
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="text-sm font-medium mb-2 block">Stake Amount (ETH)</label>
+                    <label className="text-sm font-medium mb-2 block">Stake Amount (PYUSD)</label>
                     <Input
                       type="number"
-                      placeholder="0.01"
+                      placeholder="100"
                       value={stakeAmount}
                       onChange={(e) => setStakeAmount(e.target.value)}
                       className="glass-card"
@@ -201,37 +327,47 @@ const MatchBet = () => {
                   </div>
                   
                   <Button 
-                    onClick={handleCreateBet}
-                    disabled={!address || !isCorrectNetwork}
+                    onClick={handleApprove}
+                    disabled={!address || !isCorrectNetwork || isApproving}
                     className="w-full"
                     size="lg"
                   >
-                    <Swords className="w-4 h-4 mr-2" />
-                    Create Bet
+                    {isApproving ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Approving...
+                      </>
+                    ) : (
+                      <>
+                        <Wallet className="w-4 h-4 mr-2" />
+                        Approve PYUSD
+                      </>
+                    )}
                   </Button>
-                </div>
-              )}
 
-              {betStatus === "awaiting" && (
-                <div className="space-y-4">
-                  <div className="p-4 rounded-lg bg-muted/50 border border-border">
-                    <p className="text-sm text-muted-foreground mb-2">Opponent:</p>
-                    <p className="font-mono text-sm">{opponentAddress}</p>
-                    <p className="text-sm text-muted-foreground mt-3 mb-2">Stake:</p>
-                    <p className="font-semibold">{stakeAmount} ETH</p>
-                  </div>
-                  
                   <Button 
                     onClick={handleJoinBet}
+                    disabled={!address || !isCorrectNetwork || isJoining}
                     className="w-full"
                     size="lg"
+                    variant="outline"
                   >
-                    Join Bet
+                    {isJoining ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Joining...
+                      </>
+                    ) : (
+                      <>
+                        <Swords className="w-4 h-4 mr-2" />
+                        Join Bet
+                      </>
+                    )}
                   </Button>
                 </div>
               )}
 
-              {betStatus === "ready" && (
+              {contractStatus === BetStatus.READY_TO_RESOLVE && (
                 <div className="space-y-4">
                   <div className="grid gap-4">
                     <div>
@@ -276,27 +412,37 @@ const MatchBet = () => {
                   
                   <Button 
                     onClick={handleResolve}
+                    disabled={!address || !isCorrectNetwork || isResolving}
                     className="w-full"
                     size="lg"
                   >
-                    <Trophy className="w-4 h-4 mr-2" />
-                    Resolve
+                    {isResolving ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Resolving...
+                      </>
+                    ) : (
+                      <>
+                        <Trophy className="w-4 h-4 mr-2" />
+                        Resolve
+                      </>
+                    )}
                   </Button>
                 </div>
               )}
 
-              {betStatus === "resolved" && (
+              {contractStatus === BetStatus.RESOLVED && txHash && (
                 <div className="space-y-4">
                   <div className="p-6 rounded-lg bg-gradient-to-br from-green-500/10 to-primary/10 border border-green-500/30 text-center">
                     <Trophy className="w-12 h-12 text-green-500 mx-auto mb-4" />
                     <h3 className="text-xl font-bold mb-2">Bet Resolved!</h3>
                     <p className="text-muted-foreground mb-4">Winner</p>
                     <p className="font-mono text-sm bg-background/50 p-3 rounded">
-                      {resolvedWinner}
+                      {winnerAddress || "View on explorer"}
                     </p>
                     <p className="text-sm text-muted-foreground mt-4">Transaction Hash</p>
                     <a 
-                      href={`https://sepolia.arbiscan.io/tx/${txHash}`}
+                      href={`https://sepolia.etherscan.io/tx/${txHash}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="font-mono text-xs text-primary hover:underline block mt-2"
@@ -307,18 +453,17 @@ const MatchBet = () => {
                   
                   <Button 
                     onClick={() => {
-                      setBetStatus("none");
-                      setOpponentAddress("");
                       setStakeAmount("");
                       setSig1("");
                       setSig2("");
                       setWinnerAddress("");
-                      setResolvedWinner("");
+                      setTxHash("");
+                      loadContractData();
                     }}
                     variant="outline"
                     className="w-full"
                   >
-                    Create New Bet
+                    Refresh Status
                   </Button>
                 </div>
               )}
@@ -327,7 +472,19 @@ const MatchBet = () => {
         </div>
       </main>
 
-      <Footer />
+      <footer className="relative border-t border-border/50 py-12 px-6">
+        <div className="absolute inset-0 bg-gradient-to-t from-primary/5 to-transparent pointer-events-none" />
+        <div className="relative max-w-7xl mx-auto text-center">
+          <div className="glass-card inline-block px-6 py-3 rounded-full border border-primary/30 mb-6">
+            <span className="text-sm font-semibold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+              Built on Ethereum Sepolia • Powered by Urim Quantum Markets
+            </span>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Contract: <a href={`https://sepolia.etherscan.io/address/${CONTRACT_ADDRESS}`} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline font-mono">{CONTRACT_ADDRESS}</a>
+          </p>
+        </div>
+      </footer>
     </div>
   );
 };
