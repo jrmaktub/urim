@@ -60,11 +60,6 @@ const MatchBet = () => {
       // Set default state if contract isn't initialized yet
       if (error.code === 'CALL_EXCEPTION') {
         setContractStatus(BetStatus.AWAITING_JOIN);
-        toast({
-          title: "Contract Not Initialized",
-          description: "The match bet contract is ready for players to join.",
-          variant: "default",
-        });
       }
     }
   };
