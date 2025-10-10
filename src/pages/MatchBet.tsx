@@ -11,7 +11,7 @@ import { BrowserProvider, Contract, parseUnits } from "ethers";
 import UrimMatchBetABI from "@/contracts/UrimMatchBet.json";
 import ERC20ABI from "@/contracts/ERC20.json";
 
-const CONTRACT_ADDRESS = UrimMatchBetABI.address;
+const CONTRACT_ADDRESS = "0xe0d1BaC845c45869F14C70b5F06e6EE92d6d4C57";
 const PYUSD_ADDRESS = "0x6c3ea9036406852006290770BEdFcAbA0e23A0e8";
 
 enum BetStatus {
