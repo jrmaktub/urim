@@ -7,6 +7,7 @@ import Index from "./pages/Index";
 import CreateDecision from "./pages/CreateDecision";
 import Markets from "./pages/Markets";
 import DecisionDetail from "./pages/DecisionDetail";
+import MatchBet from "./pages/MatchBet";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -22,6 +23,7 @@ const App = () => (
           <Route path="/create" element={<CreateDecision />} />
           <Route path="/markets" element={<Markets />} />
           <Route path="/decision/:id" element={<DecisionDetail />} />
+          <Route path="/match-bet" element={<MatchBet />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

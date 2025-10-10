@@ -19,6 +19,9 @@ const Navigation = () => {
           <a href="/create" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
             Create
           </a>
+          <a href="/match-bet" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+            Match Bet
+          </a>
           <a href="/docs" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
             Docs
           </a>
