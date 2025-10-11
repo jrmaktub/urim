@@ -11,6 +11,8 @@ import CreateDecision from "./pages/CreateDecision";
 import Markets from "./pages/Markets";
 import DecisionDetail from "./pages/DecisionDetail";
 import MatchBet from "./pages/MatchBet";
+import CreateMatch from "./pages/CreateMatch";
+import Match from "./pages/Match";
 import NotFound from "./pages/NotFound";
 import '@rainbow-me/rainbowkit/styles.css';
 
@@ -30,10 +32,11 @@ const App = () => (
           <BrowserRouter>
             <Routes>
               <Route path="/" element={<Index />} />
-              <Route path="/create" element={<CreateDecision />} />
+              <Route path="/create" element={<CreateMatch />} />
               <Route path="/markets" element={<Markets />} />
               <Route path="/decision/:id" element={<DecisionDetail />} />
               <Route path="/match-bet" element={<MatchBet />} />
+              <Route path="/match/:matchId" element={<Match />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>
