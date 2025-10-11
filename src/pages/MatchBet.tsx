@@ -12,7 +12,7 @@ import UrimMatchBetABI from "@/contracts/UrimMatchBet.json";
 import ERC20ABI from "@/contracts/ERC20.json";
 
 const CONTRACT_ADDRESS = "0xe0d1BaC845c45869F14C70b5F06e6EE92d6d4C57";
-const PYUSD_ADDRESS = "0x6c3ea9036406852006290770BEdFcAbA0e23A0e8";
+const PYUSD_ADDRESS = "0xCaC524BcA292aaade2DF8A05cC58F0a65B1B3bB9";
 
 enum BetStatus {
   AWAITING_JOIN = 0,
@@ -32,8 +32,7 @@ const MatchBet = () => {
   const [sig2, setSig2] = useState("");
   const [winnerAddress, setWinnerAddress] = useState("");
   const [txHash, setTxHash] = useState("");
-  const [isApproving, setIsApproving] = useState(false);
-  const [isJoining, setIsJoining] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   const [isResolving, setIsResolving] = useState(false);
   const [player1, setPlayer1] = useState("");
   const [player2, setPlayer2] = useState("");
@@ -101,58 +100,7 @@ const MatchBet = () => {
     }
   }, [address, isCorrectNetwork, stakeAmount, stakeRequired]);
 
-  const handleApprove = async () => {
-    if (!isConnected || !address || !isCorrectNetwork) {
-      toast({
-        title: "Wallet Error",
-        description: "Please connect to Ethereum Sepolia",
-        variant: "destructive",
-      });
-      return;
-    }
-
-
-    setIsApproving(true);
-    try {
-      const provider = new BrowserProvider(window.ethereum);
-      const signer = await provider.getSigner();
-      const pyusdContract = new Contract(PYUSD_ADDRESS, ERC20ABI.abi, signer);
-
-      const amount = (stakeAmount && parseFloat(stakeAmount) > 0)
-        ? parseUnits(stakeAmount, 6)
-        : stakeRequired;
-      const tx = await pyusdContract.approve(CONTRACT_ADDRESS, amount);
-
-      toast({
-        title: "Approving PYUSD",
-        description: "Transaction submitted...",
-      });
-
-      await tx.wait();
-      setAllowanceEnough(true);
-
-      // Automatically proceed to Join step if this wallet is the opponent
-      if (address && player2 && address.toLowerCase() === player2.toLowerCase()) {
-        await handleJoinBet();
-      }
-      
-      toast({
-        title: "Approved!",
-        description: `Successfully approved ${stakeAmount || parseFloat(formatUnits(stakeRequired, 6)).toString()} PYUSD`,
-      });
-    } catch (error: any) {
-      console.error('Approval error:', error);
-      toast({
-        title: "Approval Failed",
-        description: error.message || "Failed to approve PYUSD",
-        variant: "destructive",
-      });
-    } finally {
-      setIsApproving(false);
-    }
-  };
-
-  const handleJoinBet = async () => {
+  const handleConfirmBet = async () => {
     if (!isConnected || !address || !isCorrectNetwork) {
       toast({
         title: "Wallet Error",
@@ -172,36 +120,57 @@ const MatchBet = () => {
       return;
     }
 
-    setIsJoining(true);
+    setIsProcessing(true);
     try {
       const provider = new BrowserProvider(window.ethereum);
       const signer = await provider.getSigner();
-      const contract = new Contract(CONTRACT_ADDRESS, UrimMatchBetABI.abi, signer);
+      const pyusdContract = new Contract(PYUSD_ADDRESS, ERC20ABI.abi, signer);
+      const matchBetContract = new Contract(CONTRACT_ADDRESS, UrimMatchBetABI.abi, signer);
 
-      const tx = await contract.join();
-      setTxHash(tx.hash);
+      const amount = (stakeAmount && parseFloat(stakeAmount) > 0)
+        ? parseUnits(stakeAmount, 6)
+        : stakeRequired;
+
+      // Check current allowance
+      const currentAllowance: bigint = await pyusdContract.allowance(address, CONTRACT_ADDRESS);
+
+      // If allowance is insufficient, approve first
+      if (currentAllowance < amount) {
+        const approveTx = await pyusdContract.approve(CONTRACT_ADDRESS, amount);
+        
+        toast({
+          title: "Processing...",
+          description: "Approving PYUSD...",
+        });
+
+        await approveTx.wait();
+      }
+
+      // Now join the bet
+      const joinTx = await matchBetContract.join();
+      setTxHash(joinTx.hash);
 
       toast({
-        title: "Joining Bet",
-        description: "Transaction submitted...",
+        title: "Processing...",
+        description: "Confirming bet...",
       });
 
-      await tx.wait();
+      await joinTx.wait();
       await loadContractData();
 
       toast({
-        title: "Joined!",
-        description: "Successfully joined the bet",
+        title: "Bet Confirmed!",
+        description: "Successfully joined the match bet",
       });
     } catch (error: any) {
-      console.error('Join error:', error);
+      console.error('Confirm bet error:', error);
       toast({
-        title: "Join Failed",
-        description: error.message || "Failed to join bet",
+        title: "Failed",
+        description: error.message || "Failed to confirm bet",
         variant: "destructive",
       });
     } finally {
-      setIsJoining(false);
+      setIsProcessing(false);
     }
   };
 
@@ -327,54 +296,21 @@ const MatchBet = () => {
               {/* Always show UI based on status, default to AWAITING_JOIN */}
               {(contractStatus === BetStatus.AWAITING_JOIN || contractStatus === null) && (
                 <div className="space-y-4 animate-fade-in">
-                  <div>
-                    <label className="text-sm font-medium mb-2 block">Stake Amount (PYUSD)</label>
-                    <Input
-                      type="number"
-                      placeholder="100"
-                      value={stakeAmount}
-                      onChange={(e) => setStakeAmount(e.target.value)}
-                      className="glass-card"
-                    />
-                  </div>
-                  
-                  {!allowanceEnough && (
-                    <Button 
-                      onClick={handleApprove}
-                      disabled={!address || !isCorrectNetwork || isApproving}
-                      className="w-full"
-                      size="lg"
-                    >
-                      {isApproving ? (
-                        <>
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          Approving...
-                        </>
-                      ) : (
-                        <>
-                          <Wallet className="w-4 h-4 mr-2" />
-                          Approve PYUSD
-                        </>
-                      )}
-                    </Button>
-                  )}
-
                   <Button 
-                    onClick={handleJoinBet}
-                    disabled={!address || !isCorrectNetwork || isJoining}
+                    onClick={handleConfirmBet}
+                    disabled={!address || !isCorrectNetwork || isProcessing}
                     className="w-full"
                     size="lg"
-                    variant="outline"
                   >
-                    {isJoining ? (
+                    {isProcessing ? (
                       <>
                         <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Joining...
+                        Processing...
                       </>
                     ) : (
                       <>
                         <Swords className="w-4 h-4 mr-2" />
-                        Join Bet
+                        Confirm Bet
                       </>
                     )}
                   </Button>
