@@ -11,9 +11,13 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import UrimMatchBetABI from "@/contracts/UrimMatchBet.json";
 import ERC20ABI from "@/contracts/ERC20.json";
-
-const CONTRACT_ADDRESS = "0xe0d1BaC845c45869F14C70b5F06e6EE92d6d4C57";
-const PYUSD_ADDRESS = "0xCaC524BcA292aaade2DF8A05cC58F0a65B1B3bB9";
+import {
+  URIM_CONTRACT_ADDRESS,
+  PYUSD_ADDRESS,
+  PYTH_ADDRESS,
+  ENTROPY_ADDRESS,
+  SEPOLIA_CHAIN_ID
+} from "@/constants/contracts";
 
 const CreateMatch = () => {
   const { address, isConnected } = useAccount();
@@ -41,7 +45,7 @@ const CreateMatch = () => {
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState("");
   
-  const isCorrectNetwork = chainId === 11155111;
+  const isCorrectNetwork = chainId === SEPOLIA_CHAIN_ID;
   
   const validateForm = () => {
     if (!eventTitle.trim()) return "Event title is required";
@@ -82,45 +86,49 @@ const CreateMatch = () => {
     try {
       const provider = new BrowserProvider(window.ethereum);
       const signer = await provider.getSigner();
-      const amount = parseUnits(stakeAmount, 6);
+      const stake = parseUnits(stakeAmount, 6);
+      const deadline = Math.floor(new Date(matchTime).getTime() / 1000);
       
-      // If staking now, approve + join in one flow
-      if (stakeNow) {
-        const pyusdContract = new Contract(PYUSD_ADDRESS, ERC20ABI.abi, signer);
-        const matchBetContract = new Contract(CONTRACT_ADDRESS, UrimMatchBetABI.abi, signer);
-        
-        // Check allowance
-        const currentAllowance = await pyusdContract.allowance(address, CONTRACT_ADDRESS);
-        
-        // Auto-approve if needed
-        if (currentAllowance < amount) {
-          toast({
-            title: "Processing...",
-            description: "Approving PYUSD...",
-          });
-          
-          const approveTx = await pyusdContract.approve(CONTRACT_ADDRESS, amount);
-          await approveTx.wait();
-        }
-        
-        // Join the bet
-        toast({
-          title: "Processing...",
-          description: "Creating match and staking...",
-        });
-        
-        const joinTx = await matchBetContract.join();
-        await joinTx.wait();
+      // Step 1: Approve PYUSD
+      toast({
+        title: "Processing...",
+        description: "Approving PYUSD...",
+      });
+      
+      const pyusdContract = new Contract(PYUSD_ADDRESS, ERC20ABI.abi, signer);
+      const currentAllowance = await pyusdContract.allowance(address, URIM_CONTRACT_ADDRESS);
+      
+      if (currentAllowance < stake) {
+        const approveTx = await pyusdContract.approve(URIM_CONTRACT_ADDRESS, stake);
+        await approveTx.wait();
       }
       
-      // Generate match ID (simplified - in production use contract event or actual ID)
-      const generatedMatchId = `${Date.now()}-${address?.slice(2, 8)}`;
-      setMatchId(generatedMatchId);
+      // Step 2: Create Match
+      toast({
+        title: "Processing...",
+        description: "Creating match on-chain...",
+      });
+      
+      const urimContract = new Contract(URIM_CONTRACT_ADDRESS, UrimMatchBetABI.abi, signer);
+      const createTx = await urimContract.createMatch(
+        player2Address,
+        PYUSD_ADDRESS,
+        ENTROPY_ADDRESS,
+        PYTH_ADDRESS,
+        stake,
+        eventTitle,
+        deadline
+      );
+      const receipt = await createTx.wait();
+      
+      // Extract match address from event or use contract address as fallback
+      const matchAddress = receipt.logs[0]?.address || URIM_CONTRACT_ADDRESS;
+      setMatchId(matchAddress);
       setIsSuccess(true);
       
       toast({
         title: "Match Created!",
-        description: stakeNow ? "You've staked successfully" : "Share the link with your opponent",
+        description: "Share the link with your opponent",
       });
     } catch (error: any) {
       console.error('Create match error:', error);

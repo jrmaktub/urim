@@ -10,9 +10,11 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import UrimMatchBetABI from "@/contracts/UrimMatchBet.json";
 import ERC20ABI from "@/contracts/ERC20.json";
-
-const CONTRACT_ADDRESS = "0xe0d1BaC845c45869F14C70b5F06e6EE92d6d4C57";
-const PYUSD_ADDRESS = "0xCaC524BcA292aaade2DF8A05cC58F0a65B1B3bB9";
+import {
+  URIM_CONTRACT_ADDRESS,
+  PYUSD_ADDRESS,
+  SEPOLIA_CHAIN_ID
+} from "@/constants/contracts";
 
 enum BetStatus {
   AWAITING_JOIN = 0,
@@ -40,7 +42,7 @@ const Match = () => {
   const [player2Sig, setPlayer2Sig] = useState<string | null>(null);
   const [declaredWinner, setDeclaredWinner] = useState<string | null>(null);
   
-  const isCorrectNetwork = chainId === 11155111;
+  const isCorrectNetwork = chainId === SEPOLIA_CHAIN_ID;
   const matchTime = new Date();
   matchTime.setDate(matchTime.getDate() + 1);
   matchTime.setHours(20, 0, 0, 0);
@@ -51,7 +53,7 @@ const Match = () => {
 
     try {
       const provider = new BrowserProvider(window.ethereum);
-      const contract = new Contract(CONTRACT_ADDRESS, UrimMatchBetABI.abi, provider);
+      const contract = new Contract(URIM_CONTRACT_ADDRESS, UrimMatchBetABI.abi, provider);
 
       const [status, p1, p2, stake] = await Promise.all([
         contract.status(),
@@ -103,32 +105,43 @@ const Match = () => {
       const provider = new BrowserProvider(window.ethereum);
       const signer = await provider.getSigner();
       const pyusdContract = new Contract(PYUSD_ADDRESS, ERC20ABI.abi, signer);
-      const matchBetContract = new Contract(CONTRACT_ADDRESS, UrimMatchBetABI.abi, signer);
+      const matchBetContract = new Contract(URIM_CONTRACT_ADDRESS, UrimMatchBetABI.abi, signer);
 
       const amount = stakeRequired;
-      const currentAllowance: bigint = await pyusdContract.allowance(address, CONTRACT_ADDRESS);
+      const currentAllowance: bigint = await pyusdContract.allowance(address, URIM_CONTRACT_ADDRESS);
 
+      // Step 1: Approve PYUSD if needed
       if (currentAllowance < amount) {
         toast({
           title: "Processing...",
           description: "Approving PYUSD...",
         });
 
-        const approveTx = await pyusdContract.approve(CONTRACT_ADDRESS, amount);
+        const approveTx = await pyusdContract.approve(URIM_CONTRACT_ADDRESS, amount);
         await approveTx.wait();
       }
 
+      // Step 2: Get fee from entropy provider
+      toast({
+        title: "Processing...",
+        description: "Getting provider fee...",
+      });
+
+      const defaultProvider = await matchBetContract.getDefaultProvider();
+      const fee = await matchBetContract.getFee(defaultProvider);
+
+      // Step 3: Join match with fee
       toast({
         title: "Processing...",
         description: "Confirming bet...",
       });
 
-      const joinTx = await matchBetContract.join();
+      const joinTx = await matchBetContract.join({ value: fee });
       await joinTx.wait();
       await loadContractData();
 
       toast({
-        title: "Bet Confirmed!",
+        title: "Match Locked In!",
         description: "Successfully joined the match bet",
       });
     } catch (error: any) {
@@ -172,7 +185,7 @@ const Match = () => {
       if ((player1Sig && address === player2) || (player2Sig && address === player1)) {
         const provider = new BrowserProvider(window.ethereum);
         const signer = await provider.getSigner();
-        const contract = new Contract(CONTRACT_ADDRESS, UrimMatchBetABI.abi, signer);
+        const contract = new Contract(URIM_CONTRACT_ADDRESS, UrimMatchBetABI.abi, signer);
 
         const sig1 = address === player1 ? signature : player1Sig!;
         const sig2 = address === player2 ? signature : player2Sig!;
