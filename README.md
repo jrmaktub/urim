@@ -1,73 +1,57 @@
-# Welcome to your Lovable project
+# Sample Hardhat 3 Beta Project (`mocha` and `ethers`)
 
-## Project info
+This project showcases a Hardhat 3 Beta project using `mocha` for tests and the `ethers` library for Ethereum interactions.
 
-**URL**: https://lovable.dev/projects/76c4cbeb-2a4c-417e-88fc-cad6a0842ec7
+To learn more about the Hardhat 3 Beta, please visit the [Getting Started guide](https://hardhat.org/docs/getting-started#getting-started-with-hardhat-3). To share your feedback, join our [Hardhat 3 Beta](https://hardhat.org/hardhat3-beta-telegram-group) Telegram group or [open an issue](https://github.com/NomicFoundation/hardhat/issues/new) in our GitHub issue tracker.
 
-## How can I edit this code?
+## Project Overview
 
-There are several ways of editing your application.
+This example project includes:
 
-**Use Lovable**
+- A simple Hardhat configuration file.
+- Foundry-compatible Solidity unit tests.
+- TypeScript integration tests using `mocha` and ethers.js
+- Examples demonstrating how to connect to different types of networks, including locally simulating OP mainnet.
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/76c4cbeb-2a4c-417e-88fc-cad6a0842ec7) and start prompting.
+## Usage
 
-Changes made via Lovable will be committed automatically to this repo.
+### Running Tests
 
-**Use your preferred IDE**
+To run all the tests in the project, execute the following command:
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+```shell
+npx hardhat test
 ```
 
-**Edit a file directly in GitHub**
+You can also selectively run the Solidity or `mocha` tests:
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+```shell
+npx hardhat test solidity
+npx hardhat test mocha
+```
 
-**Use GitHub Codespaces**
+### Make a deployment to Sepolia
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+This project includes an example Ignition module to deploy the contract. You can deploy this module to a locally simulated chain or to Sepolia.
 
-## What technologies are used for this project?
+To run the deployment to a local chain:
 
-This project is built with:
+```shell
+npx hardhat ignition deploy ignition/modules/Counter.ts
+```
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+To run the deployment to Sepolia, you need an account with funds to send the transaction. The provided Hardhat configuration includes a Configuration Variable called `SEPOLIA_PRIVATE_KEY`, which you can use to set the private key of the account you want to use.
 
-## How can I deploy this project?
+You can set the `SEPOLIA_PRIVATE_KEY` variable using the `hardhat-keystore` plugin or by setting it as an environment variable.
 
-Simply open [Lovable](https://lovable.dev/projects/76c4cbeb-2a4c-417e-88fc-cad6a0842ec7) and click on Share -> Publish.
+To set the `SEPOLIA_PRIVATE_KEY` config variable using `hardhat-keystore`:
 
-## Can I connect a custom domain to my Lovable project?
+```shell
+npx hardhat keystore set SEPOLIA_PRIVATE_KEY
+```
 
-Yes, you can!
+After setting the variable, you can run the deployment with the Sepolia network:
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+```shell
+npx hardhat ignition deploy --network sepolia ignition/modules/Counter.ts
+```
