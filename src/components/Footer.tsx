@@ -1,9 +1,11 @@
 import { Sparkles } from "lucide-react";
+import { Link } from "react-router-dom";
 
 const Footer = () => {
   const navigation = [
+    { name: "Quantum Bets", href: "/" },
+    { name: "Everything Bets", href: "/everything-bets" },
     { name: "Markets", href: "/markets" },
-    { name: "Create", href: "/create" },
     { name: "Docs", href: "#" }
   ];
 
@@ -13,21 +15,21 @@ const Footer = () => {
         {/* Main Footer Content */}
         <div className="flex flex-col md:flex-row items-center justify-between gap-8">
           {/* Logo */}
-          <div className="flex items-center gap-2">
+          <Link to="/" className="flex items-center gap-2">
             <Sparkles className="w-6 h-6 text-primary" />
             <span className="text-2xl font-bold tracking-tight text-primary">URIM</span>
-          </div>
+          </Link>
 
           {/* Navigation */}
           <nav className="flex flex-wrap justify-center gap-8">
             {navigation.map(item => (
-              <a 
+              <Link
                 key={item.name} 
-                href={item.href} 
+                to={item.href} 
                 className="text-muted-foreground hover:text-primary transition-colors duration-200 text-sm font-bold uppercase tracking-wide"
               >
                 {item.name}
-              </a>
+              </Link>
             ))}
           </nav>
 

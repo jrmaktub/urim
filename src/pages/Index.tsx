@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
@@ -112,24 +113,35 @@ const Index = () => {
               onChange={(e) => setSituation(e.target.value)}
               className="h-16 text-lg"
             />
-            <Button
-              onClick={handleGenerateScenarios}
-              disabled={isGenerating}
-              size="lg"
-              className="w-full h-14"
-            >
-              {isGenerating ? (
-                <>
-                  <Sparkles className="w-5 h-5 animate-spin" />
-                  Generating Scenarios...
-                </>
-              ) : (
-                <>
-                  <Sparkles className="w-5 h-5" />
-                  Generate Scenarios
-                </>
-              )}
-            </Button>
+            <div className="flex gap-4">
+              <Button
+                onClick={handleGenerateScenarios}
+                disabled={isGenerating}
+                size="lg"
+                className="flex-1 h-14"
+              >
+                {isGenerating ? (
+                  <>
+                    <Sparkles className="w-5 h-5 animate-spin" />
+                    Generating Scenarios...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-5 h-5" />
+                    Generate Scenarios
+                  </>
+                )}
+              </Button>
+              <Link to="/everything-bets" className="flex-1">
+                <Button
+                  variant="outline"
+                  size="lg"
+                  className="w-full h-14 border-2 border-primary hover:bg-primary hover:text-black transition-all"
+                >
+                  Create Classic Bet
+                </Button>
+              </Link>
+            </div>
           </div>
         </div>
       </section>
