@@ -53,6 +53,10 @@ contract PredictionMarket is Ownable, ReentrancyGuard {
         uint256 amount
     );
 
+    function _canSetOwner() internal view virtual returns (bool) {
+        return msg.sender == owner();
+    }
+
     constructor(address _bettingToken) Ownable(msg.sender) {
         bettingToken = IERC20(_bettingToken);
     }
@@ -71,7 +75,7 @@ contract PredictionMarket is Ownable, ReentrancyGuard {
         );
 
         uint256 marketId = marketCount++;
-        Market storage market = markets(marketId);
+        Market storage market = markets[marketId];
 
         market.question = _question;
         market.optionA = _optionA;
@@ -107,16 +111,15 @@ contract PredictionMarket is Ownable, ReentrancyGuard {
             "Token transfer failed"
         );
 
-    if (_isOptionA){
-        market.optionASharesBalance[msg.sender] += _amount;
-        market.totalOptionAShares += _amount;
-    } else {
-        market.optionBSharesBalance[msg.sender] += _amount;
-        market.totalOptionAShares += _amount;
-    }
+        if (_isOptionA) {
+            market.optionASharesBalance[msg.sender] += _amount;
+            market.totalOptionAShares += _amount;
+        } else {
+            market.optionBSharesBalance[msg.sender] += _amount;
+            market.totalOptionAShares += _amount;
+        }
 
-    emit SharesPurchased(_marketId, msg.sender, _isOptionA, _amount);
-
+        emit SharesPurchased(_marketId, msg.sender, _isOptionA, _amount);
     }
 
     function resolveMarket(uint256 _marketId, MarketOutcome _outcome) external {
@@ -134,5 +137,77 @@ contract PredictionMarket is Ownable, ReentrancyGuard {
 
     function claimWinnings(uint256 _marketId) external {
         Market storage market = markets[_marketId];
+        require(market.resolved, "Market not resolved yet");
+
+        uint256 userShares;
+        uint256 winningShares;
+        uint256 losingShares;
+
+        if (market.outcome == MarketOutcome.OPTION_A) {
+            userShares = market.optionASharesBalance[msg.sender];
+            winningShares = market.totalOptionAShares;
+            losingShares = market.totalOptionBShares;
+            market.optionASharesBalance[msg.sender] = 0;
+        } else if (market.outcome == MarketOutcome.OPTION_B) {
+            userShares = market.optionBSharesBalance[msg.sender];
+            winningShares = market.totalOptionBShares;
+            losingShares = market.totalOptionAShares;
+            market.optionBSharesBalance[msg.sender] = 0;
+        } else {
+            revert("Market outcome is not valid");
+        }
+
+        require(userShares > 0, "No winnings to claim");
+
+        uint256 rewardRatio = (losingShares * 1e18) / winningShares; // Using 1e18 for precision
+
+        uint256 winnings = userShares + (userShares * rewardRatio) / 1e18;
+
+        require(
+            bettingToken.transfer(msg.sender, winnings),
+            "Token transfer failed"
+        );
+
+        emit Claimed(_marketId, msg.sender, winnings);
+    }
+
+    function getMarketInfo(
+        uint256 _marketId
+    )
+        external
+        view
+        returns (
+            string memory question,
+            string memory optionA,
+            string memory optionB,
+            uint256 endTime,
+            MarketOutcome outcome,
+            uint256 totalOptionAShares,
+            uint256 totalOptionBShares,
+            bool resolved
+        )
+    {
+        Market storage market = markets[_marketId];
+        return (
+            market.question,
+            market.optionA,
+            market.optionB,
+            market.endTime,
+            market.outcome,
+            market.totalOptionAShares,
+            market.totalOptionBShares,
+            market.resolved
+        );
+    }
+
+    function getSharesBalance(
+        uint256 _marketId,
+        address _user
+    ) external view returns (uint256 optionAShares, uint256 optionBShares){
+        Market storage market = markets[_marketId];
+        return(
+            market.optionASharesBalance[_user],
+            market.optionBSharesBalance[_user]
+        );
     }
 }
