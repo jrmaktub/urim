@@ -7,6 +7,8 @@ import { WagmiProvider } from 'wagmi';
 import { RainbowKitProvider, darkTheme } from '@rainbow-me/rainbowkit';
 import { config } from './wagmi.config';
 import Index from "./pages/Index";
+import CreateBet from "./pages/CreateBet";
+import CreateQuantumBet from "./pages/CreateQuantumBet";
 import CreateDecision from "./pages/CreateDecision";
 import Markets from "./pages/Markets";
 import DecisionDetail from "./pages/DecisionDetail";
@@ -32,7 +34,9 @@ const App = () => (
           <BrowserRouter>
             <Routes>
               <Route path="/" element={<Index />} />
-              <Route path="/create" element={<CreateMatch />} />
+              <Route path="/create" element={<CreateBet />} />
+              <Route path="/create-quantum" element={<CreateQuantumBet />} />
+              <Route path="/create-match" element={<CreateMatch />} />
               <Route path="/markets" element={<Markets />} />
               <Route path="/decision/:id" element={<DecisionDetail />} />
               <Route path="/match-bet" element={<MatchBet />} />
