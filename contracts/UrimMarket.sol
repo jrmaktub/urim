@@ -5,11 +5,17 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-contract PredictionMarket is Ownable, ReentrancyGuard {
+contract UrimMarket is Ownable, ReentrancyGuard {
     enum MarketOutcome {
         UNRESOLVED,
         OPTION_A,
         OPTION_B
+    }
+
+    enum MarketStatus {
+        OPEN,
+        ENDED,
+        RESOLVED
     }
 
     struct Market {
@@ -29,6 +35,7 @@ contract PredictionMarket is Ownable, ReentrancyGuard {
     IERC20 public bettingToken;
     uint256 public marketCount;
     mapping(uint256 => Market) public markets;
+    mapping(bytes32 => bool) public marketExists;
 
     event MarketCreated(
         uint256 indexed marketId,
@@ -74,6 +81,14 @@ contract PredictionMarket is Ownable, ReentrancyGuard {
             "Options cannot be empty"
         );
 
+        // --- NEW ---
+        // Hash the question and check if a market with this question already exists.
+        bytes32 questionHash = keccak256(abi.encodePacked(_question));
+        require(
+            !marketExists[questionHash],
+            "Market with this question already exists"
+        );
+
         uint256 marketId = marketCount++;
         Market storage market = markets[marketId];
 
@@ -82,6 +97,8 @@ contract PredictionMarket is Ownable, ReentrancyGuard {
         market.optionB = _optionB;
         market.endTime = block.timestamp + _duration;
         market.outcome = MarketOutcome.UNRESOLVED;
+
+        marketExists[questionHash] = true;
 
         emit MarketCreated(
             marketId,
@@ -116,7 +133,7 @@ contract PredictionMarket is Ownable, ReentrancyGuard {
             market.totalOptionAShares += _amount;
         } else {
             market.optionBSharesBalance[msg.sender] += _amount;
-            market.totalOptionAShares += _amount;
+            market.totalOptionBShares += _amount;
         }
 
         emit SharesPurchased(_marketId, msg.sender, _isOptionA, _amount);
@@ -135,9 +152,10 @@ contract PredictionMarket is Ownable, ReentrancyGuard {
         emit MarketResolved(_marketId, _outcome);
     }
 
-    function claimWinnings(uint256 _marketId) external {
+    function claimWinnings(uint256 _marketId) external nonReentrant {
         Market storage market = markets[_marketId];
         require(market.resolved, "Market not resolved yet");
+        require(market.hasClaimed[msg.sender] == false, "Already claimed");
 
         uint256 userShares;
         uint256 winningShares;
@@ -157,11 +175,15 @@ contract PredictionMarket is Ownable, ReentrancyGuard {
             revert("Market outcome is not valid");
         }
 
+        // --- FIX --- Moved this check to after winningShares is assigned.
+        require(winningShares > 0, "No Winning Shares");
         require(userShares > 0, "No winnings to claim");
 
         uint256 rewardRatio = (losingShares * 1e18) / winningShares; // Using 1e18 for precision
 
         uint256 winnings = userShares + (userShares * rewardRatio) / 1e18;
+
+        market.hasClaimed[msg.sender] = true;
 
         require(
             bettingToken.transfer(msg.sender, winnings),
@@ -203,11 +225,32 @@ contract PredictionMarket is Ownable, ReentrancyGuard {
     function getSharesBalance(
         uint256 _marketId,
         address _user
-    ) external view returns (uint256 optionAShares, uint256 optionBShares){
+    ) external view returns (uint256 optionAShares, uint256 optionBShares) {
         Market storage market = markets[_marketId];
-        return(
+        return (
             market.optionASharesBalance[_user],
             market.optionBSharesBalance[_user]
         );
+    }
+
+    function marketStatus(
+        uint256 _marketId
+    ) public view returns (MarketStatus) {
+        Market storage market = markets[_marketId];
+        if (market.resolved) {
+            return MarketStatus.RESOLVED;
+        }
+        if (block.timestamp >= market.endTime) {
+            return MarketStatus.ENDED;
+        }
+        return MarketStatus.OPEN;
+    }
+
+    function getAllMarketIds() external view returns (uint256[] memory) {
+        uint256[] memory allMarketIds = new uint256[](marketCount);
+        for (uint256 i = 0; i < marketCount; i++) {
+            allMarketIds[i] = i;
+        }
+        return allMarketIds;
     }
 }
