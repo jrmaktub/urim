@@ -24,14 +24,15 @@ import { CheckCircle2, Clock, TrendingUp } from "lucide-react";
 const EverythingBets = () => {
   const { toast } = useToast();
   const [question, setQuestion] = useState("");
-  const [optionA, setOptionA] = useState("");
-  const [optionB, setOptionB] = useState("");
+  const [optionA, setOptionA] = useState("Yes");
+  const [optionB, setOptionB] = useState("No");
   const [duration, setDuration] = useState("");
   const [stakeAmount, setStakeAmount] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [selectedMarket, setSelectedMarket] = useState<any>(null);
   const [stakeModalOpen, setStakeModalOpen] = useState(false);
+  const [selectedOption, setSelectedOption] = useState<string>("");
 
   // Mock active markets
   const activeMarkets = [
@@ -116,8 +117,8 @@ const EverythingBets = () => {
               onClick={() => {
                 setIsSuccess(false);
                 setQuestion("");
-                setOptionA("");
-                setOptionB("");
+                setOptionA("Yes");
+                setOptionB("No");
                 setDuration("");
                 setStakeAmount("");
               }}
@@ -144,7 +145,7 @@ const EverythingBets = () => {
               CREATE A BET
             </h1>
             <p className="text-lg text-muted-foreground">
-              Define a question, set two sides, and open your market to the world.
+              Define a question, set two sides, and open your market to everyone.
             </p>
           </div>
 
@@ -232,39 +233,55 @@ const EverythingBets = () => {
       {/* Active Markets Section */}
       <section className="pb-24 px-6">
         <div className="max-w-7xl mx-auto">
-          <h2 className="text-3xl font-bold mb-8 text-primary">ACTIVE MARKETS</h2>
-          <div className="space-y-4">
+          <h2 className="text-3xl font-bold mb-8 text-primary">ACTIVE USER MARKETS</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {activeMarkets.map((market, index) => (
               <div
                 key={market.id}
-                className="gold-card p-6 cursor-pointer animate-fade-up"
+                className="gold-card p-6 animate-fade-up hover:shadow-[0_0_30px_rgba(212,175,55,0.3)] transition-all duration-300"
                 style={{ animationDelay: `${index * 0.1}s` }}
-                onClick={() => handleMarketClick(market)}
               >
-                <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-center">
-                  <div className="md:col-span-2">
-                    <h3 className="text-lg font-bold text-foreground">{market.question}</h3>
+                <h3 className="text-lg font-bold text-foreground mb-4">{market.question}</h3>
+                
+                <div className="space-y-3 mb-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">{market.optionA} Pool</span>
+                    <span className="text-primary font-bold">{market.poolA} PYUSD</span>
                   </div>
-                  <div className="text-center">
-                    <div className="text-xs text-muted-foreground mb-1">{market.optionA}</div>
-                    <div className="flex items-center gap-1 justify-center text-primary">
-                      <TrendingUp className="w-3 h-3" />
-                      <span className="font-bold">{market.poolA} PYUSD</span>
-                    </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">{market.optionB} Pool</span>
+                    <span className="text-primary font-bold">{market.poolB} PYUSD</span>
                   </div>
-                  <div className="text-center">
-                    <div className="text-xs text-muted-foreground mb-1">{market.optionB}</div>
-                    <div className="flex items-center gap-1 justify-center text-primary">
-                      <TrendingUp className="w-3 h-3" />
-                      <span className="font-bold">{market.poolB} PYUSD</span>
-                    </div>
-                  </div>
-                  <div className="text-center">
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground justify-center">
-                      <Clock className="w-4 h-4" />
-                      <span>{market.timeLeft}</span>
-                    </div>
-                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
+                  <Clock className="w-4 h-4" />
+                  <span>{market.timeLeft}</span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <Button 
+                    variant="outline" 
+                    className="border-2 border-primary hover:bg-primary hover:text-black transition-all"
+                    onClick={() => {
+                      setSelectedMarket(market);
+                      setSelectedOption(market.optionA);
+                      setStakeModalOpen(true);
+                    }}
+                  >
+                    Bet on {market.optionA}
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    className="border-2 border-primary hover:bg-primary hover:text-black transition-all"
+                    onClick={() => {
+                      setSelectedMarket(market);
+                      setSelectedOption(market.optionB);
+                      setStakeModalOpen(true);
+                    }}
+                  >
+                    Bet on {market.optionB}
+                  </Button>
                 </div>
               </div>
             ))}
@@ -283,17 +300,27 @@ const EverythingBets = () => {
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label className="text-foreground font-bold mb-2 block">CHOOSE OUTCOME</Label>
-              <div className="grid grid-cols-2 gap-3">
-                <Button variant="outline">{selectedMarket?.optionA}</Button>
-                <Button variant="outline">{selectedMarket?.optionB}</Button>
+              <Label className="text-foreground font-bold mb-2 block">BETTING ON</Label>
+              <div className="p-4 border-2 border-primary rounded-md bg-primary/10">
+                <span className="text-primary font-bold text-lg">{selectedOption}</span>
               </div>
             </div>
             <div>
               <Label className="text-foreground font-bold mb-2 block">STAKE AMOUNT (PYUSD)</Label>
               <Input type="number" placeholder="100" />
             </div>
-            <Button className="w-full">Confirm Bet</Button>
+            <Button 
+              className="w-full"
+              onClick={() => {
+                toast({
+                  title: "Bet Placed ⚡",
+                  description: `You bet on "${selectedOption}"`,
+                });
+                setStakeModalOpen(false);
+              }}
+            >
+              Confirm Bet
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
