@@ -1,6 +1,6 @@
 import { createConfig, http } from 'wagmi';
 import { baseSepolia } from 'wagmi/chains';
-import { injected, coinbaseWallet } from 'wagmi/connectors';
+import { baseAccount } from 'wagmi/connectors';
 
 export const config = createConfig({
   chains: [baseSepolia],
@@ -8,10 +8,8 @@ export const config = createConfig({
     [baseSepolia.id]: http() 
   },
   connectors: [
-    coinbaseWallet({
+    baseAccount({
       appName: 'Urim',
-      preference: 'smartWalletOnly',
     }),
-    injected(),
   ],
 });
