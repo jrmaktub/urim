@@ -4,6 +4,8 @@ pragma solidity ^0.8.28;
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {IPyth} from "@pythnetwork/pyth-sdk-solidity/IPyth.sol";
+import {PythStructs} from "@pythnetwork/pyth-sdk-solidity/PythStructs.sol";
 
 contract UrimQuantumMarket is Ownable, ReentrancyGuard {
     struct Market {
@@ -11,14 +13,19 @@ contract UrimQuantumMarket is Ownable, ReentrancyGuard {
         uint256 endTime;
         bool resolved;
         uint8 winningScenario; // index of winning scenario (0..n-1). Only valid if resolved == true
-        // Dynamic arrays stored in the struct:
         string[] scenarios; // scenario descriptions
         uint256[] probabilities; // optional AI-provided probabilities/weights (not used in payouts)
         uint256[] totalSharesPerScenario; // total tokens staked per scenario
+        bytes32 priceFeedId;
+        // This array defines the upper bound for each scenario.
+        // For N scenarios, you need N-1 boundaries.
+        // e.g., Scenarios: [<3500, 3500-4000, >4000]. Boundaries: [3500, 4000]
+        int64[] scenarioPriceBoundaries;
         mapping(address => mapping(uint8 => uint256)) balances; // user -> scenarioIndex -> amount
         mapping(address => bool) hasClaimed;
     }
 
+    IPyth public pyth;
     IERC20 public bettingToken;
     uint256 public marketCount;
     mapping(uint256 => Market) private markets;
@@ -44,9 +51,10 @@ contract UrimQuantumMarket is Ownable, ReentrancyGuard {
 
     event QuantumClaimed(uint256 indexed marketId, address indexed user, uint256 amount);
 
-    constructor(address _bettingToken) Ownable(msg.sender){
+    constructor(address _bettingToken, address _pythContractAddress) Ownable(msg.sender){
         require(_bettingToken != address(0), "Invalid token address");
         bettingToken = IERC20(_bettingToken);
+        pyth = IPyth(_pythContractAddress);
     }
 
     /**
@@ -61,10 +69,13 @@ contract UrimQuantumMarket is Ownable, ReentrancyGuard {
         string memory _question,
         string[] memory _scenarios,
         uint256[] memory _probabilities,
-        uint256 _duration
+        uint256 _duration,
+        bytes32 _priceFeedId,
+        int64[] memory _priceBoundaries // for example [3500e8, 4000e8]
     ) external onlyOwner returns (uint256) {
         require(_duration > 0, "Duration must be positive");
         uint256 n = _scenarios.length;
+        require(_priceBoundaries.length == n - 1, "Incorrect number of price Boundaries");
         require(n >= 2 && n <= 10, "Scenarios length must be between 2 and 10");
         require(_probabilities.length == n, "Probabilities length mismatch");
 
@@ -85,6 +96,7 @@ contract UrimQuantumMarket is Ownable, ReentrancyGuard {
         m.endTime = block.timestamp + _duration;
         m.resolved = false;
         m.winningScenario = type(uint8).max; // invalid until resolved
+        m.priceFeedId = _priceFeedId;
 
         // copy arrays into storage
         for (uint256 i = 0; i < n; i++) {
@@ -92,6 +104,10 @@ contract UrimQuantumMarket is Ownable, ReentrancyGuard {
             m.probabilities.push(_probabilities[i]);
             m.totalSharesPerScenario.push(0);
         }
+        for (uint256 i = 0; i < _priceBoundaries.length; i++) {
+            m.scenarioPriceBoundaries.push(_priceBoundaries[i]);
+        }
+
 
         marketExists[questionHash] = true;
 
@@ -130,22 +146,36 @@ contract UrimQuantumMarket is Ownable, ReentrancyGuard {
         emit ScenarioPurchased(_marketId, msg.sender, _scenarioIndex, _amount);
     }
 
-    /**
-     * @notice Resolve the market to a winning scenario. Only owner (for now).
-     * @param _marketId Market index.
-     * @param _winningScenarioIndex Index of winning scenario (0..n-1).
-     */
-    function resolveQuantumMarket(uint256 _marketId, uint8 _winningScenarioIndex) external onlyOwner {
+
+function resolveQuantumMarket(uint256 _marketId, bytes[] calldata _priceUpdateData) external payable {
         Market storage m = markets[_marketId];
-        require(bytes(m.question).length > 0, "Market does not exist");
         require(block.timestamp >= m.endTime, "Market hasn't ended yet");
         require(!m.resolved, "Market already resolved");
-        require(_winningScenarioIndex < m.scenarios.length, "Invalid scenario index");
 
-        m.winningScenario = _winningScenarioIndex;
+        // Update Pyth price on-chain
+        uint256 fee = pyth.getUpdateFee(_priceUpdateData);
+        pyth.updatePriceFeeds{value: fee}(_priceUpdateData);
+
+        // Get the final price
+        PythStructs.Price memory currentPrice = pyth.getPriceNoOlderThan(m.priceFeedId, 60);
+        require(currentPrice.publishTime >= m.endTime, "Pyth price is too old");
+
+        // Determine the winning scenario by checking which price range the final price falls into
+        uint8 winningIndex = 0;
+        for (uint8 i = 0; i < m.scenarioPriceBoundaries.length; i++) {
+            if (currentPrice.price < m.scenarioPriceBoundaries[i]) {
+                winningIndex = i;
+                break; // Found the correct bucket
+            }
+            // If we are in the last loop iteration and still haven't broken, it means the price is in the highest bucket
+            if (i == m.scenarioPriceBoundaries.length - 1) {
+                winningIndex = i + 1;
+            }
+        }
+        
+        m.winningScenario = winningIndex;
         m.resolved = true;
-
-        emit QuantumMarketResolved(_marketId, _winningScenarioIndex);
+        emit QuantumMarketResolved(_marketId, m.winningScenario);
     }
 
     /**
