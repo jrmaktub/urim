@@ -1,64 +1,85 @@
-"use client";
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { parseUnits } from "viem";
-import { baseSepolia } from "viem/chains";
-import { getBaseProvider } from "@/lib/baseAccount";
+import { useWriteContract, useWaitForTransactionReceipt, useAccount } from "wagmi";
+import { baseSepolia } from "wagmi/chains";
+import { Button } from "./ui/button";
 
-const USDC = "0x2f3A40A3db8a7e3D09B0adfEfbCe4f6F81927557"; // Base Sepolia USDC
-const RECEIVER = "0x2177F513BA2a0746A22037Eb6626616e131eB69E"; // verified BetReceiver
+const USDC = "0x036CbD53842c5426634e7929541eC2318f3dCF7e"; // Base Sepolia USDC
+const RECEIVER = "0x2177F513BA2a0746A22037Eb6626616e131eB69E"; // BetReceiver contract
+
+const PLACE_BET_ABI = [{
+  name: 'placeBet',
+  type: 'function',
+  stateMutability: 'nonpayable',
+  inputs: [
+    { name: 'token', type: 'address' },
+    { name: 'amount', type: 'uint256' }
+  ],
+  outputs: []
+}] as const;
 
 export default function BetButton() {
-  const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState("");
+  const { address } = useAccount();
+  
+  const { writeContract, data: hash, isPending } = useWriteContract();
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
 
   const handleBet = async () => {
+    if (!address) {
+      setMsg("❌ Please connect wallet first");
+      return;
+    }
+
     try {
-      setLoading(true);
-      setMsg("⏳ Sending 0.1 USDC to contract...");
-      const provider = getBaseProvider();
-
-      const accounts = (await provider.request({ method: "eth_requestAccounts", params: [] })) as string[];
-      const from = (accounts.length > 1 ? accounts[1] : accounts[0]) as `0x${string}`;
-      console.log("🟣 Sub Account:", from);
-
-      // ABI selector for placeBet(address,uint256)
-      const selector = "0x8b32d59c"; 
-      const tokenParam = USDC.slice(2).padStart(64, "0");
-      const amountParam = parseUnits("0.1", 6).toString(16).padStart(64, "0");
-      const data = `${selector}${tokenParam}${amountParam}`;
-
-      const tx = await provider.request({
-        method: "wallet_sendCalls",
-        params: [
-          {
-            version: "2.0",
-            atomicRequired: true,
-            chainId: `0x${baseSepolia.id.toString(16)}`,
-            from,
-            calls: [{ to: RECEIVER, data, value: "0x0" }],
-          },
-        ],
+      setMsg("⏳ Placing bet...");
+      
+      writeContract({
+        account: address,
+        chain: baseSepolia,
+        address: RECEIVER,
+        abi: PLACE_BET_ABI,
+        functionName: 'placeBet',
+        args: [USDC, parseUnits("0.1", 6)]
       });
-
-      console.log("✅ TX sent:", tx);
-      setMsg("✅ Bet placed! Check Basescan.");
+      
     } catch (err) {
       console.error("❌ Bet failed:", err);
       setMsg("❌ Bet failed — check console.");
-    } finally {
-      setLoading(false);
     }
   };
 
+  // Update message based on transaction status
+  useEffect(() => {
+    if (isConfirming) {
+      setMsg("⏳ Confirming transaction...");
+    } else if (isSuccess) {
+      setMsg("✅ Bet placed! Check Basescan.");
+    }
+  }, [isConfirming, isSuccess]);
+
+  const loading = isPending || isConfirming;
+
   return (
-    <button
-      onClick={handleBet}
-      disabled={loading}
-      className="px-6 py-3 rounded-xl border border-purple-400 text-purple-100 hover:bg-purple-600/20 disabled:opacity-50"
-    >
-      {loading ? "Processing…" : "Bet"}
-      {msg && <p className="text-xs text-gray-400 mt-1">{msg}</p>}
-    </button>
+    <div className="space-y-2">
+      <Button
+        onClick={handleBet}
+        disabled={loading}
+        className="w-full rounded-xl border border-primary/40 bg-background/50 text-foreground hover:bg-primary/20 disabled:opacity-50"
+      >
+        {loading ? "Processing…" : "Place Bet (0.1 USDC)"}
+      </Button>
+      {msg && <p className="text-xs text-muted-foreground text-center">{msg}</p>}
+      {hash && (
+        <a 
+          href={`https://sepolia.basescan.org/tx/${hash}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-xs text-primary hover:underline block text-center"
+        >
+          View on Basescan →
+        </a>
+      )}
+    </div>
   );
 }

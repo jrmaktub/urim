@@ -9,7 +9,7 @@ export const config = createConfig({
   },
   connectors: [
     baseAccount({
-      appName: 'Urim',
+      appName: 'Urim - Quantum Prediction Markets',
     }),
   ],
 });
