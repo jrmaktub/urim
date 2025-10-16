@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAccount, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
+import { useAccount } from "wagmi";
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,8 @@ import { CheckCircle2, Plus, X, Flag } from "lucide-react";
 import { FACTORY_ADDRESS, USDC_ADDRESS, MAX_OUTCOMES, BASE_SEPOLIA_CHAIN_ID } from "@/constants/contracts";
 import FactoryABI from "@/contracts/MarketFactory.json";
 import { Card } from "@/components/ui/card";
+import { sendFromSubAccount } from "@/lib/baseAccount";
+import { encodeFunctionData } from "viem";
 
 const CreateBet = () => {
   const { toast } = useToast();
@@ -21,9 +23,7 @@ const CreateBet = () => {
   const [outcomes, setOutcomes] = useState(["", ""]);
   const [endDateTime, setEndDateTime] = useState("");
   const [createdMarketAddress, setCreatedMarketAddress] = useState<string | null>(null);
-
-  const { writeContract, data: hash, isPending: isCreating } = useWriteContract();
-  const { isSuccess } = useWaitForTransactionReceipt({ hash });
+  const [isCreating, setIsCreating] = useState(false);
 
   const handleAddOutcome = () => {
     if (outcomes.length < MAX_OUTCOMES) {
@@ -89,31 +89,39 @@ const CreateBet = () => {
 
     const endTime = Math.floor(new Date(endDateTime).getTime() / 1000);
     
-    (writeContract as any)({
-      address: FACTORY_ADDRESS as `0x${string}`,
-      abi: FactoryABI.abi,
-      functionName: "createMarket",
-      args: [question, outcomes, USDC_ADDRESS, BigInt(endTime)],
-    });
+    setIsCreating(true);
     
-    toast({
-      title: "Creating Market...",
-      description: "Transaction submitted to blockchain",
-    });
-  };
+    try {
+      const data = encodeFunctionData({
+        abi: FactoryABI.abi,
+        functionName: "createMarket",
+        args: [question, outcomes, USDC_ADDRESS, BigInt(endTime)],
+      });
 
-  // Navigate to market detail on success
-  if (isSuccess && hash) {
-    // In a real implementation, we'd extract the market address from the transaction logs
-    // For now, we'll just show success and redirect to home
-    setTimeout(() => {
+      await sendFromSubAccount({
+        to: FACTORY_ADDRESS as `0x${string}`,
+        data: data as `0x${string}`,
+      });
+      
       toast({
         title: "Market Created! 🎉",
-        description: "Your market is now live on Base Sepolia",
+        description: "Your market is now live on Base Sepolia (no wallet pop-up!)",
       });
-      navigate("/");
-    }, 1000);
-  }
+      
+      setTimeout(() => {
+        navigate("/");
+      }, 1500);
+    } catch (error) {
+      console.error("Failed to create market:", error);
+      toast({
+        title: "Transaction Failed",
+        description: "Could not create market. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsCreating(false);
+    }
+  };
 
   if (createdMarketAddress) {
     return (

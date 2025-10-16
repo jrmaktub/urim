@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
+import { useAccount, useReadContract } from "wagmi";
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,8 @@ import { formatUsdc, parseUsdc } from "@/lib/erc20";
 import { USDC_ADDRESS, BASE_SEPOLIA_CHAIN_ID } from "@/constants/contracts";
 import MarketABI from "@/contracts/Market.json";
 import ERC20ABI from "@/contracts/ERC20.json";
+import { sendFromSubAccount } from "@/lib/baseAccount";
+import { encodeFunctionData } from "viem";
 import {
   Dialog,
   DialogContent,
@@ -60,9 +62,9 @@ const MarketDetail = () => {
     args: [userAddress, address],
   });
 
-  const { writeContract: approveUsdc, data: approveHash, isPending: isApproving } = useWriteContract();
-  const { writeContract: placeBetTx, data: placeBetHash, isPending: isPlacingBet } = useWriteContract();
-  const { writeContract: claimTx, data: claimHash, isPending: isClaiming } = useWriteContract();
+  const [isApproving, setIsApproving] = useState(false);
+  const [isPlacingBet, setIsPlacingBet] = useState(false);
+  const [isClaiming, setIsClaiming] = useState(false);
 
   const info = marketInfo as [string, string, bigint, boolean, number] | undefined;
   const question = info?.[0] || "";
@@ -101,56 +103,107 @@ const MarketDetail = () => {
     return () => clearInterval(interval);
   }, [endTime]);
 
-  const handleApprove = () => {
+  const handleApprove = async () => {
     if (!betAmount || !address) return;
     
-    const amount = parseUsdc(betAmount);
-    (approveUsdc as any)({
-      address: USDC_ADDRESS as `0x${string}`,
-      abi: ERC20ABI.abi,
-      functionName: "approve",
-      args: [address, amount],
-    });
+    setIsApproving(true);
     
-    toast({
-      title: "Approval Submitted",
-      description: "Approving USDC for betting...",
-    });
+    try {
+      const amount = parseUsdc(betAmount);
+      const data = encodeFunctionData({
+        abi: ERC20ABI.abi,
+        functionName: "approve",
+        args: [address, amount],
+      });
+
+      await sendFromSubAccount({
+        to: USDC_ADDRESS as `0x${string}`,
+        data: data as `0x${string}`,
+      });
+      
+      toast({
+        title: "USDC Approved",
+        description: "You can now place your bet (no wallet pop-up!)",
+      });
+    } catch (error) {
+      console.error("Approval failed:", error);
+      toast({
+        title: "Approval Failed",
+        description: "Could not approve USDC. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsApproving(false);
+    }
   };
 
-  const handlePlaceBet = () => {
+  const handlePlaceBet = async () => {
     if (!betAmount || selectedOutcome === null || !address) return;
     
-    const amount = parseUsdc(betAmount);
-    (placeBetTx as any)({
-      address: address as `0x${string}`,
-      abi: MarketABI.abi,
-      functionName: "placeBet",
-      args: [BigInt(selectedOutcome), amount],
-    });
+    setIsPlacingBet(true);
     
-    toast({
-      title: "Bet Placed!",
-      description: `Placed ${betAmount} USDC on outcome ${selectedOutcome}`,
-    });
-    
-    setSelectedOutcome(null);
-    setBetAmount("");
+    try {
+      const amount = parseUsdc(betAmount);
+      const data = encodeFunctionData({
+        abi: MarketABI.abi,
+        functionName: "placeBet",
+        args: [BigInt(selectedOutcome), amount],
+      });
+
+      await sendFromSubAccount({
+        to: address as `0x${string}`,
+        data: data as `0x${string}`,
+      });
+      
+      toast({
+        title: "Bet Placed! 🎯",
+        description: `Placed ${betAmount} USDC (no wallet pop-up!)`,
+      });
+      
+      setSelectedOutcome(null);
+      setBetAmount("");
+    } catch (error) {
+      console.error("Bet placement failed:", error);
+      toast({
+        title: "Bet Failed",
+        description: "Could not place bet. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsPlacingBet(false);
+    }
   };
 
-  const handleClaim = () => {
+  const handleClaim = async () => {
     if (!address) return;
     
-    (claimTx as any)({
-      address: address as `0x${string}`,
-      abi: MarketABI.abi,
-      functionName: "claim",
-    });
+    setIsClaiming(true);
     
-    toast({
-      title: "Claim Submitted",
-      description: "Claiming your winnings...",
-    });
+    try {
+      const data = encodeFunctionData({
+        abi: MarketABI.abi,
+        functionName: "claim",
+      });
+
+      await sendFromSubAccount({
+        to: address as `0x${string}`,
+        data: data as `0x${string}`,
+      });
+      
+      toast({
+        title: "Winnings Claimed! 🏆",
+        description: "Your USDC has been transferred (no wallet pop-up!)",
+      });
+    } catch (error) {
+      console.error("Claim failed:", error);
+      toast({
+        title: "Claim Failed",
+        description: "Could not claim winnings. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsClaiming(false);
+    }
   };
 
   if (chainId !== BASE_SEPOLIA_CHAIN_ID) {
