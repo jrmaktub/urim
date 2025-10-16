@@ -1,27 +1,31 @@
 import { createBaseAccountSDK } from "@base-org/account";
 import { baseSepolia } from "viem/chains";
 
-console.log("🔵 [URIM] Initializing Base Account SDK...");
+// Lazy SDK and provider initialization to avoid cross-origin issues in iframes
+let sdkInstance: ReturnType<typeof createBaseAccountSDK> | null = null;
+let providerInstance: any = null;
 
-export const baseAccountSDK = createBaseAccountSDK({
-  appName: "Urim — Quantum Bets",
-  appLogoUrl: "https://urim.app/logo.png",
-  appChainIds: [baseSepolia.id],
-  paymasterUrls: {
-    [baseSepolia.id]: "https://api.developer.coinbase.com/rpc/v1/base-sepolia",
-  },
-  subAccounts: {
-    creation: "on-connect",
-    defaultAccount: "sub",
-  },
-});
-
-// Lazy provider to avoid cross-origin access at module load in iframe
-let providerInstance: ReturnType<typeof baseAccountSDK.getProvider> | null = null;
 export function getBaseProvider() {
-  if (!providerInstance) {
-    providerInstance = baseAccountSDK.getProvider();
+  if (!sdkInstance) {
+    console.log("🔵 [URIM] Initializing Base Account SDK...");
+    sdkInstance = createBaseAccountSDK({
+      appName: "Urim — Quantum Bets",
+      appLogoUrl: "https://urim.app/logo.png",
+      appChainIds: [baseSepolia.id],
+      paymasterUrls: {
+        [baseSepolia.id]: "https://api.developer.coinbase.com/rpc/v1/base-sepolia",
+      },
+      subAccounts: {
+        creation: "on-connect",
+        defaultAccount: "sub",
+      },
+    });
   }
+  
+  if (!providerInstance) {
+    providerInstance = sdkInstance.getProvider();
+  }
+  
   return providerInstance;
 }
 
