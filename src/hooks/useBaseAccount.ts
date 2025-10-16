@@ -1,32 +1,15 @@
-import { useState, useEffect } from "react";
-import { debugBaseAccount } from "@/lib/baseAccount";
+import { useAccount } from "wagmi";
 
 export function useBaseAccount() {
-  const [universalAddress, setUniversalAddress] = useState<string | null>(null);
-  const [subAccountAddress, setSubAccountAddress] = useState<string | null>(null);
-  const [status, setStatus] = useState<"idle" | "connecting" | "connected" | "error">("idle");
+  const { address, connector } = useAccount();
 
-  useEffect(() => {
-    const init = async () => {
-      try {
-        setStatus("connecting");
-        const result = await debugBaseAccount();
-        
-        if (result) {
-          setUniversalAddress(result.universal);
-          setSubAccountAddress(result.sub);
-          setStatus("connected");
-        } else {
-          setStatus("error");
-        }
-      } catch (err) {
-        console.error("Base Account connection failed:", err);
-        setStatus("error");
-      }
-    };
+  const isBaseAccount = connector?.name === "Base Account";
+  const status = address && isBaseAccount ? "connected" : "idle";
 
-    init();
-  }, []);
-
-  return { universalAddress, subAccountAddress, status };
+  return {
+    universalAddress: address || null,
+    subAccountAddress: address || null, // In wagmi, the address is the sub-account when using baseAccount connector
+    status,
+    isBaseAccount,
+  };
 }
