@@ -7,10 +7,10 @@ let providerInstance: any = null;
 
 export function getBaseProvider() {
   if (!sdkInstance) {
-    console.log("🔵 [URIM] Initializing Base Account SDK...");
+    console.log("🔵 [URIM] Initializing Base Account SDK with Sub Accounts + Auto Spend...");
     sdkInstance = createBaseAccountSDK({
-      appName: "Urim — Quantum Bets",
-      appLogoUrl: "https://urim.app/logo.png",
+      appName: "URIM",
+      appLogoUrl: "https://base.org/logo.png",
       appChainIds: [baseSepolia.id],
       paymasterUrls: {
         [baseSepolia.id]: "https://api.developer.coinbase.com/rpc/v1/base-sepolia",
@@ -23,6 +23,7 @@ export function getBaseProvider() {
   }
   
   if (!providerInstance) {
+    console.log("🟢 [URIM] Getting provider instance...");
     providerInstance = sdkInstance.getProvider();
   }
   

@@ -21,19 +21,18 @@ export default function BetButton() {
 
   // Main function for the "Place Bet" button
   const handleBet = async () => {
-    setIsLoading(true);
-    setStatus("⏳ Connecting Base Smart Wallet...");
-
     try {
-      // 1. Get the provider lazily to avoid cross-origin issues
+      setIsLoading(true);
+      setStatus("🔵 Connecting Base Smart Wallet...");
+
+      // 1. Get the provider (initializes SDK with Sub Accounts)
       const provider = getBaseProvider();
       if (!provider) {
-        setStatus("❌ Provider not available.");
-        setIsLoading(false);
-        return;
+        throw new Error("Provider not available");
       }
 
-      // 2. Connect and get Sub Account (with auto-spend permissions)
+      // 2. Connect and get Sub Account (Auto Spend enabled)
+      setStatus("🟣 Requesting accounts...");
       let accs = await provider.request({ method: "eth_accounts" }) as string[];
       if (accs.length < 2) {
         accs = await provider.request({ method: "eth_requestAccounts" }) as string[];
@@ -42,8 +41,9 @@ export default function BetButton() {
       const universalAccount = accs[0];
       const subAccountAddress = accs[1]; // Sub account is the second account
 
-      console.log(`🔵 Universal Account: ${universalAccount}`);
-      console.log(`🟢 Sub Account: ${subAccountAddress}`);
+      console.log("🔵 Universal Account:", universalAccount);
+      console.log("🟢 Sub Account (Auto-Spend):", subAccountAddress);
+      
       setStatus("⏳ Checking USDC allowance...");
 
       // 3. Check current allowance
@@ -63,7 +63,7 @@ export default function BetButton() {
       }) as string;
 
       const currentAllowance = BigInt(allowanceResult);
-      console.log(`Current USDC allowance: ${currentAllowance.toString()}`);
+      console.log(`💰 Current USDC allowance: ${currentAllowance.toString()}`);
 
       // 4. Prepare calls array
       const calls = [];
@@ -71,7 +71,7 @@ export default function BetButton() {
       // Add approve call if needed
       if (currentAllowance < betAmount) {
         console.log("⚠️ Insufficient allowance, adding approve call");
-        setStatus("⏳ Approving USDC...");
+        setStatus("🟣 Approving USDC (first time enables Auto-Spend)...");
         
         const approveCallData = encodeFunctionData({
           abi: ERC20_ABI,
@@ -99,7 +99,7 @@ export default function BetButton() {
         value: '0x0',
       });
 
-      setStatus("⏳ Placing bet with Auto-Spend...");
+      setStatus("⚙️ Placing bet with Auto-Spend...");
 
       // 5. Send transaction with wallet_sendCalls v2.0.0 (enables auto-spend)
       const result = await provider.request({
@@ -107,38 +107,42 @@ export default function BetButton() {
         params: [{
           version: "2.0.0", // ✅ Critical: Use 2.0.0 for auto-spend permissions
           atomicRequired: true,
-          from: subAccountAddress,
           chainId: `0x${baseSepolia.id.toString(16)}`,
+          from: subAccountAddress,
           calls,
         }],
       }) as string;
 
-      console.log("✅ SUCCESS! Transaction sent. Calls ID:", result);
-      console.log("🎉 Auto-Spend enabled! Future bets won't need approval.");
+      console.log("✅ Bet Tx:", result);
+      console.log("✅ Auto-Spend enabled! Future transactions won't need approval.");
       setCallsId(result);
-      setStatus("✅ Bet placed! Auto-Spend enabled.");
+      setStatus("✅ Bet placed successfully! Auto-Spend enabled.");
 
     } catch (error) {
-      console.error("❌ Bet placement failed:", error);
-      setStatus(`❌ Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.error("❌ Error:", error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      setStatus(`❌ Error: ${errorMessage}`);
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="space-y-2">
+    <div className="flex flex-col items-center gap-3 p-6 bg-background/30 rounded-2xl border border-primary/20">
       <Button
         onClick={handleBet}
         disabled={isLoading}
-        className="w-full rounded-xl border border-primary/40 bg-background/50 text-foreground hover:bg-primary/20 disabled:opacity-50"
+        size="lg"
+        className="w-full rounded-xl text-lg"
       >
         {isLoading ? "Processing..." : "Place Bet (1 USDC)"}
       </Button>
-      {status && <p className="text-xs text-muted-foreground text-center">{status}</p>}
+      {status && (
+        <p className="text-sm text-muted-foreground text-center">{status}</p>
+      )}
       {callsId && (
-        <p className="text-xs text-primary/80 text-center font-mono">
-          Calls ID: {callsId.slice(0, 10)}...
+        <p className="text-xs text-primary font-mono text-center break-all px-2">
+          TX: {callsId}
         </p>
       )}
     </div>
