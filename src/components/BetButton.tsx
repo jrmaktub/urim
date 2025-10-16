@@ -1,34 +1,72 @@
 import { useState, useEffect } from "react";
-import { parseEther } from "viem";
-import { useAccount, useSendTransaction, useWaitForTransactionReceipt } from "wagmi";
+import { parseUnits } from "viem";
+import { useAccount, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
 import { Button } from "./ui/button";
 
-const CONTRACT_ADDRESS = "0xe56e233fa13Ec5D144F829656BeEc294c8F2647F"; // ETH Bet contract
+const NEW_URIM_CONTRACT_ADDRESS = '0xdBaDF64Fd3070b18C036d477F0e203007BA8C692' as const;
+const NEW_URIM_CONTRACT_ABI = [
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "usdcAmount",
+        "type": "uint256"
+      }
+    ],
+    "name": "placeBet",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "user",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      }
+    ],
+    "name": "BetPlaced",
+    "type": "event"
+  }
+] as const;
 
 export default function BetButton() {
   const [msg, setMsg] = useState("");
   
   const { address } = useAccount();
-  const { sendTransaction, data: hash, isPending, error } = useSendTransaction();
+  const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
     hash,
   });
 
   // The SDK will automatically trigger the "Skip further approvals" popup
-  // when the Sub Account needs funds for the first transaction
+  // when the Sub Account needs funds for the first USDC transaction
   const handleBet = async () => {
     if (!address) {
       setMsg("❌ Please connect wallet first");
       return;
     }
 
-    setMsg("⏳ Placing bet from Sub Account...");
+    setMsg("⏳ Placing USDC bet from Sub Account...");
     
-    // Simply send the transaction - the baseAccount connector
-    // will automatically handle Sub Account creation and permissions
-    sendTransaction({
-      to: CONTRACT_ADDRESS,
-      value: parseEther("0.001"),
+    const betAmountString = '1.0';
+    const usdcDecimals = 6;
+    
+    // Call the new USDC contract's placeBet function
+    writeContract({
+      address: NEW_URIM_CONTRACT_ADDRESS,
+      abi: NEW_URIM_CONTRACT_ABI,
+      functionName: 'placeBet',
+      args: [parseUnits(betAmountString, usdcDecimals)],
     });
   };
 
@@ -54,7 +92,7 @@ export default function BetButton() {
         disabled={loading}
         className="w-full rounded-xl border border-primary/40 bg-background/50 text-foreground hover:bg-primary/20 disabled:opacity-50"
       >
-        {loading ? "Processing…" : "Place Bet (0.001 ETH)"}
+        {loading ? "Processing…" : "Place Bet (1 USDC)"}
       </Button>
       {msg && <p className="text-xs text-muted-foreground text-center">{msg}</p>}
       {explorerUrl && (
