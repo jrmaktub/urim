@@ -16,10 +16,18 @@ export const baseAccountSDK = createBaseAccountSDK({
   },
 });
 
-export const provider = baseAccountSDK.getProvider();
+// Lazy provider to avoid cross-origin access at module load in iframe
+let providerInstance: ReturnType<typeof baseAccountSDK.getProvider> | null = null;
+export function getBaseProvider() {
+  if (!providerInstance) {
+    providerInstance = baseAccountSDK.getProvider();
+  }
+  return providerInstance;
+}
 
 export async function debugBaseAccount() {
   try {
+    const provider = getBaseProvider();
     console.log("🟣 [URIM] Connecting to Base Account...");
     const accounts = (await provider.request({
       method: "eth_requestAccounts",
@@ -45,6 +53,7 @@ export async function debugBaseAccount() {
 
 export async function testUSDCTransfer() {
   try {
+    const provider = getBaseProvider();
     console.log("🟡 [URIM] Preparing test USDC transfer...");
     const result = await debugBaseAccount();
     if (!result) return;
@@ -85,6 +94,7 @@ export async function sendTransaction({
   value?: string;
 }) {
   try {
+    const provider = getBaseProvider();
     const accounts = (await provider.request({
       method: "eth_requestAccounts",
       params: [],

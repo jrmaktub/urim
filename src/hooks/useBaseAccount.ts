@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { provider, debugBaseAccount } from "@/lib/baseAccount";
+import { debugBaseAccount } from "@/lib/baseAccount";
 
 export function useBaseAccount() {
   const [universalAddress, setUniversalAddress] = useState<string | null>(null);
