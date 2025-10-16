@@ -1,28 +1,15 @@
 import { useState, useEffect } from "react";
-import { parseUnits } from "viem";
-import { useWriteContract, useWaitForTransactionReceipt, useAccount } from "wagmi";
-import { baseSepolia } from "wagmi/chains";
+import { parseEther } from "viem";
+import { useSendTransaction, useWaitForTransactionReceipt, useAccount } from "wagmi";
 import { Button } from "./ui/button";
 
-const USDC = "0x036CbD53842c5426634e7929541eC2318f3dCF7e"; // Base Sepolia USDC
-const RECEIVER = "0x2177F513BA2a0746A22037Eb6626616e131eB69E"; // BetReceiver contract
-
-const PLACE_BET_ABI = [{
-  name: 'placeBet',
-  type: 'function',
-  stateMutability: 'nonpayable',
-  inputs: [
-    { name: 'token', type: 'address' },
-    { name: 'amount', type: 'uint256' }
-  ],
-  outputs: []
-}] as const;
+const CONTRACT_ADDRESS = "0xe56e233fa13Ec5D144F829656BeEc294c8F2647F"; // ETH Bet contract
 
 export default function BetButton() {
   const [msg, setMsg] = useState("");
   const { address } = useAccount();
   
-  const { writeContract, data: hash, isPending } = useWriteContract();
+  const { sendTransaction, data: hash, isPending } = useSendTransaction();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
 
   const handleBet = async () => {
@@ -34,13 +21,9 @@ export default function BetButton() {
     try {
       setMsg("⏳ Placing bet...");
       
-      writeContract({
-        account: address,
-        chain: baseSepolia,
-        address: RECEIVER,
-        abi: PLACE_BET_ABI,
-        functionName: 'placeBet',
-        args: [USDC, parseUnits("0.1", 6)]
+      sendTransaction({
+        to: CONTRACT_ADDRESS,
+        value: parseEther("0.001")
       });
       
     } catch (err) {
@@ -67,7 +50,7 @@ export default function BetButton() {
         disabled={loading}
         className="w-full rounded-xl border border-primary/40 bg-background/50 text-foreground hover:bg-primary/20 disabled:opacity-50"
       >
-        {loading ? "Processing…" : "Place Bet (0.1 USDC)"}
+        {loading ? "Processing…" : "Place Bet (0.001 ETH)"}
       </Button>
       {msg && <p className="text-xs text-muted-foreground text-center">{msg}</p>}
       {hash && (
