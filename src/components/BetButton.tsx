@@ -1,109 +1,104 @@
 import { createBaseAccountSDK } from "@base-org/account";
 import { useEffect, useState } from "react";
 import { baseSepolia } from "viem/chains";
-import { encodeFunctionData, parseUnits } from 'viem';
+import { encodeFunctionData, parseUnits, maxUint256 } from 'viem';
 import { Button } from "./ui/button";
 
-// --- TYPE DEFINITIONS FROM THE DOCS ---
-interface SubAccount {
-  address: `0x${string}`;
-}
-interface GetSubAccountsResponse {
-  subAccounts: SubAccount[];
-}
-interface WalletAddSubAccountResponse {
-  address: `0x${string}`;
+// --- TYPE DEFINITIONS ---
+interface SubAccount { 
+  address: `0x${string}`; 
 }
 
 // --- OUR CONTRACT DETAILS ---
 const OUR_CONTRACT_ADDRESS = '0xa926eD649871b21dd4C18AbD379fE82C8859b21E';
 const OUR_CONTRACT_ABI = [{"inputs":[{"internalType":"uint256","name":"usdcAmount","type":"uint256"}],"name":"placeBet","outputs":[],"stateMutability":"nonpayable","type":"function"}] as const;
+const USDC_TOKEN_ADDRESS = '0x036CbD53842c5426634e7929541eC2318f3dCF7e';
+const ERC20_APPROVE_ABI = [{"constant":false,"inputs":[{"name":"spender","type":"address"},{"name":"amount","type":"uint256"}],"name":"approve","outputs":[{"name":"","type":"bool"}],"type":"function"}] as const;
 
 // --- THE COMPLETE REACT COMPONENT ---
 export default function BetButton() {
   const [provider, setProvider] = useState<any>(null);
-  const [subAccount, setSubAccount] = useState<SubAccount | null>(null);
-  const [isConnected, setIsConnected] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [status, setStatus] = useState("Initialize SDK to start");
+  const [status, setStatus] = useState("");
   const [callsId, setCallsId] = useState<string | null>(null);
 
-  // 1. INITIALIZE THE SDK ON COMPONENT MOUNT
+  // Initialize the SDK on component mount
   useEffect(() => {
     const sdkInstance = createBaseAccountSDK({
       appName: "Urim",
       appChainIds: [baseSepolia.id],
-      subAccounts: {
-        creation: 'on-connect',
-        defaultAccount: 'sub',
-      },
+      subAccounts: { creation: 'on-connect', defaultAccount: 'sub' },
     });
-    const providerInstance = sdkInstance.getProvider();
-    setProvider(providerInstance);
-    setStatus("Ready to connect");
+    setProvider(sdkInstance.getProvider());
   }, []);
 
-  // 2. CONNECT WALLET AND FIND/CREATE SUB ACCOUNT
-  const connectAndSetup = async () => {
-    if (!provider) return;
-    setIsLoading(true);
-    setStatus("Connecting...");
-    try {
-      const accounts = await provider.request({ method: "eth_requestAccounts" }) as string[];
-      const universalAddr = accounts[0];
-      setIsConnected(true);
-
-      const response = await provider.request({
-        method: "wallet_getSubAccounts",
-        params: [{ account: universalAddr, domain: window.location.origin }],
-      }) as GetSubAccountsResponse;
-      const existingSubAccount = response.subAccounts[0];
-
-      if (existingSubAccount) {
-        setSubAccount(existingSubAccount);
-        setStatus("Ready to Bet");
-      } else {
-        setStatus("Creating Sub Account...");
-        const newSubAccount = await provider.request({
-          method: "wallet_addSubAccount",
-          params: [{ account: { type: 'create' } }],
-        }) as WalletAddSubAccountResponse;
-        setSubAccount({ address: newSubAccount.address });
-        setStatus("Ready to Bet");
-      }
-    } catch (error) {
-      setStatus(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    } finally {
-      setIsLoading(false);
+  // Main function for the "Place Bet" button
+  const handleBet = async () => {
+    if (!provider) {
+      setStatus("❌ Provider not ready.");
+      return;
     }
-  };
-
-  // 3. PLACE THE BET FROM THE SUB ACCOUNT
-  const placeBet = async () => {
-    if (!provider || !subAccount) return;
     setIsLoading(true);
-    setStatus("Placing bet...");
+    setStatus("⏳ Connecting...");
+
     try {
+      // 1. Connect and get Sub Account
+      let accs = await provider.request({ method: "eth_accounts" }) as string[];
+      if (accs.length < 2) {
+        accs = await provider.request({ method: "eth_requestAccounts" }) as string[];
+      }
+      const subAccountAddress = accs[1]; // Sub account is the second account
+
+      console.log(`Sending from Sub Account: ${subAccountAddress}`);
+      setStatus("⏳ Preparing transaction...");
+
+      // 2. Prepare the two calls: approve AND placeBet
       const betAmount = parseUnits('1.0', 6);
-      const callData = encodeFunctionData({
+
+      // Call 1: Approve our contract to spend USDC
+      const approveCallData = encodeFunctionData({
+        abi: ERC20_APPROVE_ABI,
+        functionName: 'approve',
+        args: [OUR_CONTRACT_ADDRESS, maxUint256], // Approve a large amount
+      });
+
+      // Call 2: Place the actual bet
+      const placeBetCallData = encodeFunctionData({
         abi: OUR_CONTRACT_ABI,
         functionName: 'placeBet',
         args: [betAmount],
       });
 
+      setStatus("⏳ Placing bet...");
+
+      // 3. Send both calls in a single batch transaction
       const result = await provider.request({
         method: "wallet_sendCalls",
         params: [{
           version: "2.0",
-          from: subAccount.address,
+          from: subAccountAddress,
           chainId: `0x${baseSepolia.id.toString(16)}`,
-          calls: [{ to: OUR_CONTRACT_ADDRESS, data: callData, value: '0x0' }],
+          calls: [
+            // First, approve the USDC token
+            {
+              to: USDC_TOKEN_ADDRESS,
+              data: approveCallData,
+              value: '0x0',
+            },
+            // Second, call our contract's placeBet function
+            {
+              to: OUR_CONTRACT_ADDRESS,
+              data: placeBetCallData,
+              value: '0x0',
+            },
+          ],
         }],
       }) as string;
-      
+
       console.log("SUCCESS! Transaction sent. Calls ID:", result);
       setCallsId(result);
       setStatus("✅ Bet placed successfully!");
+
     } catch (error) {
       console.error("Bet placement failed:", error);
       setStatus(`❌ Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -112,47 +107,16 @@ export default function BetButton() {
     }
   };
 
-  // 4. RENDER THE CORRECT BUTTON BASED ON STATE
-  if (!isConnected) {
-    return (
-      <div className="space-y-2">
-        <Button
-          onClick={connectAndSetup}
-          disabled={isLoading}
-          className="w-full rounded-xl border border-primary/40 bg-background/50 text-foreground hover:bg-primary/20 disabled:opacity-50"
-        >
-          {isLoading ? "Connecting..." : "Connect Wallet to Bet"}
-        </Button>
-        <p className="text-xs text-muted-foreground text-center">{status}</p>
-      </div>
-    );
-  }
-  
-  if (!subAccount) {
-    return (
-      <div className="space-y-2">
-        <Button
-          onClick={connectAndSetup}
-          disabled={isLoading}
-          className="w-full rounded-xl border border-primary/40 bg-background/50 text-foreground hover:bg-primary/20 disabled:opacity-50"
-        >
-          {isLoading ? "Creating Account..." : "Setup Account to Bet"}
-        </Button>
-        <p className="text-xs text-muted-foreground text-center">{status}</p>
-      </div>
-    );
-  }
-  
   return (
     <div className="space-y-2">
       <Button
-        onClick={placeBet}
+        onClick={handleBet}
         disabled={isLoading}
         className="w-full rounded-xl border border-primary/40 bg-background/50 text-foreground hover:bg-primary/20 disabled:opacity-50"
       >
         {isLoading ? "Processing..." : "Place Bet (1 USDC)"}
       </Button>
-      <p className="text-xs text-muted-foreground text-center">{status}</p>
+      {status && <p className="text-xs text-muted-foreground text-center">{status}</p>}
       {callsId && (
         <p className="text-xs text-primary/80 text-center font-mono">
           Calls ID: {callsId.slice(0, 10)}...
