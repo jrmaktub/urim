@@ -1,9 +1,17 @@
-import { getDefaultConfig } from '@rainbow-me/rainbowkit';
+import { createConfig, http } from 'wagmi';
 import { baseSepolia } from 'wagmi/chains';
+import { injected, coinbaseWallet } from 'wagmi/connectors';
 
-export const config = getDefaultConfig({
-  appName: 'URIM',
-  projectId: 'YOUR_PROJECT_ID', // Get from walletconnect.com
+export const config = createConfig({
   chains: [baseSepolia],
-  ssr: false,
+  transports: { 
+    [baseSepolia.id]: http() 
+  },
+  connectors: [
+    coinbaseWallet({
+      appName: 'Urim',
+      preference: 'smartWalletOnly',
+    }),
+    injected(),
+  ],
 });
