@@ -207,7 +207,7 @@ const EverythingBets = () => {
 
               <div>
                 <Label htmlFor="stake" className="text-foreground font-bold mb-2 block">
-                  INITIAL STAKE (PYUSD)
+                  INITIAL STAKE (USDC)
                 </Label>
                 <Input
                   id="stake"
@@ -246,11 +246,11 @@ const EverythingBets = () => {
                 <div className="space-y-3 mb-4">
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-muted-foreground">{market.optionA} Pool</span>
-                    <span className="text-primary font-bold">{market.poolA} PYUSD</span>
+                    <span className="text-primary font-bold">{market.poolA} USDC</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-muted-foreground">{market.optionB} Pool</span>
-                    <span className="text-primary font-bold">{market.poolB} PYUSD</span>
+                    <span className="text-primary font-bold">{market.poolB} USDC</span>
                   </div>
                 </div>
 
@@ -306,7 +306,7 @@ const EverythingBets = () => {
               </div>
             </div>
             <div>
-              <Label className="text-foreground font-bold mb-2 block">STAKE AMOUNT (PYUSD)</Label>
+              <Label className="text-foreground font-bold mb-2 block">STAKE AMOUNT (USDC)</Label>
               <Input type="number" placeholder="100" />
             </div>
             <Button 

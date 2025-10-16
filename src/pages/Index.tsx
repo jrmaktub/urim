@@ -165,11 +165,11 @@ const Index = () => {
                     </h3>
                     <div className="flex items-center gap-2 text-sm text-primary mb-4">
                       <TrendingUp className="w-4 h-4" />
-                      <span>{scenario.pool} PYUSD</span>
+                      <span>{scenario.pool} USDC</span>
                     </div>
                   </div>
                   <Button variant="outline" className="w-full">
-                    Bet on this outcome
+                    Bet
                   </Button>
                 </div>
               ))}
@@ -197,10 +197,10 @@ const Index = () => {
                       <div className="text-base font-bold mb-3">{outcome.text}</div>
                       <div className="flex items-center gap-2 text-sm text-primary mb-3">
                         <TrendingUp className="w-4 h-4" />
-                        <span>{outcome.pool} PYUSD</span>
+                        <span>{outcome.pool} USDC</span>
                       </div>
                       <Button variant="outline" size="sm" className="w-full">
-                        Bet on this
+                        Bet
                       </Button>
                     </div>
                   ))}

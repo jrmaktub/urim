@@ -12,7 +12,7 @@ import UrimMatchBetABI from "@/contracts/UrimMatchBet.json";
 import ERC20ABI from "@/contracts/ERC20.json";
 import {
   URIM_CONTRACT_ADDRESS,
-  PYUSD_ADDRESS,
+  USDC_ADDRESS,
   SEPOLIA_CHAIN_ID
 } from "@/constants/contracts";
 
@@ -104,20 +104,20 @@ const Match = () => {
     try {
       const provider = new BrowserProvider(window.ethereum);
       const signer = await provider.getSigner();
-      const pyusdContract = new Contract(PYUSD_ADDRESS, ERC20ABI.abi, signer);
+      const usdcContract = new Contract(USDC_ADDRESS, ERC20ABI.abi, signer);
       const matchBetContract = new Contract(URIM_CONTRACT_ADDRESS, UrimMatchBetABI.abi, signer);
 
       const amount = stakeRequired;
-      const currentAllowance: bigint = await pyusdContract.allowance(address, URIM_CONTRACT_ADDRESS);
+      const currentAllowance: bigint = await usdcContract.allowance(address, URIM_CONTRACT_ADDRESS);
 
-      // Step 1: Approve PYUSD if needed
+      // Step 1: Approve USDC if needed
       if (currentAllowance < amount) {
         toast({
           title: "Processing...",
-          description: "Approving PYUSD...",
+          description: "Approving USDC...",
         });
 
-        const approveTx = await pyusdContract.approve(URIM_CONTRACT_ADDRESS, amount);
+        const approveTx = await usdcContract.approve(URIM_CONTRACT_ADDRESS, amount);
         await approveTx.wait();
       }
 
@@ -238,7 +238,7 @@ const Match = () => {
                   </div>
                   <div className="flex items-center gap-2">
                     <DollarSign className="w-4 h-4 text-primary" />
-                    <span className="text-lg font-semibold">{totalPool} PYUSD</span>
+                    <span className="text-lg font-semibold">{totalPool} USDC</span>
                     <span className="text-sm text-muted-foreground">total pool</span>
                   </div>
                 </div>
@@ -388,7 +388,7 @@ const Match = () => {
                   </div>
                   <h3 className="text-2xl font-bold mb-2">Bet Settled ✓</h3>
                   <p className="text-muted-foreground">
-                    Winner received {totalPool} PYUSD
+                    Winner received {totalPool} USDC
                   </p>
                 </div>
               </CardContent>

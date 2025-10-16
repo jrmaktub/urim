@@ -12,7 +12,7 @@ import UrimMatchBetABI from "@/contracts/UrimMatchBet.json";
 import ERC20ABI from "@/contracts/ERC20.json";
 
 const CONTRACT_ADDRESS = "0xe0d1BaC845c45869F14C70b5F06e6EE92d6d4C57";
-const PYUSD_ADDRESS = "0xCaC524BcA292aaade2DF8A05cC58F0a65B1B3bB9";
+const USDC_ADDRESS = "0x2f3A40A3db8a7e3D09B0adfEfbCe4f6F81927557";
 
 enum BetStatus {
   AWAITING_JOIN = 0,
@@ -72,8 +72,8 @@ const MatchBet = () => {
     if (!window.ethereum || !isCorrectNetwork || !address) return;
     try {
       const provider = new BrowserProvider(window.ethereum);
-      const pyusd = new Contract(PYUSD_ADDRESS, ERC20ABI.abi, provider);
-      const current: bigint = await pyusd.allowance(address, CONTRACT_ADDRESS);
+      const usdc = new Contract(USDC_ADDRESS, ERC20ABI.abi, provider);
+      const current: bigint = await usdc.allowance(address, CONTRACT_ADDRESS);
       const required: bigint = (stakeAmount && parseFloat(stakeAmount) > 0)
         ? parseUnits(stakeAmount, 6)
         : stakeRequired;
@@ -124,7 +124,7 @@ const MatchBet = () => {
     try {
       const provider = new BrowserProvider(window.ethereum);
       const signer = await provider.getSigner();
-      const pyusdContract = new Contract(PYUSD_ADDRESS, ERC20ABI.abi, signer);
+      const usdcContract = new Contract(USDC_ADDRESS, ERC20ABI.abi, signer);
       const matchBetContract = new Contract(CONTRACT_ADDRESS, UrimMatchBetABI.abi, signer);
 
       const amount = (stakeAmount && parseFloat(stakeAmount) > 0)
@@ -132,15 +132,15 @@ const MatchBet = () => {
         : stakeRequired;
 
       // Check current allowance
-      const currentAllowance: bigint = await pyusdContract.allowance(address, CONTRACT_ADDRESS);
+      const currentAllowance: bigint = await usdcContract.allowance(address, CONTRACT_ADDRESS);
 
       // If allowance is insufficient, approve first
       if (currentAllowance < amount) {
-        const approveTx = await pyusdContract.approve(CONTRACT_ADDRESS, amount);
+        const approveTx = await usdcContract.approve(CONTRACT_ADDRESS, amount);
         
         toast({
           title: "Processing...",
-          description: "Approving PYUSD...",
+          description: "Approving USDC...",
         });
 
         await approveTx.wait();
@@ -288,7 +288,7 @@ const MatchBet = () => {
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Stake:</p>
-                    <p className="font-semibold">{contractStake} PYUSD</p>
+                    <p className="font-semibold">{contractStake} USDC</p>
                   </div>
                 </div>
               )}

@@ -53,7 +53,7 @@ const CreateQuantumBet = () => {
       probabilities: outcomes.filter(o => o.trim()).map(() => 
         (Math.random() * 40 + 20).toFixed(1)
       ),
-      totalPool: "1,234 PYUSD",
+      totalPool: "1,234 USDC",
     };
 
     setPreviewData(generatedData);

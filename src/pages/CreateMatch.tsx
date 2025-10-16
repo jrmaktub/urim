@@ -13,7 +13,7 @@ import UrimMatchBetABI from "@/contracts/UrimMatchBet.json";
 import ERC20ABI from "@/contracts/ERC20.json";
 import {
   URIM_CONTRACT_ADDRESS,
-  PYUSD_ADDRESS,
+  USDC_ADDRESS,
   PYTH_ADDRESS,
   ENTROPY_ADDRESS,
   SEPOLIA_CHAIN_ID
@@ -89,17 +89,17 @@ const CreateMatch = () => {
       const stake = parseUnits(stakeAmount, 6);
       const deadline = Math.floor(new Date(matchTime).getTime() / 1000);
       
-      // Step 1: Approve PYUSD
+      // Step 1: Approve USDC
       toast({
         title: "Processing...",
-        description: "Approving PYUSD...",
+        description: "Approving USDC...",
       });
       
-      const pyusdContract = new Contract(PYUSD_ADDRESS, ERC20ABI.abi, signer);
-      const currentAllowance = await pyusdContract.allowance(address, URIM_CONTRACT_ADDRESS);
+      const usdcContract = new Contract(USDC_ADDRESS, ERC20ABI.abi, signer);
+      const currentAllowance = await usdcContract.allowance(address, URIM_CONTRACT_ADDRESS);
       
       if (currentAllowance < stake) {
-        const approveTx = await pyusdContract.approve(URIM_CONTRACT_ADDRESS, stake);
+        const approveTx = await usdcContract.approve(URIM_CONTRACT_ADDRESS, stake);
         await approveTx.wait();
       }
       
@@ -112,7 +112,7 @@ const CreateMatch = () => {
       const urimContract = new Contract(URIM_CONTRACT_ADDRESS, UrimMatchBetABI.abi, signer);
       const createTx = await urimContract.createMatch(
         player2Address,
-        PYUSD_ADDRESS,
+        USDC_ADDRESS,
         ENTROPY_ADDRESS,
         PYTH_ADDRESS,
         stake,
@@ -202,7 +202,7 @@ const CreateMatch = () => {
                 <div className="space-y-2 p-4 rounded-lg bg-muted/30 border border-border/50">
                   <div className="flex items-start gap-3">
                     <Check className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
-                    <p className="text-sm">You staked {stakeAmount} PYUSD</p>
+                    <p className="text-sm">You staked {stakeAmount} USDC</p>
                   </div>
                   <div className="flex items-start gap-3">
                     <div className="w-4 h-4 rounded-full border-2 border-muted-foreground mt-0.5 flex-shrink-0" />
@@ -253,11 +253,11 @@ const CreateMatch = () => {
                 <CardTitle className="text-2xl">Create 1v1 Match Bet</CardTitle>
               </div>
               <CardDescription>
-                Two players stake PYUSD. Winner gets the pool.
+                Two players stake USDC. Winner gets the pool.
               </CardDescription>
               <div className="flex items-center gap-2 mt-4">
                 <Badge variant="outline" className="bg-primary/10 text-primary border-primary/30 text-xs">
-                  PYUSD
+                  USDC
                 </Badge>
                 <Badge variant="outline" className="bg-accent/10 text-accent border-accent/30 text-xs">
                   Sepolia
@@ -355,7 +355,7 @@ const CreateMatch = () => {
                 <div className="space-y-3">
                   <div>
                     <label className="text-sm font-medium mb-2 block">
-                      Amount (PYUSD)
+                      Amount (USDC)
                       <span className="text-xs text-muted-foreground ml-2">= both stake this amount</span>
                     </label>
                     <Input
@@ -373,7 +373,7 @@ const CreateMatch = () => {
                     <div className="p-4 rounded-lg bg-primary/5 border border-primary/20">
                       <p className="text-sm text-muted-foreground">Total Pool</p>
                       <p className="text-3xl font-bold text-primary">
-                        {(parseFloat(stakeAmount) * 2).toFixed(2)} PYUSD
+                        {(parseFloat(stakeAmount) * 2).toFixed(2)} USDC
                       </p>
                     </div>
                   )}
