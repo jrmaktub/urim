@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { provider, baseAccountSDK } from "@/lib/baseAccount";
+import { baseAccountSDK, getBaseProvider } from "@/lib/baseAccount";
 
 export function useBaseAccount() {
   const [universalAddress, setUniversalAddress] = useState<string | null>(null);
@@ -10,6 +10,7 @@ export function useBaseAccount() {
     const init = async () => {
       try {
         setStatus("connecting");
+        const provider = getBaseProvider();
         const accounts = (await provider.request({
           method: "eth_requestAccounts",
           params: [],

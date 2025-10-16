@@ -12,7 +12,15 @@ export const baseAccountSDK = createBaseAccountSDK({
   },
 });
 
-export const provider = baseAccountSDK.getProvider();
+// Lazy initialization - only get provider when needed
+let providerInstance: ReturnType<typeof baseAccountSDK.getProvider> | null = null;
+
+function getProvider() {
+  if (!providerInstance) {
+    providerInstance = baseAccountSDK.getProvider();
+  }
+  return providerInstance;
+}
 
 export async function sendTransaction({ 
   to, 
@@ -24,6 +32,8 @@ export async function sendTransaction({
   value?: string;
 }) {
   try {
+    const provider = getProvider();
+    
     const accounts = (await provider.request({
       method: "eth_requestAccounts",
       params: [],
@@ -49,3 +59,5 @@ export async function sendTransaction({
     throw err;
   }
 }
+
+export { getProvider as getBaseProvider };
