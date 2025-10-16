@@ -1,10 +1,10 @@
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { Button } from './ui/button';
-import { useState, useEffect } from 'react';
-import { ensureSubAccount } from '@/lib/baseAccount';
+import { useBaseAccount } from '@/hooks/useBaseAccount';
 
 const WalletButton = () => {
-  const [subAccountActive, setSubAccountActive] = useState(false);
+  const { subAccountAddress, status } = useBaseAccount();
+  const subAccountActive = status === "connected" && !!subAccountAddress;
 
   return (
     <ConnectButton.Custom>
@@ -18,14 +18,6 @@ const WalletButton = () => {
       }) => {
         const ready = mounted;
         const connected = ready && account && chain;
-
-        useEffect(() => {
-          if (connected) {
-            ensureSubAccount()
-              .then(() => setSubAccountActive(true))
-              .catch(() => setSubAccountActive(false));
-          }
-        }, [connected]);
 
         return (
           <div

@@ -11,7 +11,7 @@ import { CheckCircle2, Plus, X, Flag } from "lucide-react";
 import { FACTORY_ADDRESS, USDC_ADDRESS, MAX_OUTCOMES, BASE_SEPOLIA_CHAIN_ID } from "@/constants/contracts";
 import FactoryABI from "@/contracts/MarketFactory.json";
 import { Card } from "@/components/ui/card";
-import { sendFromSubAccount } from "@/lib/baseAccount";
+import { sendTransaction } from "@/lib/baseAccount";
 import { encodeFunctionData } from "viem";
 
 const CreateBet = () => {
@@ -98,8 +98,8 @@ const CreateBet = () => {
         args: [question, outcomes, USDC_ADDRESS, BigInt(endTime)],
       });
 
-      await sendFromSubAccount({
-        to: FACTORY_ADDRESS as `0x${string}`,
+      await sendTransaction({
+        to: FACTORY_ADDRESS,
         data: data as `0x${string}`,
       });
       

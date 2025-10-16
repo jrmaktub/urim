@@ -11,7 +11,7 @@ import { formatUsdc, parseUsdc } from "@/lib/erc20";
 import { USDC_ADDRESS, BASE_SEPOLIA_CHAIN_ID } from "@/constants/contracts";
 import MarketABI from "@/contracts/Market.json";
 import ERC20ABI from "@/contracts/ERC20.json";
-import { sendFromSubAccount } from "@/lib/baseAccount";
+import { sendTransaction } from "@/lib/baseAccount";
 import { encodeFunctionData } from "viem";
 import {
   Dialog,
@@ -116,8 +116,8 @@ const MarketDetail = () => {
         args: [address, amount],
       });
 
-      await sendFromSubAccount({
-        to: USDC_ADDRESS as `0x${string}`,
+      await sendTransaction({
+        to: USDC_ADDRESS,
         data: data as `0x${string}`,
       });
       
@@ -150,8 +150,8 @@ const MarketDetail = () => {
         args: [BigInt(selectedOutcome), amount],
       });
 
-      await sendFromSubAccount({
-        to: address as `0x${string}`,
+      await sendTransaction({
+        to: address!,
         data: data as `0x${string}`,
       });
       
@@ -185,8 +185,8 @@ const MarketDetail = () => {
         functionName: "claim",
       });
 
-      await sendFromSubAccount({
-        to: address as `0x${string}`,
+      await sendTransaction({
+        to: address!,
         data: data as `0x${string}`,
       });
       
