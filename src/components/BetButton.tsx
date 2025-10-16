@@ -1,11 +1,11 @@
 import { useState } from "react";
 import { encodeFunctionData, parseUnits } from "viem";
-import { useAccount, useWalletClient } from "wagmi";
+import { useWalletClient } from "wagmi";
 import { baseSepolia } from "viem/chains";
 import { Button } from "./ui/button";
 
-const NEW_URIM_CONTRACT_ADDRESS = '0xdBaDF64Fd3070b18C036d477F0e203007BA8C692' as const;
-const NEW_URIM_CONTRACT_ABI = [
+const OUR_MARKET_CONTRACT_ADDRESS = '0xdBaDF64Fd3070b18C036d477F0e203007BA8C692' as const;
+const OUR_MARKET_CONTRACT_ABI = [
   {
     "inputs": [
       {
@@ -45,35 +45,43 @@ export default function BetButton() {
   const [loading, setLoading] = useState(false);
   const [callsId, setCallsId] = useState<string | null>(null);
   
-  const { address: subAccountAddress } = useAccount();
   const { data: walletClient } = useWalletClient();
 
-  // The SDK will automatically trigger the "Skip further approvals" popup
-  // when the Sub Account needs funds for the first USDC transaction
-  const handleBet = async () => {
-    if (!walletClient || !subAccountAddress) {
-      setMsg("❌ Please connect wallet first");
+  const handleFinalBet = async () => {
+    if (!walletClient) {
+      setMsg("❌ Wallet not connected");
       return;
     }
 
     setMsg("⏳ Placing USDC bet from Sub Account...");
     setLoading(true);
-    
-    const betAmountString = '1.0';
-    const usdcDecimals = 6;
-    const betAmount = parseUnits(betAmountString, usdcDecimals);
 
     try {
-      console.log(`Sending transaction from Sub Account: ${subAccountAddress}`);
+      // Get ALL accounts. For Sub Accounts, this returns [universal_address, sub_account_address].
+      const accounts = await walletClient.request({ 
+        method: 'eth_accounts',
+        params: []
+      }) as `0x${string}`[];
+      
+      if (!accounts || accounts.length < 2) {
+        setMsg("❌ Sub Account not found. Please reconnect your wallet.");
+        setLoading(false);
+        return;
+      }
+      const subAccountAddress = accounts[1]; // The second address is the Sub Account.
 
-      // Manually encode the function call data for placeBet
+      console.log(`Sending from Sub Account: ${subAccountAddress}`);
+
+      // Define the transaction details
+      const betAmount = parseUnits('1.0', 6); // 1 USDC
+
       const callData = encodeFunctionData({
-        abi: NEW_URIM_CONTRACT_ABI,
+        abi: OUR_MARKET_CONTRACT_ABI,
         functionName: 'placeBet',
         args: [betAmount],
       });
 
-      // Use wallet_sendCalls - this triggers Auto Spend Permissions
+      // Build and send the wallet_sendCalls request
       const result = await walletClient.request({
         method: 'wallet_sendCalls',
         params: [{
@@ -81,21 +89,21 @@ export default function BetButton() {
           from: subAccountAddress,
           chainId: `0x${baseSepolia.id.toString(16)}`,
           calls: [{
-            to: NEW_URIM_CONTRACT_ADDRESS,
+            to: OUR_MARKET_CONTRACT_ADDRESS,
             data: callData,
             value: '0x0',
           }],
         }],
       });
 
-      console.log("wallet_sendCalls successful! Calls ID:", result);
+      console.log("SUCCESS! The transaction was sent. Calls ID:", result);
       setCallsId(result as string);
       setMsg("✅ Bet placed! Future bets won't need approval!");
       setLoading(false);
 
     } catch (error) {
-      console.error("wallet_sendCalls failed:", error);
-      setMsg("❌ Bet failed — check console.");
+      console.error("FINAL ATTEMPT FAILED:", error);
+      setMsg(`❌ Bet failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
       setLoading(false);
     }
   };
@@ -103,7 +111,7 @@ export default function BetButton() {
   return (
     <div className="space-y-2">
       <Button
-        onClick={handleBet}
+        onClick={handleFinalBet}
         disabled={loading}
         className="w-full rounded-xl border border-primary/40 bg-background/50 text-foreground hover:bg-primary/20 disabled:opacity-50"
       >
