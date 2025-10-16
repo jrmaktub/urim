@@ -1,13 +1,8 @@
-import { createBaseAccountSDK } from "@base-org/account";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { baseSepolia } from "viem/chains";
 import { encodeFunctionData, parseUnits, maxUint256 } from 'viem';
 import { Button } from "./ui/button";
-
-// --- TYPE DEFINITIONS ---
-interface SubAccount { 
-  address: `0x${string}`; 
-}
+import { getBaseProvider } from "@/lib/baseAccount";
 
 // --- OUR CONTRACT DETAILS ---
 const OUR_CONTRACT_ADDRESS = '0xa926eD649871b21dd4C18AbD379fE82C8859b21E';
@@ -17,32 +12,25 @@ const ERC20_APPROVE_ABI = [{"constant":false,"inputs":[{"name":"spender","type":
 
 // --- THE COMPLETE REACT COMPONENT ---
 export default function BetButton() {
-  const [provider, setProvider] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [status, setStatus] = useState("");
   const [callsId, setCallsId] = useState<string | null>(null);
 
-  // Initialize the SDK on component mount
-  useEffect(() => {
-    const sdkInstance = createBaseAccountSDK({
-      appName: "Urim",
-      appChainIds: [baseSepolia.id],
-      subAccounts: { creation: 'on-connect', defaultAccount: 'sub' },
-    });
-    setProvider(sdkInstance.getProvider());
-  }, []);
-
   // Main function for the "Place Bet" button
   const handleBet = async () => {
-    if (!provider) {
-      setStatus("❌ Provider not ready.");
-      return;
-    }
     setIsLoading(true);
     setStatus("⏳ Connecting...");
 
     try {
-      // 1. Connect and get Sub Account
+      // 1. Get the provider lazily to avoid cross-origin issues
+      const provider = getBaseProvider();
+      if (!provider) {
+        setStatus("❌ Provider not available.");
+        setIsLoading(false);
+        return;
+      }
+
+      // 2. Connect and get Sub Account
       let accs = await provider.request({ method: "eth_accounts" }) as string[];
       if (accs.length < 2) {
         accs = await provider.request({ method: "eth_requestAccounts" }) as string[];
