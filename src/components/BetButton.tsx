@@ -12,9 +12,10 @@ export default function BetButton({ outcomeAddress }: { outcomeAddress: `0x${str
   async function handleBet() {
     try {
       setLoading(true);
-      setMsg("⏳ Sending 0.1 USDC via Base Sub Account...");
+      setMsg("⏳ Placing 0.1 USDC bet on Base Sepolia...");
 
       const provider = getBaseProvider();
+      const betReceiver = "0x2177F513BA2a0746A22037Eb6626616e131eB69E";
       const usdc = "0x2f3A40A3db8a7e3D09B0adfEfbCe4f6F81927557";
 
       // Fetch Sub Account (Base SDK defaultAccount: sub)
@@ -26,10 +27,10 @@ export default function BetButton({ outcomeAddress }: { outcomeAddress: `0x${str
       const from = (accounts.length > 1 ? accounts[1] : accounts[0]) as `0x${string}`;
       console.log("🟣 Sub Account:", from);
 
-      // Encode ERC20 transfer(to, amount)
-      const recipient = outcomeAddress.slice(2).padStart(64, "0");
-      const amount = parseUnits("0.1", 6).toString(16).padStart(64, "0");
-      const data = `0xa9059cbb${recipient}${amount}`;
+      // Encode placeBet(address token, uint256 amount)
+      const tokenParam = usdc.slice(2).padStart(64, "0");
+      const amountParam = parseUnits("0.1", 6).toString(16).padStart(64, "0");
+      const data = `0x4f2be91f${tokenParam}${amountParam}`; // placeBet(address,uint256)
 
       // Send with Auto-Spend (wallet_sendCalls)
       const tx = await provider.request({
@@ -40,13 +41,13 @@ export default function BetButton({ outcomeAddress }: { outcomeAddress: `0x${str
             atomicRequired: true,
             chainId: `0x${baseSepolia.id.toString(16)}`,
             from,
-            calls: [{ to: usdc, data, value: "0x0" }],
+            calls: [{ to: betReceiver, data, value: "0x0" }],
           },
         ],
       });
 
-      console.log("✅ Transaction sent:", tx);
-      setMsg("✅ Bet confirmed! Check Base Sepolia explorer.");
+      console.log("✅ USDC Bet sent:", tx);
+      setMsg("✅ Bet confirmed! View on https://sepolia.basescan.org");
     } catch (err) {
       console.error("❌ Transaction failed:", err);
       setMsg("❌ Transaction failed. Check console.");
