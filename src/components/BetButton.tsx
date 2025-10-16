@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { parseUnits } from "viem";
 import { useAccount, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
+import { baseSepolia } from "wagmi/chains";
 import { Button } from "./ui/button";
 
 const NEW_URIM_CONTRACT_ADDRESS = '0xdBaDF64Fd3070b18C036d477F0e203007BA8C692' as const;
@@ -42,7 +43,7 @@ const NEW_URIM_CONTRACT_ABI = [
 export default function BetButton() {
   const [msg, setMsg] = useState("");
   
-  const { address } = useAccount();
+  const { address, chain } = useAccount();
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
     hash,
@@ -67,6 +68,8 @@ export default function BetButton() {
       abi: NEW_URIM_CONTRACT_ABI,
       functionName: 'placeBet',
       args: [parseUnits(betAmountString, usdcDecimals)],
+      account: address,
+      chain: chain || baseSepolia,
     });
   };
 
