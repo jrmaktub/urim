@@ -1,14 +1,17 @@
 import { useState } from "react";
 import { baseSepolia } from "viem/chains";
-import { encodeFunctionData, parseUnits, maxUint256 } from 'viem';
+import { encodeFunctionData, parseUnits, maxUint256, decodeFunctionResult } from 'viem';
 import { Button } from "./ui/button";
 import { getBaseProvider } from "@/lib/baseAccount";
 
-// --- OUR CONTRACT DETAILS ---
+// --- CONTRACT DETAILS ---
 const OUR_CONTRACT_ADDRESS = '0xa926eD649871b21dd4C18AbD379fE82C8859b21E';
 const OUR_CONTRACT_ABI = [{"inputs":[{"internalType":"uint256","name":"usdcAmount","type":"uint256"}],"name":"placeBet","outputs":[],"stateMutability":"nonpayable","type":"function"}] as const;
 const USDC_TOKEN_ADDRESS = '0x036CbD53842c5426634e7929541eC2318f3dCF7e';
-const ERC20_APPROVE_ABI = [{"constant":false,"inputs":[{"name":"spender","type":"address"},{"name":"amount","type":"uint256"}],"name":"approve","outputs":[{"name":"","type":"bool"}],"type":"function"}] as const;
+const ERC20_ABI = [
+  {"constant":false,"inputs":[{"name":"spender","type":"address"},{"name":"amount","type":"uint256"}],"name":"approve","outputs":[{"name":"","type":"bool"}],"type":"function"},
+  {"constant":true,"inputs":[{"name":"owner","type":"address"},{"name":"spender","type":"address"}],"name":"allowance","outputs":[{"name":"","type":"uint256"}],"type":"function"}
+] as const;
 
 // --- THE COMPLETE REACT COMPONENT ---
 export default function BetButton() {
@@ -19,7 +22,7 @@ export default function BetButton() {
   // Main function for the "Place Bet" button
   const handleBet = async () => {
     setIsLoading(true);
-    setStatus("⏳ Connecting...");
+    setStatus("⏳ Connecting Base Smart Wallet...");
 
     try {
       // 1. Get the provider lazily to avoid cross-origin issues
@@ -30,65 +33,93 @@ export default function BetButton() {
         return;
       }
 
-      // 2. Connect and get Sub Account
+      // 2. Connect and get Sub Account (with auto-spend permissions)
       let accs = await provider.request({ method: "eth_accounts" }) as string[];
       if (accs.length < 2) {
         accs = await provider.request({ method: "eth_requestAccounts" }) as string[];
       }
+      
+      const universalAccount = accs[0];
       const subAccountAddress = accs[1]; // Sub account is the second account
 
-      console.log(`Sending from Sub Account: ${subAccountAddress}`);
-      setStatus("⏳ Preparing transaction...");
+      console.log(`🔵 Universal Account: ${universalAccount}`);
+      console.log(`🟢 Sub Account: ${subAccountAddress}`);
+      setStatus("⏳ Checking USDC allowance...");
 
-      // 2. Prepare the two calls: approve AND placeBet
+      // 3. Check current allowance
       const betAmount = parseUnits('1.0', 6);
-
-      // Call 1: Approve our contract to spend USDC
-      const approveCallData = encodeFunctionData({
-        abi: ERC20_APPROVE_ABI,
-        functionName: 'approve',
-        args: [OUR_CONTRACT_ADDRESS, maxUint256], // Approve a large amount
+      const allowanceCallData = encodeFunctionData({
+        abi: ERC20_ABI,
+        functionName: 'allowance',
+        args: [subAccountAddress as `0x${string}`, OUR_CONTRACT_ADDRESS as `0x${string}`],
       });
 
-      // Call 2: Place the actual bet
+      const allowanceResult = await provider.request({
+        method: "eth_call",
+        params: [{
+          to: USDC_TOKEN_ADDRESS,
+          data: allowanceCallData,
+        }, "latest"],
+      }) as string;
+
+      const currentAllowance = BigInt(allowanceResult);
+      console.log(`Current USDC allowance: ${currentAllowance.toString()}`);
+
+      // 4. Prepare calls array
+      const calls = [];
+
+      // Add approve call if needed
+      if (currentAllowance < betAmount) {
+        console.log("⚠️ Insufficient allowance, adding approve call");
+        setStatus("⏳ Approving USDC...");
+        
+        const approveCallData = encodeFunctionData({
+          abi: ERC20_ABI,
+          functionName: 'approve',
+          args: [OUR_CONTRACT_ADDRESS as `0x${string}`, maxUint256],
+        });
+
+        calls.push({
+          to: USDC_TOKEN_ADDRESS,
+          data: approveCallData,
+          value: '0x0',
+        });
+      }
+
+      // Add placeBet call
       const placeBetCallData = encodeFunctionData({
         abi: OUR_CONTRACT_ABI,
         functionName: 'placeBet',
         args: [betAmount],
       });
 
-      setStatus("⏳ Placing bet...");
+      calls.push({
+        to: OUR_CONTRACT_ADDRESS,
+        data: placeBetCallData,
+        value: '0x0',
+      });
 
-      // 3. Send both calls in a single batch transaction
+      setStatus("⏳ Placing bet with Auto-Spend...");
+
+      // 5. Send transaction with wallet_sendCalls v2.0.0 (enables auto-spend)
       const result = await provider.request({
         method: "wallet_sendCalls",
         params: [{
-          version: "2.0",
+          version: "2.0.0", // ✅ Critical: Use 2.0.0 for auto-spend permissions
+          atomicRequired: true,
           from: subAccountAddress,
           chainId: `0x${baseSepolia.id.toString(16)}`,
-          calls: [
-            // First, approve the USDC token
-            {
-              to: USDC_TOKEN_ADDRESS,
-              data: approveCallData,
-              value: '0x0',
-            },
-            // Second, call our contract's placeBet function
-            {
-              to: OUR_CONTRACT_ADDRESS,
-              data: placeBetCallData,
-              value: '0x0',
-            },
-          ],
+          calls,
         }],
       }) as string;
 
-      console.log("SUCCESS! Transaction sent. Calls ID:", result);
+      console.log("✅ SUCCESS! Transaction sent. Calls ID:", result);
+      console.log("🎉 Auto-Spend enabled! Future bets won't need approval.");
       setCallsId(result);
-      setStatus("✅ Bet placed successfully!");
+      setStatus("✅ Bet placed! Auto-Spend enabled.");
 
     } catch (error) {
-      console.error("Bet placement failed:", error);
+      console.error("❌ Bet placement failed:", error);
       setStatus(`❌ Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsLoading(false);
