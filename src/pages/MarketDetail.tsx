@@ -316,7 +316,7 @@ const MarketDetail = () => {
                 disabled={isApproving}
                 className="w-full"
               >
-                {isApproving ? "APPROVING..." : "APPROVE USDC"}
+                {isApproving ? "Approving..." : "Approve USDC"}
               </Button>
             ) : (
               <Button
@@ -324,7 +324,7 @@ const MarketDetail = () => {
                 disabled={isPlacingBet || !betAmount}
                 className="w-full"
               >
-                {isPlacingBet ? "PLACING BET..." : "PLACE BET"}
+                {isPlacingBet ? "Placing Bet..." : "Bet"}
               </Button>
             )}
           </div>
@@ -393,7 +393,7 @@ const OutcomeCard = ({ index, marketAddress, userAddress, resolved, winningIndex
       
       {!resolved && (
         <Button onClick={onBet} className="w-full">
-          BET
+          Bet
         </Button>
       )}
     </Card>
