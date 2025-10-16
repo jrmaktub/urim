@@ -100,7 +100,7 @@ export default function BetButton() {
         const result = await walletClient.request({
           method: 'wallet_sendCalls',
           params: [{
-            version: '2.0',
+            version: '1.0',
             from: subAccountAddress,
             chainId: `0x${baseSepolia.id.toString(16)}`,
             calls: [{
@@ -129,7 +129,7 @@ export default function BetButton() {
         await walletClient.request({
           method: 'wallet_sendCalls',
           params: [{
-            version: '2.0',
+            version: '1.0',
             from: subAccountAddress,
             chainId: `0x${baseSepolia.id.toString(16)}`,
             calls: [{
