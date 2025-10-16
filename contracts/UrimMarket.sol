@@ -5,6 +5,9 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
+import {IPyth} from "@pythnetwork/pyth-sdk-solidity/IPyth.sol";
+import {PythStructs} from "@pythnetwork/pyth-sdk-solidity/PythStructs.sol";
+
 contract UrimMarket is Ownable, ReentrancyGuard {
     enum MarketOutcome {
         UNRESOLVED,
@@ -22,16 +25,19 @@ contract UrimMarket is Ownable, ReentrancyGuard {
         string question;
         uint256 endTime;
         MarketOutcome outcome;
-        string optionA;
-        string optionB;
+        string optionA; // "Yes, price will be > target"
+        string optionB; // "No, price will be <= target"
         uint256 totalOptionAShares;
         uint256 totalOptionBShares;
         bool resolved;
+        bytes32 priceFeedId;
+        int64 targetPrice; // Pyth prices are in int64, for example: 4000 * 1e18
         mapping(address => uint256) optionASharesBalance;
         mapping(address => uint256) optionBSharesBalance;
         mapping(address => bool) hasClaimed;
     }
 
+    IPyth public pyth;
     IERC20 public bettingToken;
     uint256 public marketCount;
     mapping(uint256 => Market) public markets;
@@ -64,15 +70,21 @@ contract UrimMarket is Ownable, ReentrancyGuard {
         return msg.sender == owner();
     }
 
-    constructor(address _bettingToken) Ownable(msg.sender) {
+    constructor(
+        address _bettingToken,
+        address _pythContractAddress
+    ) Ownable(msg.sender) {
         bettingToken = IERC20(_bettingToken);
+        pyth = IPyth(_pythContractAddress);
     }
 
     function createMarket(
         string memory _question,
         string memory _optionA,
         string memory _optionB,
-        uint256 _duration
+        uint256 _duration,
+        bytes32 _priceFeedId,
+        int64 _tragetPrice // For example $4000, pass in 400000000000
     ) external returns (uint256) {
         require(msg.sender == owner(), "Only owner can create markets");
         require(_duration > 0, "Duration must be positive");
@@ -97,6 +109,8 @@ contract UrimMarket is Ownable, ReentrancyGuard {
         market.optionB = _optionB;
         market.endTime = block.timestamp + _duration;
         market.outcome = MarketOutcome.UNRESOLVED;
+        market.priceFeedId = _priceFeedId;
+        market.targetPrice = _tragetPrice;
 
         marketExists[questionHash] = true;
 
@@ -139,17 +153,43 @@ contract UrimMarket is Ownable, ReentrancyGuard {
         emit SharesPurchased(_marketId, msg.sender, _isOptionA, _amount);
     }
 
-    function resolveMarket(uint256 _marketId, MarketOutcome _outcome) external {
-        require(msg.sender == owner(), "Only owner can resolve markets");
+    /**
+     * @notice Resolves a market using Pyth price data. Can be called by anyone.
+     * @param _marketId The ID of the market to resolve.
+     * @param _priceUpdateData The signed price data from Pyth's off-chain service.
+     */
+    function resolveMarket(
+        uint256 _marketId,
+        bytes[] calldata _priceUpdateData
+    ) external payable {
         Market storage market = markets[_marketId];
         require(block.timestamp >= market.endTime, "Market hasn't ended yet");
         require(!market.resolved, "Market already resolved");
-        require(_outcome != MarketOutcome.UNRESOLVED, "Invalid outcome");
 
-        market.outcome = _outcome;
+        // Pay the fee to Pyth to update the price on-chain
+        uint256 fee = pyth.getUpdateFee(_priceUpdateData);
+        pyth.updatePriceFeeds{value: fee}(_priceUpdateData);
+
+        // 60 seconds is a safe and standard value for this check.
+        PythStructs.Price memory currentPrice = pyth.getPriceNoOlderThan(
+            market.priceFeedId,
+            60
+        );
+
+        require(
+            currentPrice.publishTime >= market.endTime,
+            "Pyth price is from before the market ended"
+        );
+
+        // Resolve outcome based on the Pyth price
+        if (currentPrice.price > market.targetPrice) {
+            market.outcome = MarketOutcome.OPTION_A; // Option A wins
+        } else {
+            market.outcome = MarketOutcome.OPTION_B; // Option B wins
+        }
+
         market.resolved = true;
-
-        emit MarketResolved(_marketId, _outcome);
+        emit MarketResolved(_marketId, market.outcome);
     }
 
     function claimWinnings(uint256 _marketId) external nonReentrant {
