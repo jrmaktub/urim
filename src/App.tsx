@@ -8,6 +8,8 @@ import { RainbowKitProvider, darkTheme } from '@rainbow-me/rainbowkit';
 import { config } from './wagmi.config';
 import Index from "./pages/Index";
 import EverythingBets from "./pages/EverythingBets";
+import CreateBet from "./pages/CreateBet";
+import MarketDetail from "./pages/MarketDetail";
 import NotFound from "./pages/NotFound";
 import '@rainbow-me/rainbowkit/styles.css';
 
@@ -28,6 +30,8 @@ const App = () => (
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/everything-bets" element={<EverythingBets />} />
+              <Route path="/create" element={<CreateBet />} />
+              <Route path="/market/:address" element={<MarketDetail />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>

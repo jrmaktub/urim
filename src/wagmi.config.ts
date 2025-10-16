@@ -1,9 +1,9 @@
 import { getDefaultConfig } from '@rainbow-me/rainbowkit';
-import { sepolia } from 'wagmi/chains';
+import { baseSepolia } from 'wagmi/chains';
 
 export const config = getDefaultConfig({
-  appName: 'URIM Match Bet',
+  appName: 'URIM',
   projectId: 'YOUR_PROJECT_ID', // Get from walletconnect.com
-  chains: [sepolia],
+  chains: [baseSepolia],
   ssr: false,
 });

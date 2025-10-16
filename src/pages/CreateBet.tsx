@@ -1,86 +1,154 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAccount, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle2 } from "lucide-react";
+import { CheckCircle2, Plus, X, Flag } from "lucide-react";
+import { FACTORY_ADDRESS, USDC_ADDRESS, MAX_OUTCOMES, BASE_SEPOLIA_CHAIN_ID } from "@/constants/contracts";
+import FactoryABI from "@/contracts/MarketFactory.json";
+import { Card } from "@/components/ui/card";
 
 const CreateBet = () => {
   const { toast } = useToast();
+  const navigate = useNavigate();
+  const { chainId } = useAccount();
+  
   const [question, setQuestion] = useState("");
-  const [optionA, setOptionA] = useState("");
-  const [optionB, setOptionB] = useState("");
-  const [duration, setDuration] = useState("");
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [isSuccess, setIsSuccess] = useState(false);
+  const [outcomes, setOutcomes] = useState(["", ""]);
+  const [endDateTime, setEndDateTime] = useState("");
+  const [createdMarketAddress, setCreatedMarketAddress] = useState<string | null>(null);
 
-  const handleLaunchBet = async () => {
-    if (!question || !optionA || !optionB || !duration) {
+  const { writeContract, data: hash, isPending: isCreating } = useWriteContract();
+  const { isSuccess } = useWaitForTransactionReceipt({ hash });
+
+  const handleAddOutcome = () => {
+    if (outcomes.length < MAX_OUTCOMES) {
+      setOutcomes([...outcomes, ""]);
+    }
+  };
+
+  const handleRemoveOutcome = (index: number) => {
+    if (outcomes.length > 2) {
+      setOutcomes(outcomes.filter((_, i) => i !== index));
+    }
+  };
+
+  const handleOutcomeChange = (index: number, value: string) => {
+    const newOutcomes = [...outcomes];
+    newOutcomes[index] = value;
+    setOutcomes(newOutcomes);
+  };
+
+  const fillHondurasPreset = () => {
+    setQuestion("Who will be the next President of Honduras?");
+    setOutcomes(["Rixi Moncada", "Salvador Nasralla", "Nasry Asfura"]);
+    
+    // Set end time to ~180 days from now
+    const futureDate = new Date();
+    futureDate.setDate(futureDate.getDate() + 180);
+    const dateStr = futureDate.toISOString().slice(0, 16);
+    setEndDateTime(dateStr);
+    
+    toast({
+      title: "Honduras Election Preset Loaded 🇭🇳",
+      description: "Market configured for Honduras presidential race",
+    });
+  };
+
+  const handleCreateMarket = async () => {
+    if (!question || outcomes.some(o => !o.trim()) || !endDateTime) {
       toast({
         title: "Missing Information",
-        description: "Please fill in all fields before launching your bet.",
+        description: "Please fill in all fields before creating your market.",
         variant: "destructive",
       });
       return;
     }
 
-    setIsProcessing(true);
-
-    try {
-      // Simulate blockchain interaction
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-
-      setIsSuccess(true);
+    if (chainId !== BASE_SEPOLIA_CHAIN_ID) {
       toast({
-        title: "Bet Created Successfully! ⚡",
-        description: "Your quantum bet is now live on the blockchain.",
-      });
-    } catch (error) {
-      toast({
-        title: "Error Creating Bet",
-        description: "Something went wrong. Please try again.",
+        title: "Wrong Network",
+        description: "Please switch to Base Sepolia testnet.",
         variant: "destructive",
       });
-    } finally {
-      setIsProcessing(false);
+      return;
     }
+
+    if (FACTORY_ADDRESS === "0x0000000000000000000000000000000000000000") {
+      toast({
+        title: "Factory Not Deployed",
+        description: "Please deploy the Factory contract and update FACTORY_ADDRESS in src/constants/contracts.ts",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const endTime = Math.floor(new Date(endDateTime).getTime() / 1000);
+    
+    (writeContract as any)({
+      address: FACTORY_ADDRESS as `0x${string}`,
+      abi: FactoryABI.abi,
+      functionName: "createMarket",
+      args: [question, outcomes, USDC_ADDRESS, BigInt(endTime)],
+    });
+    
+    toast({
+      title: "Creating Market...",
+      description: "Transaction submitted to blockchain",
+    });
   };
 
-  if (isSuccess) {
+  // Navigate to market detail on success
+  if (isSuccess && hash) {
+    // In a real implementation, we'd extract the market address from the transaction logs
+    // For now, we'll just show success and redirect to home
+    setTimeout(() => {
+      toast({
+        title: "Market Created! 🎉",
+        description: "Your market is now live on Base Sepolia",
+      });
+      navigate("/");
+    }, 1000);
+  }
+
+  if (createdMarketAddress) {
     return (
       <div className="min-h-screen w-full bg-background">
         <Navigation />
         <div className="flex items-center justify-center min-h-[calc(100vh-200px)] px-6">
-          <div className="max-w-md w-full gold-card p-8 text-center animate-fade-up">
+          <Card className="max-w-md w-full p-8 text-center animate-fade-up">
             <CheckCircle2 className="w-16 h-16 text-primary mx-auto mb-6" />
             <h2 className="text-3xl font-bold mb-4 text-primary">
-              Bet Created Successfully
+              Market Created Successfully
             </h2>
             <p className="text-muted-foreground mb-8">
-              Your bet is now live on the blockchain. Share it with others or create another.
+              Your market is now live on Base Sepolia. Start accepting bets!
             </p>
-            <Button
-              onClick={() => {
-                setIsSuccess(false);
-                setQuestion("");
-                setOptionA("");
-                setOptionB("");
-                setDuration("");
-              }}
-              className="w-full"
-            >
-              Create Another Bet
-            </Button>
-          </div>
+            <div className="space-y-4">
+              <Button
+                onClick={() => navigate(`/market/${createdMarketAddress}`)}
+                className="w-full"
+              >
+                View Market
+              </Button>
+              <Button
+                onClick={() => {
+                  setCreatedMarketAddress(null);
+                  setQuestion("");
+                  setOutcomes(["", ""]);
+                  setEndDateTime("");
+                }}
+                variant="outline"
+                className="w-full"
+              >
+                Create Another Market
+              </Button>
+            </div>
+          </Card>
         </div>
         <Footer />
       </div>
@@ -93,18 +161,28 @@ const CreateBet = () => {
       
       <div className="pt-32 pb-24 px-6">
         <div className="max-w-2xl mx-auto">
-          {/* Title */}
           <div className="text-center mb-12 animate-fade-up">
             <h1 className="text-5xl font-bold mb-4 text-primary">
-              CREATE YOUR BET
+              CREATE MARKET
             </h1>
             <p className="text-lg text-muted-foreground">
-              Define an event. Set your sides. Let the blockchain decide.
+              Create a prediction market settled in USDC on Base Sepolia
             </p>
           </div>
 
-          {/* Form */}
-          <div className="gold-card p-8 animate-fade-up" style={{ animationDelay: "0.2s" }}>
+          {/* Honduras Election Preset */}
+          <div className="mb-8 animate-fade-up" style={{ animationDelay: "0.1s" }}>
+            <Button
+              onClick={fillHondurasPreset}
+              variant="outline"
+              className="w-full h-16 text-base border-2 border-primary/30 hover:border-primary"
+            >
+              <Flag className="w-5 h-5 mr-2" />
+              Create Honduras Presidential Market 🇭🇳
+            </Button>
+          </div>
+
+          <Card className="p-8 animate-fade-up" style={{ animationDelay: "0.2s" }}>
             <div className="space-y-6">
               {/* Question */}
               <div>
@@ -119,61 +197,82 @@ const CreateBet = () => {
                 />
               </div>
 
-              {/* Option A */}
+              {/* Outcomes */}
               <div>
-                <Label htmlFor="optionA" className="text-foreground font-bold mb-2 block">
-                  OPTION A
+                <div className="flex items-center justify-between mb-2">
+                  <Label className="text-foreground font-bold">
+                    OUTCOMES ({outcomes.length}/{MAX_OUTCOMES})
+                  </Label>
+                  {outcomes.length < MAX_OUTCOMES && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleAddOutcome}
+                    >
+                      <Plus className="w-4 h-4 mr-1" />
+                      Add Outcome
+                    </Button>
+                  )}
+                </div>
+                
+                <div className="space-y-3">
+                  {outcomes.map((outcome, index) => (
+                    <div key={index} className="flex gap-2">
+                      <Input
+                        placeholder={`Outcome ${index + 1}`}
+                        value={outcome}
+                        onChange={(e) => handleOutcomeChange(index, e.target.value)}
+                      />
+                      {outcomes.length > 2 && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleRemoveOutcome(index)}
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* End Time */}
+              <div>
+                <Label htmlFor="endTime" className="text-foreground font-bold mb-2 block">
+                  END TIME
                 </Label>
                 <Input
-                  id="optionA"
-                  placeholder="First outcome (e.g., Yes)"
-                  value={optionA}
-                  onChange={(e) => setOptionA(e.target.value)}
+                  id="endTime"
+                  type="datetime-local"
+                  value={endDateTime}
+                  onChange={(e) => setEndDateTime(e.target.value)}
+                  min={new Date().toISOString().slice(0, 16)}
                 />
               </div>
 
-              {/* Option B */}
-              <div>
-                <Label htmlFor="optionB" className="text-foreground font-bold mb-2 block">
-                  OPTION B
-                </Label>
-                <Input
-                  id="optionB"
-                  placeholder="Second outcome (e.g., No)"
-                  value={optionB}
-                  onChange={(e) => setOptionB(e.target.value)}
-                />
+              {/* Settlement Token Info */}
+              <div className="bg-muted/30 p-4 rounded-lg">
+                <p className="text-sm text-muted-foreground">
+                  <span className="font-bold text-foreground">Settlement Token:</span> USDC (ERC-20)
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  All bets will be placed and settled in USDC on Base Sepolia
+                </p>
               </div>
 
-              {/* Duration */}
-              <div>
-                <Label htmlFor="duration" className="text-foreground font-bold mb-2 block">
-                  DURATION
-                </Label>
-                <Select value={duration} onValueChange={setDuration}>
-                  <SelectTrigger className="h-12 border-2 border-primary/50 bg-transparent text-foreground focus:border-primary focus:shadow-[0_0_20px_hsl(var(--primary)/0.3)]">
-                    <SelectValue placeholder="Select bet duration" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="1d">1 Day</SelectItem>
-                    <SelectItem value="3d">3 Days</SelectItem>
-                    <SelectItem value="1w">1 Week</SelectItem>
-                    <SelectItem value="2w">2 Weeks</SelectItem>
-                    <SelectItem value="1m">1 Month</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Launch Button */}
+              {/* Create Button */}
               <Button
-                onClick={handleLaunchBet}
-                disabled={isProcessing}
+                onClick={handleCreateMarket}
+                disabled={isCreating}
                 className="w-full h-14 text-base mt-8"
               >
-                {isProcessing ? "PROCESSING..." : "LAUNCH BET"}
+                {isCreating ? "CREATING MARKET..." : "CREATE MARKET"}
               </Button>
             </div>
-          </div>
+          </Card>
         </div>
       </div>
 
