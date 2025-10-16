@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { baseAccountSDK, getBaseProvider } from "@/lib/baseAccount";
+import { provider, debugBaseAccount } from "@/lib/baseAccount";
 
 export function useBaseAccount() {
   const [universalAddress, setUniversalAddress] = useState<string | null>(null);
@@ -10,31 +10,15 @@ export function useBaseAccount() {
     const init = async () => {
       try {
         setStatus("connecting");
-        const provider = getBaseProvider();
-        const accounts = (await provider.request({
-          method: "eth_requestAccounts",
-          params: [],
-        })) as string[];
-
-        const universal = accounts[0];
-        setUniversalAddress(universal);
-
-        const result = (await provider.request({
-          method: "wallet_getSubAccounts",
-          params: [{ account: universal, domain: window.location.origin }],
-        })) as { subAccounts: { address: string }[] };
-
-        let sub = result?.subAccounts?.[0];
-        if (!sub) {
-          const created = (await provider.request({
-            method: "wallet_addSubAccount",
-            params: [{ account: { type: "create" } }],
-          })) as { address: string };
-          sub = { address: created.address };
+        const result = await debugBaseAccount();
+        
+        if (result) {
+          setUniversalAddress(result.universal);
+          setSubAccountAddress(result.sub);
+          setStatus("connected");
+        } else {
+          setStatus("error");
         }
-        setSubAccountAddress(sub.address);
-        setStatus("connected");
-        console.log("✅ Sub Account Connected:", sub.address);
       } catch (err) {
         console.error("Base Account connection failed:", err);
         setStatus("error");
