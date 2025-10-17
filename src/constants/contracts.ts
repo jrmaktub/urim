@@ -1,8 +1,11 @@
 // Base Sepolia Configuration
 export const BASE_SEPOLIA_CHAIN_ID = 84532;
 
-// ERC-20 Token Addresses - Base Sepolia USDC
-export const USDC_ADDRESS = "0x2f3A40A3db8a7e3D09B0adfEfbCe4f6F81927557";
+// ERC-20 Token Addresses - Base Sepolia USDC (Authoritative)
+export const USDC_ADDRESS = "0x036CbD53842c5426634e7929541eC2318f3dCF7e";
+
+// Bet Contract Address (Authoritative)
+export const BET_CONTRACT_ADDRESS = "0xa926eD649871b21dd4C18AbD379fE82C8859b21E";
 
 // Market Contract Addresses
 export const FACTORY_ADDRESS = "0x0000000000000000000000000000000000000000"; // UPDATE AFTER DEPLOYMENT

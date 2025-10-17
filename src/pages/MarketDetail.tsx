@@ -7,21 +7,13 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Trophy, Clock } from "lucide-react";
-import { formatUsdc, parseUsdc } from "@/lib/erc20";
+import { formatUsdc } from "@/lib/erc20";
 import { USDC_ADDRESS, BASE_SEPOLIA_CHAIN_ID } from "@/constants/contracts";
 import MarketABI from "@/contracts/Market.json";
 import ERC20ABI from "@/contracts/ERC20.json";
 import { sendTransaction } from "@/lib/baseAccount";
 import { encodeFunctionData } from "viem";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import BaseBetButton from "@/components/BaseBetButton";
 
 const MarketDetail = () => {
   const { address } = useParams<{ address: string }>();
@@ -29,8 +21,6 @@ const MarketDetail = () => {
   const { toast } = useToast();
   const { address: userAddress, chainId } = useAccount();
   
-  const [selectedOutcome, setSelectedOutcome] = useState<number | null>(null);
-  const [betAmount, setBetAmount] = useState("");
   const [timeLeft, setTimeLeft] = useState("");
 
   // Read market info
@@ -46,24 +36,6 @@ const MarketDetail = () => {
     functionName: "outcomeCount",
   });
 
-  // Read USDC balance
-  const { data: usdcBalance } = useReadContract({
-    address: USDC_ADDRESS as `0x${string}`,
-    abi: ERC20ABI.abi,
-    functionName: "balanceOf",
-    args: [userAddress],
-  });
-
-  // Read USDC allowance
-  const { data: usdcAllowance } = useReadContract({
-    address: USDC_ADDRESS as `0x${string}`,
-    abi: ERC20ABI.abi,
-    functionName: "allowance",
-    args: [userAddress, address],
-  });
-
-  const [isApproving, setIsApproving] = useState(false);
-  const [isPlacingBet, setIsPlacingBet] = useState(false);
   const [isClaiming, setIsClaiming] = useState(false);
 
   const info = marketInfo as [string, string, bigint, boolean, number] | undefined;
@@ -102,77 +74,6 @@ const MarketDetail = () => {
     const interval = setInterval(updateCountdown, 60000);
     return () => clearInterval(interval);
   }, [endTime]);
-
-  const handleApprove = async () => {
-    if (!betAmount || !address) return;
-    
-    setIsApproving(true);
-    
-    try {
-      const amount = parseUsdc(betAmount);
-      const data = encodeFunctionData({
-        abi: ERC20ABI.abi,
-        functionName: "approve",
-        args: [address, amount],
-      });
-
-      await sendTransaction({
-        to: USDC_ADDRESS,
-        data: data as `0x${string}`,
-      });
-      
-      toast({
-        title: "USDC Approved",
-        description: "You can now place your bet (no wallet pop-up!)",
-      });
-    } catch (error) {
-      console.error("Approval failed:", error);
-      toast({
-        title: "Approval Failed",
-        description: "Could not approve USDC. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsApproving(false);
-    }
-  };
-
-  const handlePlaceBet = async () => {
-    if (!betAmount || selectedOutcome === null || !address) return;
-    
-    setIsPlacingBet(true);
-    
-    try {
-      const amount = parseUsdc(betAmount);
-      const data = encodeFunctionData({
-        abi: MarketABI.abi,
-        functionName: "placeBet",
-        args: [BigInt(selectedOutcome), amount],
-      });
-
-      await sendTransaction({
-        to: address!,
-        data: data as `0x${string}`,
-      });
-      
-      toast({
-        title: "Bet Placed! 🎯",
-        description: `Placed ${betAmount} USDC (no wallet pop-up!)`,
-      });
-      
-      setSelectedOutcome(null);
-      setBetAmount("");
-    } catch (error) {
-      console.error("Bet placement failed:", error);
-      toast({
-        title: "Bet Failed",
-        description: "Could not place bet. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsPlacingBet(false);
-    }
-  };
 
   const handleClaim = async () => {
     if (!address) return;
@@ -224,7 +125,6 @@ const MarketDetail = () => {
   }
 
   const outcomes = outcomeCount ? Array.from({ length: Number(outcomeCount) }, (_, i) => i) : [];
-  const needsApproval = betAmount && usdcAllowance !== undefined && parseUsdc(betAmount) > (usdcAllowance as bigint);
 
   return (
     <div className="min-h-screen w-full bg-background">
@@ -271,7 +171,6 @@ const MarketDetail = () => {
                 userAddress={userAddress}
                 resolved={resolved}
                 winningIndex={winningIndex}
-                onBet={() => setSelectedOutcome(i)}
               />
             ))}
           </div>
@@ -288,49 +187,6 @@ const MarketDetail = () => {
         </div>
       </div>
 
-      <Dialog open={selectedOutcome !== null} onOpenChange={() => setSelectedOutcome(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Place Bet</DialogTitle>
-            <DialogDescription>
-              {usdcBalance ? `Balance: ${formatUsdc(usdcBalance as bigint)} USDC` : "Loading balance..."}
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="amount">Amount (USDC)</Label>
-              <Input
-                id="amount"
-                type="number"
-                step="0.01"
-                placeholder="0.00"
-                value={betAmount}
-                onChange={(e) => setBetAmount(e.target.value)}
-              />
-            </div>
-            
-            {needsApproval ? (
-              <Button
-                onClick={handleApprove}
-                disabled={isApproving}
-                className="w-full"
-              >
-                {isApproving ? "Approving..." : "Approve USDC"}
-              </Button>
-            ) : (
-              <Button
-                onClick={handlePlaceBet}
-                disabled={isPlacingBet || !betAmount}
-                className="w-full"
-              >
-                {isPlacingBet ? "Placing Bet..." : "Bet"}
-              </Button>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
-
       <Footer />
     </div>
   );
@@ -342,10 +198,9 @@ interface OutcomeCardProps {
   userAddress?: `0x${string}`;
   resolved: boolean;
   winningIndex: number;
-  onBet: () => void;
 }
 
-const OutcomeCard = ({ index, marketAddress, userAddress, resolved, winningIndex, onBet }: OutcomeCardProps) => {
+const OutcomeCard = ({ index, marketAddress, userAddress, resolved, winningIndex }: OutcomeCardProps) => {
   const { data: outcomeName } = useReadContract({
     address: marketAddress as `0x${string}`,
     abi: MarketABI.abi,
@@ -392,9 +247,7 @@ const OutcomeCard = ({ index, marketAddress, userAddress, resolved, winningIndex
       </div>
       
       {!resolved && (
-        <Button onClick={onBet} className="w-full">
-          Bet
-        </Button>
+        <BaseBetButton className="w-full" />
       )}
     </Card>
   );
