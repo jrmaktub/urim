@@ -1,9 +1,7 @@
 import { createBaseAccountSDK } from "@base-org/account";
-import { baseSepolia } from "viem/chains";
 
-// Base Sepolia Chain Configuration (Authoritative)
-export const BASE_SEPOLIA_CHAIN_ID = 84532;
-export const SDK_APP_CHAIN_IDS = [BASE_SEPOLIA_CHAIN_ID] as const;
+// Base Sepolia Chain Configuration (Default for Base SDK)
+const BASE_SEPOLIA_CHAIN_ID = 84532;
 
 // CRITICAL: Singleton pattern to prevent Base Pay redirects
 // Provider MUST be persistent across all wallet_sendCalls invocations
@@ -16,28 +14,23 @@ export function getBaseProvider() {
     sdkInstance = createBaseAccountSDK({
       appName: "Urim – Quantum Prediction Markets",
       appLogoUrl: "https://base.org/logo.png",
-      appChainIds: SDK_APP_CHAIN_IDS,
+      appChainIds: [BASE_SEPOLIA_CHAIN_ID], // Base Sepolia (84532)
       // ✅ Omitting subAccounts.funding enables Auto-Spend Permissions ("Skip further approvals")
       disableRedirectFallback: true,
       allowInsecureContext: true,
     } as any);
-    console.log(`✅ SDK initialized successfully - Chain ID: ${BASE_SEPOLIA_CHAIN_ID} (0x14A74)`);
-    console.log("✅ Auto-Spend enabled, redirect disabled");
+    console.log(`✅ SDK initialized for Base Sepolia (Chain ID: ${BASE_SEPOLIA_CHAIN_ID})`);
     (sdkInstance as any).setConfig?.({ disableRedirectFallback: true });
   }
   
   if (!providerInstance) {
     console.log("🟢 [URIM] Caching provider instance (ONE TIME ONLY)...");
     providerInstance = sdkInstance.getProvider();
-    // Also enforce in-page execution at provider level
+    // Enforce in-page execution at provider level
     providerInstance.setConfig?.({ disableRedirectFallback: true });
-    console.log(`🔒 Configured for Chain ID: ${BASE_SEPOLIA_CHAIN_ID} (0x14A74 - Base Sepolia)`);
-    console.log("🔒 Redirect fallback disabled = true");
-    console.log("🧪 Is sandboxed?", window.top !== window.self);
     console.log("✅ Provider cached - will be reused for all transactions");
   }
   
-  console.log(`🔄 Returning cached provider (Chain: ${BASE_SEPOLIA_CHAIN_ID})`);
   return providerInstance;
 }
 

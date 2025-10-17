@@ -132,17 +132,6 @@ export async function executeBaseBet(
       throw new Error('Sub Account not found. Reconnect Base Account to create a Sub Account.');
     }
 
-    // Runtime guard: ensure provider is on Base Sepolia before sending
-    const currentChain = (await provider.request({ method: 'eth_chainId' })) as string;
-    if (currentChain?.toLowerCase() !== CHAIN_ID_HEX.toLowerCase()) {
-      console.warn(`⚠️ Provider chainId=${currentChain} — expected ${CHAIN_ID_HEX}. Attempting switch...`);
-      try {
-        await provider.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: CHAIN_ID_HEX }] });
-      } catch (e) {
-        console.warn('wallet_switchEthereumChain not available or failed; will proceed with wallet_sendCalls specifying chainId');
-      }
-    }
-
     // 3. Check USDC allowance from Sub Account
     updateStatus('⏳ Checking USDC allowance...', true);
     const allowanceCallData = encodeFunctionData({
@@ -231,8 +220,8 @@ export async function executeBaseBet(
       };
     } catch (sendErr: any) {
       const msg = (sendErr?.message || '').toLowerCase();
-      const clientChainErr = msg.includes('client not found for chainid');
       const permissionErr = msg.includes('allowance') || msg.includes('permission') || msg.includes('cap exceeded');
+      
       if (permissionErr) {
         updateStatus('🔑 Requesting Spend Permission...', true);
         await requestSpendPermission(provider, universalAccount);
@@ -254,35 +243,6 @@ export async function executeBaseBet(
         console.info('✅ Auto-Spend enabled; TX=' + retryResult);
         updateStatus('✅ Bet placed! Auto-Spend enabled.', false, retryResult);
         return { success: true, txId: retryResult };
-      }
-
-      if (clientChainErr) {
-        console.warn('⚠️ Client not found for chain — ensuring wagmi client is on 84532 and retrying once...');
-        try {
-          // Soft-rebuild wagmi/viem client context (no-op if already correct)
-          // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-          // @ts-ignore
-          const { rebuildWagmiClientForBaseSepolia } = await import('./chainDiagnostics');
-          rebuildWagmiClientForBaseSepolia();
-
-          const retry = (await provider.request({
-            method: 'wallet_sendCalls',
-            params: [
-              {
-                version: '2.0.0',
-                atomicRequired: true,
-                chainId: CHAIN_ID_HEX,
-                from: subAccountAddress,
-                calls,
-              },
-            ],
-          })) as string;
-
-          updateStatus('✅ Bet submitted!', false, retry);
-          return { success: true, txId: retry };
-        } catch (_) {
-          // fall through to error toast
-        }
       }
 
       throw sendErr;
