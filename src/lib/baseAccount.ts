@@ -1,6 +1,9 @@
 import { createBaseAccountSDK } from "@base-org/account";
 import { baseSepolia } from "viem/chains";
 
+// Base Sepolia Chain Configuration (Authoritative)
+const BASE_SEPOLIA_CHAIN_ID = 84532;
+
 // CRITICAL: Singleton pattern to prevent Base Pay redirects
 // Provider MUST be persistent across all wallet_sendCalls invocations
 let sdkInstance: ReturnType<typeof createBaseAccountSDK> | null = null;
@@ -12,12 +15,13 @@ export function getBaseProvider() {
     sdkInstance = createBaseAccountSDK({
       appName: "Urim – Quantum Prediction Markets",
       appLogoUrl: "https://base.org/logo.png",
-      appChainIds: [84532], // Base Sepolia (NOT 84596)
+      appChainIds: [BASE_SEPOLIA_CHAIN_ID],
       // ✅ Omitting subAccounts.funding enables Auto-Spend Permissions ("Skip further approvals")
       disableRedirectFallback: true,
       allowInsecureContext: true,
     } as any);
-    console.log("✅ SDK initialized successfully - Auto-Spend enabled, redirect disabled");
+    console.log(`✅ SDK initialized successfully - Chain ID: ${BASE_SEPOLIA_CHAIN_ID} (0x14A74)`);
+    console.log("✅ Auto-Spend enabled, redirect disabled");
     (sdkInstance as any).setConfig?.({ disableRedirectFallback: true });
   }
   
@@ -26,12 +30,13 @@ export function getBaseProvider() {
     providerInstance = sdkInstance.getProvider();
     // Also enforce in-page execution at provider level
     providerInstance.setConfig?.({ disableRedirectFallback: true });
+    console.log(`🔒 Configured for Chain ID: ${BASE_SEPOLIA_CHAIN_ID} (0x14A74 - Base Sepolia)`);
     console.log("🔒 Redirect fallback disabled = true");
     console.log("🧪 Is sandboxed?", window.top !== window.self);
     console.log("✅ Provider cached - will be reused for all transactions");
   }
   
-  console.log("🔄 Returning cached provider (prevents Base Pay redirect)");
+  console.log(`🔄 Returning cached provider (Chain: ${BASE_SEPOLIA_CHAIN_ID})`);
   return providerInstance;
 }
 
