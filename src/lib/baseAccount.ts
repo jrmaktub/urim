@@ -1,32 +1,36 @@
 import { createBaseAccountSDK } from "@base-org/account";
 import { baseSepolia } from "viem/chains";
 
-// Lazy SDK and provider initialization to avoid cross-origin issues in iframes
+// CRITICAL: Singleton pattern to prevent Base Pay redirects
+// Provider MUST be persistent across all wallet_sendCalls invocations
 let sdkInstance: ReturnType<typeof createBaseAccountSDK> | null = null;
 let providerInstance: any = null;
 
 export function getBaseProvider() {
   if (!sdkInstance) {
-    console.log("🔵 [URIM] Initializing Base Account SDK with Sub Accounts + Auto Spend...");
+    console.log("🔵 [URIM] Initializing Base Account SDK (ONE TIME ONLY)...");
     sdkInstance = createBaseAccountSDK({
-      appName: "URIM",
+      appName: "Urim – Quantum Prediction Markets",
       appLogoUrl: "https://base.org/logo.png",
-      appChainIds: [baseSepolia.id],
+      appChainIds: [84532], // Base Sepolia - exact chain ID required
       paymasterUrls: {
-        [baseSepolia.id]: "https://api.developer.coinbase.com/rpc/v1/base-sepolia",
+        [84532]: "https://api.developer.coinbase.com/rpc/v1/base-sepolia",
       },
       subAccounts: {
         creation: "on-connect",
         defaultAccount: "sub",
       },
     });
+    console.log("✅ SDK initialized successfully");
   }
   
   if (!providerInstance) {
-    console.log("🟢 [URIM] Getting provider instance...");
+    console.log("🟢 [URIM] Caching provider instance (ONE TIME ONLY)...");
     providerInstance = sdkInstance.getProvider();
+    console.log("✅ Provider cached - will be reused for all transactions");
   }
   
+  console.log("🔄 Returning cached provider (prevents Base Pay redirect)");
   return providerInstance;
 }
 

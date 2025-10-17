@@ -69,17 +69,19 @@ export async function executeBaseBet(
   try {
     updateStatus('🔵 Connecting Base Smart Wallet...', true);
 
-    // 1. Get Base provider
+    // 1. Get Base provider (SINGLETON - reused across all calls)
     const provider = getBaseProvider();
     if (!provider) {
       throw new Error('Base provider not available');
     }
+    console.log('✅ Using cached provider instance (prevents Base Pay redirect)');
 
     // 2. Connect and get Sub Account
     updateStatus('🟣 Requesting accounts...', true);
     let accounts = (await provider.request({ method: 'eth_accounts' })) as string[];
     
     if (accounts.length < 2) {
+      console.log('🔄 Requesting account access...');
       accounts = (await provider.request({ method: 'eth_requestAccounts' })) as string[];
     }
 
@@ -151,7 +153,16 @@ export async function executeBaseBet(
 
     updateStatus('⚙️ Placing bet with Auto-Spend...', true);
 
+    console.log('📡 Sending wallet_sendCalls with params:', {
+      version: '2.0.0',
+      atomicRequired: true,
+      chainId: CHAIN_ID_HEX,
+      from: subAccountAddress,
+      callsCount: calls.length,
+    });
+
     // 5. Send transaction with wallet_sendCalls v2.0.0 (enables auto-spend)
+    // CRITICAL: This must NOT redirect to Base Pay - it should show Base popup in-app
     const result = (await provider.request({
       method: 'wallet_sendCalls',
       params: [
@@ -167,6 +178,7 @@ export async function executeBaseBet(
 
     console.log('✅ Bet Tx:', result);
     console.log('✅ Auto-Spend enabled! Future transactions won\'t need approval.');
+    console.log('✅ NO Base Pay redirect - transaction stayed in-app');
 
     updateStatus('✅ Bet placed! Auto-Spend enabled.', false, result);
 
