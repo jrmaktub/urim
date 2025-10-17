@@ -2,7 +2,8 @@ import { createBaseAccountSDK } from "@base-org/account";
 import { baseSepolia } from "viem/chains";
 
 // Base Sepolia Chain Configuration (Authoritative)
-const BASE_SEPOLIA_CHAIN_ID = 84532;
+export const BASE_SEPOLIA_CHAIN_ID = 84532;
+export const SDK_APP_CHAIN_IDS = [BASE_SEPOLIA_CHAIN_ID] as const;
 
 // CRITICAL: Singleton pattern to prevent Base Pay redirects
 // Provider MUST be persistent across all wallet_sendCalls invocations
@@ -15,7 +16,7 @@ export function getBaseProvider() {
     sdkInstance = createBaseAccountSDK({
       appName: "Urim – Quantum Prediction Markets",
       appLogoUrl: "https://base.org/logo.png",
-      appChainIds: [BASE_SEPOLIA_CHAIN_ID],
+      appChainIds: SDK_APP_CHAIN_IDS,
       // ✅ Omitting subAccounts.funding enables Auto-Spend Permissions ("Skip further approvals")
       disableRedirectFallback: true,
       allowInsecureContext: true,
