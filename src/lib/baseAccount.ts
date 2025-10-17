@@ -13,7 +13,7 @@ export function getBaseProvider() {
       appName: "Urim – Quantum Prediction Markets",
       appLogoUrl: "https://base.org/logo.png",
       appChainIds: [baseSepolia.id],
-      subAccounts: { creation: 'on-connect', defaultAccount: 'sub' },
+      subAccounts: { funding: "auto" }, // ✅ Enables "Skip further approvals" checkbox
       disableRedirectFallback: true,
       allowInsecureContext: true,
     } as any);
