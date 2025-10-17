@@ -3,6 +3,7 @@ import { Button } from './ui/button';
 import { executeBaseBet, BetStatus } from '@/lib/baseBetHelper';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from './ui/badge';
+import { Copy } from 'lucide-react';
 
 interface BaseBetButtonProps {
   className?: string;
@@ -37,13 +38,43 @@ export default function BaseBetButton({
     } else if (result.needsPermission) {
       toast({
         title: '⚠️ Permission Required',
-        description: result.error || 'Please approve USDC spending',
+        description: (
+          <div className="flex items-center gap-2">
+            <span className="flex-1 select-text">{result.error || 'Please approve USDC spending'}</span>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-6 w-6 p-0"
+              onClick={() => {
+                navigator.clipboard.writeText(result.error || '');
+                toast({ title: 'Error copied to clipboard' });
+              }}
+            >
+              <Copy className="h-3 w-3" />
+            </Button>
+          </div>
+        ),
         variant: 'destructive',
       });
     } else {
       toast({
         title: '❌ Bet Failed',
-        description: result.error || 'Transaction failed',
+        description: (
+          <div className="flex items-center gap-2">
+            <span className="flex-1 select-text">{result.error || 'Transaction failed'}</span>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-6 w-6 p-0"
+              onClick={() => {
+                navigator.clipboard.writeText(result.error || '');
+                toast({ title: 'Error copied to clipboard' });
+              }}
+            >
+              <Copy className="h-3 w-3" />
+            </Button>
+          </div>
+        ),
         variant: 'destructive',
       });
     }
