@@ -10,6 +10,7 @@ import EverythingBets from "./pages/EverythingBets";
 import CreateBet from "./pages/CreateBet";
 import MarketDetail from "./pages/MarketDetail";
 import NotFound from "./pages/NotFound";
+import { PythPriceTestnet }  from "./pages/PythPrice";
 
 const queryClient = new QueryClient();
 
@@ -25,6 +26,7 @@ const App = () => (
             <Route path="/everything-bets" element={<EverythingBets />} />
             <Route path="/create" element={<CreateBet />} />
             <Route path="/market/:address" element={<MarketDetail />} />
+            <Route path="/PythPrice" element={<PythPriceTestnet/>} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
