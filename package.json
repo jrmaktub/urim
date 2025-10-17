@@ -11,6 +11,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@avail-project/nexus-core": "^0.0.1",
+    "@avail-project/nexus-widgets": "^0.0.5",
     "@base-org/account": "^2.4.0",
     "@hookform/resolvers": "^3.10.0",
     "@pythnetwork/pyth-evm-js": "^1.40.0",
