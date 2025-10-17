@@ -12,16 +12,10 @@ export function getBaseProvider() {
     sdkInstance = createBaseAccountSDK({
       appName: "Urim – Quantum Prediction Markets",
       appLogoUrl: "https://base.org/logo.png",
-      appChainIds: [84532], // Base Sepolia - exact chain ID required
-      paymasterUrls: {
-        [84532]: "https://api.developer.coinbase.com/rpc/v1/base-sepolia",
-      },
-      subAccounts: {
-        creation: "on-connect",
-        defaultAccount: "sub",
-      },
+      appChainIds: [baseSepolia.id],
+      subAccounts: { funding: "auto" } as any,
     });
-    console.log("✅ SDK initialized successfully");
+    console.log("✅ Base SDK initialized (redirect fallback disabled)");
     // Enforce in-page execution at SDK level (if supported)
     (sdkInstance as any).setConfig?.({ disableRedirectFallback: true });
   }
