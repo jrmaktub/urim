@@ -12,8 +12,8 @@ export function getBaseProvider() {
     sdkInstance = createBaseAccountSDK({
       appName: "Urim – Quantum Prediction Markets",
       appLogoUrl: "https://base.org/logo.png",
-      appChainIds: [baseSepolia.id],
-      subAccounts: { funding: "auto" }, // ✅ Enables "Skip further approvals" checkbox
+      appChainIds: [84532], // Base Sepolia (NOT 84596)
+      // ✅ Omitting subAccounts.funding enables Auto-Spend Permissions ("Skip further approvals")
       disableRedirectFallback: true,
       allowInsecureContext: true,
     } as any);
