@@ -12,12 +12,12 @@ export function getBaseProvider() {
     sdkInstance = createBaseAccountSDK({
       appName: "Urim – Quantum Prediction Markets",
       appLogoUrl: "https://base.org/logo.png",
-      appChainIds: [84532], // ✅ Base Sepolia chain ID
+      appChainIds: [84532],
+      subAccounts: { funding: "auto" },
       disableRedirectFallback: true,
       allowInsecureContext: true,
     } as any);
-    console.log("✅ Base SDK initialized (redirect fallback disabled, chain=84532)");
-    // Enforce in-page execution at SDK level (if supported)
+    console.log("✅ SDK initialized successfully - Auto-Spend enabled, redirect disabled");
     (sdkInstance as any).setConfig?.({ disableRedirectFallback: true });
   }
   
