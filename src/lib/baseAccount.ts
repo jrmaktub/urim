@@ -12,8 +12,8 @@ export function getBaseProvider() {
     sdkInstance = createBaseAccountSDK({
       appName: "Urim – Quantum Prediction Markets",
       appLogoUrl: "https://base.org/logo.png",
-      appChainIds: [84532],
-      subAccounts: { funding: "auto" },
+      appChainIds: [baseSepolia.id],
+      subAccounts: { creation: 'on-connect', defaultAccount: 'sub' },
       disableRedirectFallback: true,
       allowInsecureContext: true,
     } as any);

@@ -56,7 +56,7 @@ export interface BetStatus {
 }
 
 // Request Spend Permission via Base Account SDK
-async function requestSpendPermission(provider: any, account: string) {
+async function requestSpendPermission(provider: any, account: string, chainIdDecimal: number) {
   try {
     console.info('🔑 Requesting Spend Permission (100 USDC, 1 day)');
     await provider.request({
@@ -66,7 +66,7 @@ async function requestSpendPermission(provider: any, account: string) {
           account,
           spender: BET_CONTRACT_ADDRESS,
           token: USDC_TOKEN_ADDRESS,
-          chainId: CHAIN_ID_DECIMAL,
+          chainId: chainIdDecimal,
           allowance: 100_000_000, // 100 USDC (6 decimals)
           periodInDays: 1,
         },
@@ -112,6 +112,11 @@ export async function executeBaseBet(
     provider.setConfig?.({ disableRedirectFallback: true });
     console.info('🔒 Redirect fallback disabled = true');
     console.info('🧪 Is sandboxed?', window.top !== window.self);
+
+    // Get chainId dynamically (no hardcoding)
+    const chainIdHex = (await provider.request({ method: 'eth_chainId' })) as string;
+    const chainIdDecimal = parseInt(chainIdHex, 16);
+    console.info('🧭 Using chainId (hex/dec):', chainIdHex, chainIdDecimal);
 
     // 2. Connect and get Sub Account (accounts[1])
     updateStatus('🟣 Requesting Sub Account...', true);
@@ -201,7 +206,7 @@ export async function executeBaseBet(
           {
             version: '2.0.0', // ✅ REQUIRED for Auto-Spend Permissions
             atomicRequired: true,
-            chainId: CHAIN_ID_HEX, // 0x14A74
+            chainId: chainIdHex, // from eth_chainId
             from: subAccountAddress, // ✅ MUST be Sub Account (accounts[1])
             calls,
           },
@@ -222,18 +227,18 @@ export async function executeBaseBet(
       const permissionErr = msg.includes('allowance') || msg.includes('permission') || msg.includes('cap exceeded');
       if (permissionErr) {
         updateStatus('🔑 Requesting Spend Permission...', true);
-        await requestSpendPermission(provider, universalAccount);
+        await requestSpendPermission(provider, universalAccount, chainIdDecimal);
         console.info('🔁 Retrying wallet_sendCalls after permission grant');
 
         const retryResult = (await provider.request({
           method: 'wallet_sendCalls',
           params: [
             {
-              version: '2.0.0',
-              atomicRequired: true,
-              chainId: CHAIN_ID_HEX,
-              from: subAccountAddress,
-              calls,
+                version: '2.0.0',
+                atomicRequired: true,
+                chainId: chainIdHex,
+                from: subAccountAddress,
+                calls,
             },
           ],
         })) as string;
