@@ -32,6 +32,7 @@ export function getBaseProvider() {
     // Also enforce in-page execution at provider level
     providerInstance.setConfig?.({ disableRedirectFallback: true });
     console.log("🔒 Redirect fallback disabled = true");
+    console.log("🧪 Is sandboxed?", window.top !== window.self);
     console.log("✅ Provider cached - will be reused for all transactions");
   }
   

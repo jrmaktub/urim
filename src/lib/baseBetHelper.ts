@@ -111,6 +111,7 @@ export async function executeBaseBet(
     // Ensure in-page execution (no Base Pay redirect)
     provider.setConfig?.({ disableRedirectFallback: true });
     console.info('🔒 Redirect fallback disabled = true');
+    console.info('🧪 Is sandboxed?', window.top !== window.self);
 
     // 2. Connect and get Sub Account (accounts[1])
     updateStatus('🟣 Requesting Sub Account...', true);
