@@ -1,9 +1,8 @@
 import { encodeFunctionData, parseUnits, maxUint256 } from 'viem';
-import { getBaseProvider } from './baseAccount';
+import { baseSepolia } from 'viem/chains';
+import { getBaseProvider, getSubAccount } from './baseAccount';
 
-// --- AUTHORITATIVE CONSTANTS (Base Sepolia) ---
-export const CHAIN_ID_HEX = '0x14A74' as const; // Base Sepolia (84532 decimal)
-export const CHAIN_ID_DECIMAL = 84532 as const;
+// --- Base Sepolia Constants ---
 export const USDC_TOKEN_ADDRESS = '0x036CbD53842c5426634e7929541eC2318f3dCF7e' as const;
 export const BET_CONTRACT_ADDRESS = '0xa926eD649871b21dd4C18AbD379fE82C8859b21E' as const;
 export const AMOUNT_USDC_6DP = parseUnits('1', 6); // 1 USDC = 1_000_000
@@ -66,7 +65,7 @@ async function requestSpendPermission(provider: any, account: string) {
           account,
           spender: BET_CONTRACT_ADDRESS,
           token: USDC_TOKEN_ADDRESS,
-          chainId: CHAIN_ID_DECIMAL,
+          chainId: baseSepolia.id,
           allowance: 100_000_000, // 100 USDC (6 decimals)
           periodInDays: 1,
         },
@@ -81,14 +80,14 @@ async function requestSpendPermission(provider: any, account: string) {
 
 /**
  * Execute a bet using Base Sub Account + Auto Spend Permissions
- * This is the SINGLE SOURCE OF TRUTH for placing bets
+ * Following official Base Sub Accounts documentation
  * 
  * Flow:
- * 1. Get singleton provider (NO re-initialization)
- * 2. Request Sub Account (accounts[1])
+ * 1. Get singleton provider
+ * 2. Get Sub Account via SDK
  * 3. Check USDC allowance
  * 4. Build calls: [approve (if needed), placeBet]
- * 5. Execute via wallet_sendCalls v2.0.0 from Sub Account
+ * 5. Execute via wallet_sendCalls v2.0 from Sub Account
  * 6. First bet: "Skip further approvals" → Auto-Spend enabled
  * 7. Future bets: Silent execution (no popup)
  */
@@ -102,37 +101,30 @@ export async function executeBaseBet(
   try {
     updateStatus('🔵 Connecting Base Smart Wallet...', true);
 
-    // 1. Get Base provider (SINGLETON - prevents Base Pay redirect)
+    // 1. Get Base provider (singleton)
     const provider = getBaseProvider();
     if (!provider) {
       throw new Error('Base provider not available');
     }
-    console.info('✅ Using cached provider: true');
-    // Ensure in-page execution (no Base Pay redirect)
-    provider.setConfig?.({ disableRedirectFallback: true });
-    console.info('🔒 Redirect fallback disabled = true');
-    console.info('🧪 Is sandboxed?', window.top !== window.self);
 
-    // 2. Connect and get Sub Account (accounts[1])
-    updateStatus('🟣 Requesting Sub Account...', true);
-    let accounts = (await provider.request({ method: 'eth_accounts' })) as string[];
+    // 2. Get Sub Account via SDK
+    updateStatus('🟣 Getting Sub Account...', true);
+    const subAccount = await getSubAccount();
+    const subAccountAddress = subAccount.address;
+
+    console.info('✅ Sub Account:', subAccountAddress);
+    console.info(`✅ Auto-Spend active, ChainID ${baseSepolia.id}`);
+
+    // 3. Connect accounts
+    const accounts = (await provider.request({ 
+      method: 'eth_requestAccounts',
+      params: [] 
+    })) as string[];
     
-    if (accounts.length === 0) {
-      console.info('🔄 Requesting account access...');
-      accounts = (await provider.request({ method: 'eth_requestAccounts' })) as string[];
-    }
-
     const universalAccount = accounts[0];
-    const subAccountAddress = accounts[1]; // Sub Account for Auto-Spend
-
     console.info('🔵 Universal Account:', universalAccount);
-    console.info('🟢 Sub Account (Auto-Spend):', subAccountAddress);
 
-    if (!subAccountAddress) {
-      throw new Error('Sub Account not found. Reconnect Base Account to create a Sub Account.');
-    }
-
-    // 3. Check USDC allowance from Sub Account
+    // 4. Check USDC allowance from Sub Account
     updateStatus('⏳ Checking USDC allowance...', true);
     const allowanceCallData = encodeFunctionData({
       abi: ERC20_ABI,
@@ -154,7 +146,7 @@ export async function executeBaseBet(
     const currentAllowance = BigInt(allowanceResult);
     console.info(`💰 Current USDC allowance: ${currentAllowance.toString()}`);
 
-    // 4. Build calls array: [approve (if needed), placeBet]
+    // 5. Build calls array: [approve (if needed), placeBet]
     const calls = [];
 
     // Add approve call ONLY if allowance < amount
@@ -179,7 +171,7 @@ export async function executeBaseBet(
     const placeBetCallData = encodeFunctionData({
       abi: BET_CONTRACT_ABI,
       functionName: 'placeBet',
-      args: [AMOUNT_USDC_6DP], // 1_000_000 = 1 USDC
+      args: [AMOUNT_USDC_6DP],
     });
 
     calls.push({
@@ -190,27 +182,26 @@ export async function executeBaseBet(
 
     updateStatus('⚙️ Placing bet with Auto-Spend...', true);
 
-    console.info('📡 wallet_sendCalls -> version=2.0.0, chainId=' + CHAIN_ID_HEX + ', from=' + subAccountAddress + ', calls=' + calls.length);
+    const chainIdHex = `0x${baseSepolia.id.toString(16)}`;
+    console.info(`📡 wallet_sendCalls -> version=2.0, chainId=${chainIdHex} (${baseSepolia.id}), from=${subAccountAddress}, calls=${calls.length}`);
 
-    // 5. Execute via wallet_sendCalls v2.0.0 from Sub Account
-    // CRITICAL: Must use v2.0.0 + Sub Account to enable Auto-Spend (no Base Pay)
+    // 6. Execute via wallet_sendCalls v2.0 from Sub Account
     try {
       const result = (await provider.request({
         method: 'wallet_sendCalls',
         params: [
           {
-            version: '2.0.0', // ✅ REQUIRED for Auto-Spend Permissions
+            version: '2.0',
             atomicRequired: true,
-            chainId: CHAIN_ID_HEX, // 0x14A74 - must match SDK appChainIds
-            from: subAccountAddress, // ✅ MUST be Sub Account (accounts[1])
+            chainId: chainIdHex,
+            from: subAccountAddress,
             calls,
           },
         ],
       })) as string;
 
       console.info('✅ Auto-Spend enabled; TX=' + result);
-      console.info('✅ Transaction stayed in-app (no Base Pay redirect)');
-      console.info(`OK: chainId=${CHAIN_ID_HEX} (${CHAIN_ID_DECIMAL}) • provider/client/wallet_sendCalls all match`);
+      console.info(`✅ Auto-Spend active, ChainID ${baseSepolia.id}`);
 
       updateStatus('✅ Bet placed! Auto-Spend enabled.', false, result);
 
@@ -231,9 +222,9 @@ export async function executeBaseBet(
           method: 'wallet_sendCalls',
           params: [
             {
-                version: '2.0.0',
+                version: '2.0',
                 atomicRequired: true,
-                chainId: CHAIN_ID_HEX,
+                chainId: chainIdHex,
                 from: subAccountAddress,
                 calls,
             },
