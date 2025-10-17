@@ -1,14 +1,13 @@
 import { TrendingUp, Users } from "lucide-react";
-import { Button } from "./ui/button";
+import BaseBetButton from "./BaseBetButton";
 
 interface OutcomeCardProps {
   title: string;
   odds: number;
   poolSize: string;
-  onBet: () => void;
 }
 
-const OutcomeCard = ({ title, odds, poolSize, onBet }: OutcomeCardProps) => {
+const OutcomeCard = ({ title, odds, poolSize }: OutcomeCardProps) => {
   return (
     <div className="glass-card p-6 rounded-2xl border border-border hover:border-primary/50 transition-all duration-300 group">
       <div className="space-y-4">
@@ -44,13 +43,8 @@ const OutcomeCard = ({ title, odds, poolSize, onBet }: OutcomeCardProps) => {
           />
         </div>
 
-        {/* Bet Button */}
-        <Button
-          onClick={onBet}
-          className="w-full rounded-full bg-gradient-to-r from-primary to-secondary hover:opacity-90 glow-primary"
-        >
-          Place Bet
-        </Button>
+        {/* Bet Button - Now uses Base Account SDK */}
+        <BaseBetButton className="w-full rounded-full bg-gradient-to-r from-primary to-secondary hover:opacity-90 glow-primary" />
       </div>
     </div>
   );

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { TrendingUp, Clock, Sparkles } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import BetButton from "@/components/BetButton";
+import BaseBetButton from "@/components/BaseBetButton";
 
 const Index = () => {
   const { toast } = useToast();
@@ -169,7 +169,7 @@ const Index = () => {
                       <span>{scenario.pool} USDC</span>
                     </div>
                   </div>
-                  <BetButton />
+                  <BaseBetButton className="w-full" />
                 </div>
               ))}
             </div>
@@ -198,7 +198,7 @@ const Index = () => {
                         <TrendingUp className="w-4 h-4" />
                         <span>{outcome.pool} USDC</span>
                       </div>
-                      <BetButton />
+                      <BaseBetButton className="w-full" />
                     </div>
                   ))}
                 </div>

@@ -110,7 +110,6 @@ const DecisionDetail = () => {
                     title={outcome.title}
                     odds={outcome.odds}
                     poolSize={outcome.pool}
-                    onBet={() => handleBet(outcome.title)}
                   />
                 </div>
               ))}
