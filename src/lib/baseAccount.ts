@@ -78,9 +78,9 @@ export async function testUSDCTransfer() {
       method: "wallet_sendCalls",
       params: [
         {
-          version: "2.0",
+          version: "2.0.0",
           atomicRequired: true,
-          chainId: `0x${baseSepolia.id.toString(16)}`,
+          chainId: "0x14A74",
           from: sub,
           calls: [{ to: usdcAddress, data, value: "0x0" }],
         },
@@ -109,14 +109,14 @@ export async function sendTransaction({
       params: [],
     })) as string[];
 
-    const from = accounts[0];
+    const from = accounts.length > 1 ? accounts[1] : accounts[0];
     const tx = await provider.request({
       method: "wallet_sendCalls",
       params: [
         {
-          version: "2.0",
+          version: "2.0.0",
           atomicRequired: true,
-          chainId: `0x${baseSepolia.id.toString(16)}`,
+          chainId: "0x14A74",
           from,
           calls: [{ to, data, value }],
         },

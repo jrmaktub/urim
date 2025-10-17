@@ -3,7 +3,7 @@ import { baseSepolia } from 'viem/chains';
 import { getBaseProvider } from './baseAccount';
 
 // --- CONSTANTS ---
-export const CHAIN_ID_HEX = `0x${baseSepolia.id.toString(16)}` as const; // 0x14a74
+export const CHAIN_ID_HEX = '0x14A74' as const; // Base Sepolia
 export const USDC_TOKEN_ADDRESS = '0x036CbD53842c5426634e7929541eC2318f3dCF7e' as const;
 export const OUR_CONTRACT_ADDRESS = '0xa926eD649871b21dd4C18AbD379fE82C8859b21E' as const;
 export const AMOUNT_USDC_6DP = parseUnits('1', 6); // 1 USDC
