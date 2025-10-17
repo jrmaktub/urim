@@ -55,6 +55,30 @@ export interface BetStatus {
   callsId?: string | null;
 }
 
+// Request Spend Permission via Base Account SDK
+async function requestSpendPermission(provider: any, account: string) {
+  try {
+    console.info('🔑 Requesting Spend Permission (100 USDC, 1 day)');
+    await provider.request({
+      method: 'wallet_requestSpendPermission',
+      params: [
+        {
+          account,
+          spender: BET_CONTRACT_ADDRESS,
+          token: USDC_TOKEN_ADDRESS,
+          chainId: CHAIN_ID_DECIMAL,
+          allowance: 100_000_000, // 100 USDC (6 decimals)
+          periodInDays: 1,
+        },
+      ],
+    });
+    console.info('✅ Spend Permission requested');
+  } catch (e) {
+    console.error('❌ Spend Permission request failed:', e);
+    throw e;
+  }
+}
+
 /**
  * Execute a bet using Base Sub Account + Auto Spend Permissions
  * This is the SINGLE SOURCE OF TRUTH for placing bets
@@ -166,28 +190,57 @@ export async function executeBaseBet(
 
     // 5. Execute via wallet_sendCalls v2.0.0 from Sub Account
     // CRITICAL: Must use v2.0.0 + Sub Account to enable Auto-Spend (no Base Pay)
-    const result = (await provider.request({
-      method: 'wallet_sendCalls',
-      params: [
-        {
-          version: '2.0.0', // ✅ REQUIRED for Auto-Spend Permissions
-          atomicRequired: true,
-          chainId: CHAIN_ID_HEX, // 0x14A74
-          from: subAccountAddress, // ✅ MUST be Sub Account (accounts[1])
-          calls,
-        },
-      ],
-    })) as string;
+    try {
+      const result = (await provider.request({
+        method: 'wallet_sendCalls',
+        params: [
+          {
+            version: '2.0.0', // ✅ REQUIRED for Auto-Spend Permissions
+            atomicRequired: true,
+            chainId: CHAIN_ID_HEX, // 0x14A74
+            from: subAccountAddress, // ✅ MUST be Sub Account (accounts[1])
+            calls,
+          },
+        ],
+      })) as string;
 
-    console.info('✅ Auto-Spend enabled; TX=' + result);
-    console.info('✅ Transaction stayed in-app (no Base Pay redirect)');
+      console.info('✅ Auto-Spend enabled; TX=' + result);
+      console.info('✅ Transaction stayed in-app (no Base Pay redirect)');
 
-    updateStatus('✅ Bet placed! Auto-Spend enabled.', false, result);
+      updateStatus('✅ Bet placed! Auto-Spend enabled.', false, result);
 
-    return {
-      success: true,
-      txId: result,
-    };
+      return {
+        success: true,
+        txId: result,
+      };
+    } catch (sendErr: any) {
+      const msg = (sendErr?.message || '').toLowerCase();
+      const permissionErr = msg.includes('allowance') || msg.includes('permission') || msg.includes('cap exceeded');
+      if (permissionErr) {
+        updateStatus('🔑 Requesting Spend Permission...', true);
+        await requestSpendPermission(provider, universalAccount);
+        console.info('🔁 Retrying wallet_sendCalls after permission grant');
+
+        const retryResult = (await provider.request({
+          method: 'wallet_sendCalls',
+          params: [
+            {
+              version: '2.0.0',
+              atomicRequired: true,
+              chainId: CHAIN_ID_HEX,
+              from: subAccountAddress,
+              calls,
+            },
+          ],
+        })) as string;
+
+        console.info('✅ Auto-Spend enabled; TX=' + retryResult);
+        updateStatus('✅ Bet placed! Auto-Spend enabled.', false, retryResult);
+        return { success: true, txId: retryResult };
+      }
+
+      throw sendErr;
+    }
   } catch (error: any) {
     console.error('❌ Bet execution error:', error);
 
