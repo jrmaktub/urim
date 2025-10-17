@@ -108,6 +108,9 @@ export async function executeBaseBet(
       throw new Error('Base provider not available');
     }
     console.info('✅ Using cached provider: true');
+    // Ensure in-page execution (no Base Pay redirect)
+    provider.setConfig?.({ disableRedirectFallback: true });
+    console.info('🔒 Redirect fallback disabled = true');
 
     // 2. Connect and get Sub Account (accounts[1])
     updateStatus('🟣 Requesting Sub Account...', true);

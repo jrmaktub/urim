@@ -22,11 +22,16 @@ export function getBaseProvider() {
       },
     });
     console.log("✅ SDK initialized successfully");
+    // Enforce in-page execution at SDK level (if supported)
+    (sdkInstance as any).setConfig?.({ disableRedirectFallback: true });
   }
   
   if (!providerInstance) {
     console.log("🟢 [URIM] Caching provider instance (ONE TIME ONLY)...");
     providerInstance = sdkInstance.getProvider();
+    // Also enforce in-page execution at provider level
+    providerInstance.setConfig?.({ disableRedirectFallback: true });
+    console.log("🔒 Redirect fallback disabled = true");
     console.log("✅ Provider cached - will be reused for all transactions");
   }
   
