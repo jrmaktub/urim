@@ -21,6 +21,11 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { CheckCircle2, Clock, TrendingUp } from "lucide-react";
 
+import FetchUnifiedBalanceButton from '@/components/fetch-unified-balance-button';
+import BridgeButton from '@/components/BridgeButton';
+import Bridge from "@/components/BridgeButton";
+
+
 const EverythingBets = () => {
   const { toast } = useToast();
   const [question, setQuestion] = useState("");
@@ -33,7 +38,11 @@ const EverythingBets = () => {
   const [selectedMarket, setSelectedMarket] = useState<any>(null);
   const [stakeModalOpen, setStakeModalOpen] = useState(false);
   const [selectedOption, setSelectedOption] = useState<string>("");
+  const [balances, setBalances] = useState<any>(null);
 
+    const btn =
+    'px-4 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-700 ' +
+    'disabled:opacity-50 disabled:cursor-not-allowed';
   // Mock active markets
   const activeMarkets = [
     {
@@ -148,7 +157,11 @@ const EverythingBets = () => {
               Define a question, set two sides, and open your market to everyone.
             </p>
           </div>
-
+                  {balances && (
+          <pre className="whitespace-pre-wrap">{JSON.stringify(balances, null, 2)}</pre>
+        )}
+        <FetchUnifiedBalanceButton className={btn} onResult={(r) => setBalances(r)} />
+          <BridgeButton />
           <div className="gold-card p-8 animate-fade-up" style={{ animationDelay: "0.2s" }}>
             <div className="space-y-6">
               <div>
