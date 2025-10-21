@@ -8,53 +8,54 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    /* Urim Black/Purple Theme - Original Dark Modern */
-    --background: 0 0% 0%; /* #000000 pure black */
-    --foreground: 0 0% 96%; /* #f5f5f5 soft white */
+    /* Urim Futuristic Dark Theme - ETH Online 2025 */
+    --background: 263 100% 3%; /* #0b0b0f deep black */
+    --foreground: 210 17% 98%; /* #f9fafb white */
 
-    --card: 0 0% 4%;
-    --card-foreground: 0 0% 96%;
+    --card: 240 10% 7%; /* #111114 card background */
+    --card-foreground: 210 17% 98%;
     --card-glow: 270 80% 65%;
 
-    --popover: 0 0% 4%;
-    --popover-foreground: 0 0% 96%;
+    --popover: 240 10% 7%;
+    --popover-foreground: 210 17% 98%;
 
-    --primary: 270 80% 65%; /* vibrant purple */
+    --primary: 270 80% 65%; /* #a855f7 neon purple */
     --primary-foreground: 0 0% 100%;
-    --primary-dark: 270 60% 45%; /* deep purple */
+    --primary-dark: 270 60% 45%; /* #7e22ce deep purple */
     --primary-glow: 270 100% 75%; /* neon violet */
 
-    --secondary: 0 0% 8%;
-    --secondary-foreground: 0 0% 96%;
-    --secondary-glow: 280 70% 60%;
+    --secondary: 173 58% 53%; /* #2dd4bf teal */
+    --secondary-foreground: 0 0% 100%;
+    --secondary-glow: 173 80% 60%;
 
-    --muted: 0 0% 10%;
+    --muted: 240 10% 10%;
     --muted-foreground: 0 0% 60%;
 
-    --accent: 270 80% 65%;
+    --accent: 173 58% 53%; /* teal accent */
     --accent-foreground: 0 0% 100%;
-    --accent-glow: 270 100% 75%;
+    --accent-glow: 173 80% 60%;
 
     --destructive: 0 84% 60%;
-    --destructive-foreground: 0 0% 96%;
+    --destructive-foreground: 210 17% 98%;
 
-    --border: 270 60% 50%;
-    --input: 0 0% 0%;
+    --border: 270 80% 65% / 0.25; /* rgba(168, 85, 247, 0.25) */
+    --input: 240 10% 7%;
     --ring: 270 80% 65%;
 
-    --radius: 0.5rem;
+    --radius: 1rem; /* 16px rounded corners */
 
-    /* Purple Gradients */
-    --gradient-purple: linear-gradient(135deg, hsl(270 80% 65%) 0%, hsl(270 100% 75%) 100%);
-    --gradient-dark-purple: linear-gradient(135deg, hsl(270 60% 45%) 0%, hsl(270 80% 65%) 100%);
+    /* Gradients */
+    --gradient-purple: linear-gradient(135deg, hsl(270 80% 65%) 0%, hsl(270 60% 45%) 100%);
+    --gradient-teal: linear-gradient(135deg, hsl(173 58% 53%) 0%, hsl(173 80% 60%) 100%);
     --gradient-glow: 0 0 40px hsl(270 80% 65% / 0.5);
     
     /* Shadows & Effects */
     --shadow-purple: 0 0 30px hsl(270 80% 65% / 0.4);
+    --shadow-teal: 0 0 30px hsl(173 58% 53% / 0.4);
     --shadow-card: 0 4px 20px hsl(0 0% 0% / 0.8);
     
     /* Transitions */
-    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-smooth: all 0.25s ease-in-out;
   }
 }
 
@@ -72,20 +73,25 @@ All colors MUST be HSL.
   }
 
   /* Card Effects */
-  .purple-card {
-    @apply bg-card border border-primary/30 rounded-lg;
+  .glass-card {
+    @apply bg-card border rounded-2xl;
+    border-color: hsl(var(--border));
     transition: var(--transition-smooth);
   }
 
-  .purple-card:hover {
+  .glass-card:hover {
     border-color: hsl(var(--primary));
     box-shadow: var(--shadow-purple);
-    transform: translateY(-2px);
+    transform: scale(1.02);
   }
 
-  /* Purple Glow Effect */
-  .glow-purple {
+  /* Glow Effects */
+  .glow-primary {
     box-shadow: var(--shadow-purple);
+  }
+
+  .glow-teal {
+    box-shadow: var(--shadow-teal);
   }
 
   /* Animations */
