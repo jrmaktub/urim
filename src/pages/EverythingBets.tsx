@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAccount, useWriteContract } from "wagmi";
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
@@ -20,9 +22,17 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { CheckCircle2, Clock, TrendingUp } from "lucide-react";
+import { URIM_MARKET_ADDRESS, USDC_ADDRESS } from "@/constants/contracts";
+import UrimMarketABI from "@/contracts/UrimMarket.json";
+import ERC20ABI from "@/contracts/ERC20.json";
+import { parseUnits } from "viem";
 
 const EverythingBets = () => {
   const { toast } = useToast();
+  const navigate = useNavigate();
+  const { address } = useAccount();
+  const { writeContractAsync } = useWriteContract();
+  
   const [question, setQuestion] = useState("");
   const [optionA, setOptionA] = useState("Yes");
   const [optionB, setOptionB] = useState("No");
@@ -66,6 +76,15 @@ const EverythingBets = () => {
   ];
 
   const handleCreateMarket = async () => {
+    if (!address) {
+      toast({
+        title: "Wallet Not Connected",
+        description: "Please connect your wallet first.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (!question || !optionA || !optionB || !duration || !stakeAmount) {
       toast({
         title: "Missing Information",
@@ -78,16 +97,43 @@ const EverythingBets = () => {
     setIsProcessing(true);
 
     try {
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-      setIsSuccess(true);
+      // Convert duration to timestamp
+      const durationMap: { [key: string]: number } = {
+        "1d": 1 * 24 * 60 * 60,
+        "3d": 3 * 24 * 60 * 60,
+        "1w": 7 * 24 * 60 * 60,
+        "2w": 14 * 24 * 60 * 60,
+        "1m": 30 * 24 * 60 * 60,
+      };
+      
+      const now = Math.floor(Date.now() / 1000);
+      const endTimestamp = BigInt(now + durationMap[duration]);
+      const outcomes = [optionA, optionB];
+
       toast({
-        title: "Market Created ⚡",
-        description: "Your market is live on the blockchain.",
+        title: "Creating Market",
+        description: "Please confirm the transaction in your wallet.",
       });
-    } catch (error) {
+
+      await writeContractAsync({
+        address: URIM_MARKET_ADDRESS as `0x${string}`,
+        abi: UrimMarketABI.abi as any,
+        functionName: 'createMarket',
+        args: [question, outcomes, endTimestamp],
+        gas: BigInt(3000000),
+      } as any);
+
       toast({
-        title: "Error",
-        description: "Something went wrong. Please try again.",
+        title: "Market Created! ⚡",
+        description: "Your market is now live on Base Sepolia.",
+      });
+
+      setIsSuccess(true);
+    } catch (error: any) {
+      console.error("Failed to create market:", error);
+      toast({
+        title: "Transaction Failed",
+        description: error?.shortMessage || error?.message || "Could not create market. Please try again.",
         variant: "destructive",
       });
     } finally {

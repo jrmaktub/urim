@@ -95,7 +95,7 @@ const Index = () => {
     }
   };
 
-  const handleCreateQuantumMarket = async (scenario: Scenario) => {
+  const handleCreateQuantumMarket = async (selectedScenario: Scenario) => {
     if (!address) {
       toast({
         title: "Wallet Not Connected",
@@ -109,6 +109,8 @@ const Index = () => {
 
     try {
       const durationSeconds = BigInt(7 * 24 * 60 * 60); // 7 days
+      
+      // Use ALL scenarios but create market based on user's selection
       const scenarioTexts = scenarios.map(s => s.summary);
       const probabilitiesArray = [BigInt(33), BigInt(33), BigInt(34)]; // Equal probabilities summing to 100
       
@@ -186,36 +188,35 @@ const Index = () => {
       const abi = selectedIsQuantum ? UrimQuantumMarketABI.abi : UrimMarketABI.abi;
       const functionName = selectedIsQuantum ? 'buyScenarioShares' : 'buyShares';
 
-      // Step 1: Approve exact USDC amount
+      // Step 1: Approve USDC
       toast({
-        title: "Step 1/2",
-        description: "Approving USDC...",
+        title: "Step 1/2: Approving USDC",
+        description: "Please confirm the approval transaction in your wallet.",
       });
 
-      const approveHash = await writeContractAsync({
+      await writeContractAsync({
         address: USDC_ADDRESS as `0x${string}`,
         abi: ERC20ABI.abi as any,
         functionName: 'approve',
-        args: [contractAddress, amount], // Approve exact amount, not max
+        args: [contractAddress, amount],
         gas: BigInt(100000),
       } as any);
 
-      // Wait for approval confirmation
       toast({
-        title: "Waiting for approval...",
-        description: "Please wait for confirmation.",
+        title: "Approval Confirmed ✓",
+        description: "Now placing your bet...",
       });
 
-      // Step 2: Place bet after approval confirms
+      // Step 2: Place bet
       toast({
-        title: "Step 2/2",
-        description: "Placing bet...",
+        title: "Step 2/2: Placing Bet",
+        description: "Please confirm the bet transaction in your wallet.",
       });
 
-      // For Quantum markets, scenarioIndex is uint8
+      // For Quantum markets, scenarioIndex is uint8 (Number), for Everything markets it's uint256 (BigInt)
       const outcomeIndex = selectedIsQuantum ? Number(selectedOutcome) : BigInt(selectedOutcome);
       
-      const betHash = await writeContractAsync({
+      await writeContractAsync({
         address: contractAddress as `0x${string}`,
         abi: abi as any,
         functionName,
@@ -223,18 +224,14 @@ const Index = () => {
         gas: BigInt(3000000),
       } as any);
 
-      // Wait for bet confirmation
       toast({
-        title: "Confirming transaction...",
-        description: "Please wait for blockchain confirmation.",
-      });
-
-      toast({
-        title: "Bet Placed! ⚡",
-        description: `${betAmount} USDC successfully placed. Check Base Sepolia Blockscout.`,
+        title: "Bet Placed Successfully! ⚡",
+        description: `${betAmount} USDC bet placed. Refreshing markets...`,
       });
       
       setBetModalOpen(false);
+      setSelectedOutcome("");
+      setBetAmount("");
       
       // Refresh page to show updated markets
       setTimeout(() => {

@@ -7,7 +7,7 @@ export const config = getDefaultConfig({
   projectId: 'YOUR_PROJECT_ID', // Get from https://cloud.walletconnect.com
   chains: [baseSepolia],
   transports: {
-    [baseSepolia.id]: http('https://base-sepolia.g.alchemy.com/v2/27SvVEbGAVC2VSJ8rPss0-H62vjJiL'),
+    [baseSepolia.id]: http('https://base-sepolia.g.alchemy.com/v2/27SvVEbGAVC2VSJ8rPss0'),
   },
   ssr: false,
 });
