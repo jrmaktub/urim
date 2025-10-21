@@ -8,54 +8,47 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    /* Urim Dark Cinematic Theme - ETH Online 2025 */
-    --background: 263 100% 3%; /* #0b0b0f pure black */
-    --foreground: 210 17% 98%; /* #f9fafb white */
+    /* Urim Minimal Design System - Apple-inspired */
+    --background: 0 0% 3%; /* near black */
+    --foreground: 0 0% 98%; /* soft white */
 
-    --card: 240 10% 7%; /* #111114 card background */
-    --card-foreground: 210 17% 98%;
-    --card-glow: 270 80% 65%;
+    --card: 0 0% 8%; /* subtle dark gray */
+    --card-foreground: 0 0% 98%;
 
-    --popover: 240 10% 7%;
-    --popover-foreground: 210 17% 98%;
+    --popover: 0 0% 8%;
+    --popover-foreground: 0 0% 98%;
 
-    --primary: 270 80% 65%; /* #a855f7 neon purple */
+    --primary: 270 80% 65%; /* deep purple accent */
     --primary-foreground: 0 0% 100%;
-    --primary-dark: 270 60% 45%; /* #7e22ce deep purple */
-    --primary-glow: 270 100% 75%; /* neon violet */
+    --primary-dark: 270 70% 55%;
+    --primary-light: 270 75% 75%;
 
-    --secondary: 0 0% 18%; /* #2e2e2e gunmetal gray */
+    --secondary: 0 0% 15%; /* neutral gray */
     --secondary-foreground: 0 0% 100%;
-    --secondary-glow: 270 80% 65%; /* purple glow on hover */
 
-    --muted: 240 10% 10%;
-    --muted-foreground: 0 0% 60%;
+    --muted: 0 0% 12%;
+    --muted-foreground: 0 0% 65%;
 
-    --accent: 270 80% 65%; /* purple accent */
+    --accent: 270 80% 65%;
     --accent-foreground: 0 0% 100%;
-    --accent-glow: 270 100% 75%;
 
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 210 17% 98%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 98%;
 
-    --border: 270 80% 65% / 0.25; /* rgba(168, 85, 247, 0.25) */
-    --input: 240 10% 7%;
+    --border: 0 0% 20%;
+    --input: 0 0% 12%;
     --ring: 270 80% 65%;
 
-    --radius: 1rem; /* 16px rounded corners */
+    --radius: 0.75rem; /* subtle rounded corners */
 
-    /* Gradients */
-    --gradient-purple: linear-gradient(135deg, hsl(270 80% 65%) 0%, hsl(270 60% 45%) 100%);
-    --gradient-dark: linear-gradient(135deg, hsl(0 0% 18%) 0%, hsl(0 0% 12%) 100%);
-    --gradient-glow: 0 0 40px hsl(270 80% 65% / 0.5);
-    
-    /* Shadows & Effects */
-    --shadow-purple: 0 0 30px hsl(270 80% 65% / 0.4);
-    --shadow-purple-soft: 0 0 20px hsl(270 80% 65% / 0.3);
-    --shadow-card: 0 4px 20px hsl(0 0% 0% / 0.8);
+    /* Shadows */
+    --shadow-sm: 0 1px 2px 0 hsl(0 0% 0% / 0.05);
+    --shadow-md: 0 4px 6px -1px hsl(0 0% 0% / 0.1);
+    --shadow-lg: 0 10px 15px -3px hsl(0 0% 0% / 0.2);
+    --shadow-purple: 0 0 20px hsl(270 80% 65% / 0.3);
     
     /* Transitions */
-    --transition-smooth: all 0.25s ease-in-out;
+    --transition-smooth: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   }
 }
 
@@ -66,39 +59,37 @@ All colors MUST be HSL.
 
   body {
     @apply bg-background text-foreground;
-    font-family: 'Inter', 'Neue Haas Grotesk', -apple-system, BlinkMacSystemFont, sans-serif;
-    font-weight: 500;
-    letter-spacing: -0.01em;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif;
+    font-weight: 400;
+    letter-spacing: -0.011em;
+    line-height: 1.6;
     -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 
   /* Card Effects */
   .glass-card {
-    @apply bg-card border rounded-2xl;
-    border-color: hsl(var(--border));
+    @apply bg-card rounded-xl border border-border;
+    backdrop-filter: blur(12px);
     transition: var(--transition-smooth);
   }
 
   .glass-card:hover {
-    border-color: hsl(var(--primary));
-    box-shadow: var(--shadow-purple);
-    transform: scale(1.02);
+    border-color: hsl(var(--primary) / 0.5);
+    box-shadow: var(--shadow-md);
   }
 
-  /* Glow Effects */
-  .glow-primary {
-    box-shadow: var(--shadow-purple);
-  }
-
-  .glow-soft {
-    box-shadow: var(--shadow-purple-soft);
+  /* Minimal card variant */
+  .card-minimal {
+    @apply bg-card/50 rounded-lg border border-border/50;
+    backdrop-filter: blur(8px);
   }
 
   /* Animations */
-  @keyframes fade-up {
+  @keyframes fade-in {
     from {
       opacity: 0;
-      transform: translateY(20px);
+      transform: translateY(10px);
     }
     to {
       opacity: 1;
@@ -106,24 +97,27 @@ All colors MUST be HSL.
     }
   }
 
-  @keyframes purple-shimmer {
-    0% { background-position: -200% center; }
-    100% { background-position: 200% center; }
+  @keyframes shimmer {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
   }
 
-  .animate-fade-up {
-    animation: fade-up 0.6s ease-out;
+  @keyframes particles {
+    0%, 100% { 
+      transform: translateY(0) translateX(0);
+      opacity: 0;
+    }
+    50% {
+      opacity: 0.6;
+    }
   }
 
-  .animate-purple-shimmer {
-    background: linear-gradient(
-      90deg,
-      transparent 0%,
-      hsl(var(--primary) / 0.4) 50%,
-      transparent 100%
-    );
-    background-size: 200% 100%;
-    animation: purple-shimmer 2s ease-in-out infinite;
+  .animate-fade-in {
+    animation: fade-in 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .animate-shimmer {
+    animation: shimmer 2s ease-in-out infinite;
   }
 }
 

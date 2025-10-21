@@ -251,53 +251,49 @@ const Index = () => {
     <div className="min-h-screen w-full bg-background">
       <Navigation />
 
-      {/* Quantum Bets Section */}
-      <section className="pt-32 pb-20 px-6">
-        <div className="max-w-5xl mx-auto text-center animate-fade-up">
-          <h1 className="text-6xl md:text-7xl font-bold tracking-tight mb-6">
-            <span className="bg-gradient-to-r from-primary via-primary-dark to-primary bg-clip-text text-transparent">
-              QUANTUM BETS
-            </span>
+      {/* Main Hero Section */}
+      <section className="pt-28 pb-16 px-6">
+        <div className="max-w-4xl mx-auto text-center space-y-8 animate-fade-in">
+          <h1 className="text-5xl md:text-6xl font-semibold tracking-tight leading-tight">
+            Predict the Future.
           </h1>
-          <p className="text-xl md:text-2xl text-muted-foreground mb-12 max-w-3xl mx-auto">
-            Describe any situation — AI predicts the futures. You decide which becomes reality.
+          <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
+            Create AI-powered markets where every decision becomes a bet.
           </p>
 
-          {/* Input Section */}
-          <div className="max-w-2xl mx-auto space-y-6">
+          {/* Primary CTAs */}
+          <div className="max-w-2xl mx-auto space-y-4 pt-4">
             <Input
-              placeholder="e.g. Will Solana outperform Ethereum next month?"
+              placeholder="Will ETH surpass $4,000 next week?"
               value={situation}
               onChange={(e) => setSituation(e.target.value)}
-              className="h-16 text-lg bg-card border-primary/25"
+              className="h-14 text-base bg-card/50 border-border focus:border-primary"
             />
-            <div className="flex gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Button
                 onClick={handleGenerateScenarios}
                 disabled={isGenerating}
                 size="lg"
                 variant="outline"
-                className="flex-1 h-14 border-2 border-primary hover:border-primary-glow hover:shadow-[0_0_30px_hsl(var(--primary)/0.6)] transition-all duration-300"
               >
                 {isGenerating ? (
                   <>
-                    <Sparkles className="w-5 h-5 animate-spin" />
-                    Simulating possible futures...
+                    <Sparkles className="w-4 h-4 animate-spin" />
+                    Generating...
                   </>
                 ) : (
                   <>
-                    <Sparkles className="w-5 h-5" />
-                    🧠 Generate Quantum Scenarios
+                    <Sparkles className="w-4 h-4" />
+                    Generate Quantum Scenarios
                   </>
                 )}
               </Button>
               <Button
                 size="lg"
-                variant="outline"
-                className="flex-1 h-14 border-2 border-secondary hover:shadow-[0_0_25px_hsl(var(--primary)/0.4)] transition-all duration-300"
+                variant="secondary"
                 onClick={() => navigate('/everything-bets')}
               >
-                🌍 Create Everything Bet
+                Create Everything Bet
               </Button>
             </div>
           </div>
@@ -306,30 +302,30 @@ const Index = () => {
 
       {/* Generated Scenarios */}
       {scenarios.length > 0 && (
-        <section className="pb-20 px-6">
-          <div className="max-w-6xl mx-auto">
-            <h2 className="text-4xl font-bold mb-10 text-center text-primary">
-              AI-Generated Futures
+        <section className="pb-16 px-6">
+          <div className="max-w-5xl mx-auto">
+            <h2 className="text-3xl font-semibold mb-8 text-center">
+              AI Scenarios
             </h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {scenarios.map((scenario, index) => (
                 <div
                   key={scenario.id}
-                  className="glass-card p-8 animate-fade-up"
-                  style={{ animationDelay: `${index * 0.15}s` }}
+                  className="card-minimal p-6 animate-fade-in hover:border-primary/50 transition-all"
+                  style={{ animationDelay: `${index * 0.1}s` }}
                 >
-                  <div className="mb-6">
-                    <div className="text-xs text-primary font-bold mb-2">
+                  <div className="mb-4">
+                    <div className="text-xs text-muted-foreground font-medium mb-2">
                       {scenario.title}
                     </div>
-                    <h3 className="text-xl font-bold text-foreground mb-4">
+                    <h3 className="text-lg font-medium text-foreground">
                       {scenario.summary}
                     </h3>
                   </div>
                   <Button 
                     onClick={() => handleCreateQuantumMarket(scenario)}
                     disabled={isCreatingMarket}
-                    className="w-full bg-gradient-to-r from-primary to-primary-dark glow-primary"
+                    className="w-full"
                   >
                     {isCreatingMarket ? "Creating..." : "Create Market"}
                   </Button>
@@ -342,12 +338,12 @@ const Index = () => {
 
       {/* Active Quantum Markets */}
       {quantumMarketIds.length > 0 && (
-        <section className="pb-24 px-6">
-          <div className="max-w-6xl mx-auto">
-            <h2 className="text-4xl font-bold mb-10 text-center text-primary">
-              Active Quantum Markets
+        <section className="pb-16 px-6">
+          <div className="max-w-5xl mx-auto">
+            <h2 className="text-3xl font-semibold mb-8 text-center">
+              Quantum Markets
             </h2>
-            <div className="grid grid-cols-1 gap-8">
+            <div className="space-y-4">
               {quantumMarketIds.map((marketId, index) => (
                 <MarketCard
                   key={`quantum-${Number(marketId)}`}
@@ -364,12 +360,12 @@ const Index = () => {
 
       {/* Active Everything Markets */}
       {everythingMarketIds.length > 0 && (
-        <section className="pb-24 px-6">
-          <div className="max-w-6xl mx-auto">
-            <h2 className="text-4xl font-bold mb-10 text-center text-primary">
-              Active Everything Markets
+        <section className="pb-16 px-6">
+          <div className="max-w-5xl mx-auto">
+            <h2 className="text-3xl font-semibold mb-8 text-center">
+              Everything Markets
             </h2>
-            <div className="grid grid-cols-1 gap-8">
+            <div className="space-y-4">
               {everythingMarketIds.map((marketId, index) => (
                 <MarketCard
                   key={`everything-${Number(marketId)}`}
@@ -386,9 +382,9 @@ const Index = () => {
 
       {/* Bet Modal */}
       <Dialog open={betModalOpen} onOpenChange={setBetModalOpen}>
-        <DialogContent className="bg-card border-primary/25">
+        <DialogContent className="bg-card border-border">
           <DialogHeader>
-            <DialogTitle className="text-2xl font-bold">Place Your Bet</DialogTitle>
+            <DialogTitle className="text-xl font-semibold">Place Bet</DialogTitle>
           </DialogHeader>
           {selectedMarketId !== null && (
             <BetModalContent
@@ -451,19 +447,19 @@ const MarketCard = ({ marketId, isQuantum, onPlaceBet, index }: MarketCardProps)
 
   return (
     <div
-      className="glass-card p-8 animate-fade-up"
-      style={{ animationDelay: `${index * 0.1}s` }}
+      className="card-minimal p-6 animate-fade-in"
+      style={{ animationDelay: `${index * 0.05}s` }}
     >
-      <div className="flex items-start justify-between mb-6">
-        <h3 className="text-2xl font-bold text-foreground flex-1">
+      <div className="flex items-start justify-between mb-5">
+        <h3 className="text-xl font-medium text-foreground flex-1 leading-snug">
           {marketInfo.question}
         </h3>
         {marketInfo.resolved && (
-          <span className="text-primary font-bold text-sm">RESOLVED</span>
+          <span className="text-primary font-medium text-xs">RESOLVED</span>
         )}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-5">
         {marketInfo.outcomes.map((outcome, outcomeIndex) => (
           <OutcomeDisplay
             key={outcomeIndex}
@@ -478,8 +474,8 @@ const MarketCard = ({ marketId, isQuantum, onPlaceBet, index }: MarketCardProps)
         ))}
       </div>
 
-      <div className="flex items-center gap-2 text-sm text-muted-foreground border-t border-primary/25 pt-4">
-        <Clock className="w-4 h-4" />
+      <div className="flex items-center gap-2 text-xs text-muted-foreground border-t border-border pt-3">
+        <Clock className="w-3.5 h-3.5" />
         <span>{timeLeft} remaining</span>
       </div>
     </div>
@@ -501,21 +497,22 @@ const OutcomeDisplay = ({ marketId, outcomeIndex, outcomeName, isQuantum, resolv
   const poolFormatted = (Number(pool) / 1e6).toFixed(2);
 
   return (
-    <div className={`border ${isWinner ? 'border-primary border-2' : 'border-primary/25'} rounded-2xl p-6 hover:border-primary transition-all duration-300`}>
-      <div className="text-xs text-primary font-bold mb-2">
-        {isQuantum ? 'SCENARIO' : 'OUTCOME'} {outcomeIndex + 1}
+    <div className={`border ${isWinner ? 'border-primary' : 'border-border'} rounded-lg p-4 hover:border-primary/60 transition-all bg-card/30`}>
+      <div className="text-xs text-muted-foreground font-medium mb-2">
+        {isQuantum ? 'Scenario' : 'Outcome'} {outcomeIndex + 1}
       </div>
-      <div className="text-lg font-bold mb-4">{outcomeName}</div>
-      <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
-        <TrendingUp className="w-4 h-4" />
+      <div className="text-base font-medium mb-3 leading-tight">{outcomeName}</div>
+      <div className="flex items-center gap-2 text-sm text-muted-foreground mb-3">
+        <TrendingUp className="w-3.5 h-3.5" />
         <span>{poolFormatted} USDC</span>
       </div>
       {!resolved && (
         <Button
           onClick={onPlaceBet}
-          className="w-full bg-gradient-to-r from-primary to-primary-dark glow-primary"
+          size="sm"
+          className="w-full"
         >
-          Place Bet
+          Bet
         </Button>
       )}
     </div>
@@ -538,14 +535,14 @@ const BetModalContent = ({ marketId, isQuantum, selectedOutcome, setSelectedOutc
   if (!marketInfo) return null;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <div>
-        <h3 className="text-lg font-semibold mb-4">{marketInfo.question}</h3>
+        <h3 className="text-base font-medium mb-3 leading-snug">{marketInfo.question}</h3>
         <RadioGroup value={selectedOutcome} onValueChange={setSelectedOutcome}>
           {marketInfo.outcomes.map((outcome, index) => (
-            <div key={index} className="flex items-center space-x-2 mb-3">
+            <div key={index} className="flex items-center space-x-2 mb-2">
               <RadioGroupItem value={String(index)} id={`outcome-${index}`} />
-              <Label htmlFor={`outcome-${index}`} className="cursor-pointer">
+              <Label htmlFor={`outcome-${index}`} className="cursor-pointer text-sm">
                 {outcome}
               </Label>
             </div>
@@ -553,21 +550,22 @@ const BetModalContent = ({ marketId, isQuantum, selectedOutcome, setSelectedOutc
         </RadioGroup>
       </div>
       <div>
-        <Label htmlFor="amount">Amount (USDC)</Label>
+        <Label htmlFor="amount" className="text-sm">Amount (USDC)</Label>
         <Input
           id="amount"
           type="number"
           placeholder="100"
           value={betAmount}
           onChange={(e) => setBetAmount(e.target.value)}
-          className="mt-2 bg-background border-primary/25"
+          className="mt-1.5 bg-background border-border"
         />
       </div>
       <Button
         onClick={onConfirm}
-        className="w-full h-14 bg-gradient-to-r from-primary to-primary-dark glow-primary"
+        className="w-full"
+        size="lg"
       >
-        <Zap className="w-5 h-5 mr-2" />
+        <Zap className="w-4 h-4 mr-2" />
         Confirm Bet
       </Button>
     </div>
