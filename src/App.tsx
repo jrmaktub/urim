@@ -33,15 +33,16 @@ const config = getDefaultConfig({
 const queryClient = new QueryClient();
 
 const App = () => (
-    <NexusProvider
+
+  <WagmiProvider config={config}>
+    <QueryClientProvider client={queryClient}>
+      <RainbowKitProvider>
+          <NexusProvider
       config={{
         debug: false, // true to view debug logs
         network: 'testnet', // "mainnet" (default) or "testnet"
       }}
     >
-  <WagmiProvider config={config}>
-    <QueryClientProvider client={queryClient}>
-      <RainbowKitProvider>
       <TooltipProvider>
         <Toaster />
         <Sonner />
@@ -57,10 +58,11 @@ const App = () => (
           </Routes>
         </BrowserRouter>
       </TooltipProvider>
+           </NexusProvider>
         </RainbowKitProvider>
     </QueryClientProvider>
   </WagmiProvider>
-    </NexusProvider>
+
 );
 
 export default App;

@@ -1,4 +1,4 @@
-import { NexusProvider, BridgeButton } from '@avail-project/nexus-widgets';
+import { BridgeButton } from '@avail-project/nexus-widgets';
  
 function Bridge() {
   return (
