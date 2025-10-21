@@ -8,8 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { CheckCircle2, Plus, X, Flag } from "lucide-react";
-import { FACTORY_ADDRESS, USDC_ADDRESS, MAX_OUTCOMES, BASE_SEPOLIA_CHAIN_ID } from "@/constants/contracts";
-import FactoryABI from "@/contracts/MarketFactory.json";
+import { URIM_MARKET_ADDRESS, USDC_ADDRESS, MAX_OUTCOMES, BASE_SEPOLIA_CHAIN_ID } from "@/constants/contracts";
+import UrimMarketABI from "@/contracts/UrimMarket.json";
 import { Card } from "@/components/ui/card";
 
 const CreateBet = () => {
@@ -77,14 +77,6 @@ const CreateBet = () => {
       return;
     }
 
-    if (FACTORY_ADDRESS === "0x0000000000000000000000000000000000000000") {
-      toast({
-        title: "Factory Not Deployed",
-        description: "Please deploy the Factory contract and update FACTORY_ADDRESS in src/constants/contracts.ts",
-        variant: "destructive",
-      });
-      return;
-    }
 
     const endTime = Math.floor(new Date(endDateTime).getTime() / 1000);
     
@@ -92,10 +84,10 @@ const CreateBet = () => {
     
     try {
       const hash = await writeContractAsync({
-        address: FACTORY_ADDRESS as `0x${string}`,
-        abi: FactoryABI.abi as any,
+        address: URIM_MARKET_ADDRESS as `0x${string}`,
+        abi: UrimMarketABI.abi as any,
         functionName: "createMarket",
-        args: [question, outcomes, USDC_ADDRESS, BigInt(endTime)],
+        args: [question, outcomes, BigInt(endTime)],
       } as any);
       
       toast({
