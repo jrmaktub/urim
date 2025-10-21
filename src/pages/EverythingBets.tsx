@@ -21,7 +21,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle2, Clock, TrendingUp } from "lucide-react";
+import { CheckCircle2, Clock, TrendingUp, Zap } from "lucide-react";
 import { URIM_MARKET_ADDRESS, USDC_ADDRESS } from "@/constants/contracts";
 import UrimMarketABI from "@/contracts/UrimMarket.json";
 import ERC20ABI from "@/contracts/ERC20.json";
@@ -151,13 +151,15 @@ const EverythingBets = () => {
       <div className="min-h-screen w-full bg-background">
         <Navigation />
         <div className="flex items-center justify-center min-h-[calc(100vh-200px)] px-6">
-          <div className="max-w-md w-full gold-card p-8 text-center animate-fade-up">
-            <CheckCircle2 className="w-16 h-16 text-primary mx-auto mb-6" />
-            <h2 className="text-3xl font-bold mb-4 text-primary">
-              Your market is live ⚡
+          <div className="max-w-lg w-full card-glow p-12 text-center animate-fade-up">
+            <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-primary/20 border-2 border-primary mb-6">
+              <CheckCircle2 className="w-10 h-10 text-primary" />
+            </div>
+            <h2 className="text-4xl font-bold mb-4 tracking-tight">
+              Market Created! ⚡
             </h2>
-            <p className="text-muted-foreground mb-8">
-              Your bet is now on the blockchain. Share it or create another.
+            <p className="text-muted-foreground mb-8 text-lg leading-relaxed">
+              Your market is now live on Base Sepolia. Users can start placing bets immediately.
             </p>
             <Button
               onClick={() => {
@@ -169,6 +171,7 @@ const EverythingBets = () => {
                 setStakeAmount("");
               }}
               className="w-full"
+              size="lg"
             >
               Create Another Market
             </Button>
@@ -184,61 +187,74 @@ const EverythingBets = () => {
       <Navigation />
 
       {/* Create Section */}
-      <section className="pt-32 pb-16 px-6">
-        <div className="max-w-2xl mx-auto">
-          <div className="text-center mb-12 animate-fade-up">
-            <h1 className="text-5xl font-bold mb-4 text-primary">
-              CREATE A BET
+      <section className="pt-32 pb-20 px-6">
+        <div className="max-w-3xl mx-auto">
+          {/* Header */}
+          <div className="text-center mb-12 animate-fade-up space-y-4">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-secondary/50 border border-border/50 mb-4">
+              <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Binary Market</span>
+            </div>
+            <h1 className="text-6xl font-bold tracking-tight">
+              Create Everything Bet
             </h1>
-            <p className="text-lg text-muted-foreground">
-              Define a question, set two sides, and open your market to everyone.
+            <p className="text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
+              Simple Yes/No prediction markets on any topic
             </p>
           </div>
 
-          <div className="gold-card p-8 animate-fade-up" style={{ animationDelay: "0.2s" }}>
-            <div className="space-y-6">
-              <div>
-                <Label htmlFor="question" className="text-foreground font-bold mb-2 block">
-                  QUESTION
+          {/* Form Card */}
+          <div className="card-glow p-10 animate-fade-up" style={{ animationDelay: "0.15s" }}>
+            <div className="space-y-7">
+              {/* Question */}
+              <div className="space-y-3">
+                <Label htmlFor="question" className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
+                  Market Question
                 </Label>
                 <Input
                   id="question"
                   placeholder="What event do you want to predict?"
                   value={question}
                   onChange={(e) => setQuestion(e.target.value)}
+                  className="h-14 text-base border-border/50 focus:border-primary/60 bg-input/50 rounded-xl"
                 />
               </div>
 
-              <div>
-                <Label htmlFor="optionA" className="text-foreground font-bold mb-2 block">
-                  OPTION A
-                </Label>
-                <Input
-                  id="optionA"
-                  placeholder="First outcome (e.g., Yes)"
-                  value={optionA}
-                  onChange={(e) => setOptionA(e.target.value)}
-                />
+              {/* Options Grid */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-3">
+                  <Label htmlFor="optionA" className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
+                    Option A
+                  </Label>
+                  <Input
+                    id="optionA"
+                    placeholder="Yes"
+                    value={optionA}
+                    onChange={(e) => setOptionA(e.target.value)}
+                    className="h-14 text-base border-border/50 focus:border-primary/60 bg-input/50 rounded-xl"
+                  />
+                </div>
+
+                <div className="space-y-3">
+                  <Label htmlFor="optionB" className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
+                    Option B
+                  </Label>
+                  <Input
+                    id="optionB"
+                    placeholder="No"
+                    value={optionB}
+                    onChange={(e) => setOptionB(e.target.value)}
+                    className="h-14 text-base border-border/50 focus:border-primary/60 bg-input/50 rounded-xl"
+                  />
+                </div>
               </div>
 
-              <div>
-                <Label htmlFor="optionB" className="text-foreground font-bold mb-2 block">
-                  OPTION B
-                </Label>
-                <Input
-                  id="optionB"
-                  placeholder="Second outcome (e.g., No)"
-                  value={optionB}
-                  onChange={(e) => setOptionB(e.target.value)}
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="duration" className="text-foreground font-bold mb-2 block">
-                  DURATION
+              {/* Duration */}
+              <div className="space-y-3">
+                <Label htmlFor="duration" className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
+                  Market Duration
                 </Label>
                 <Select value={duration} onValueChange={setDuration}>
-                  <SelectTrigger className="h-12 border-2 border-primary/50 bg-transparent text-foreground focus:border-primary focus:shadow-[0_0_20px_hsl(var(--primary)/0.3)]">
+                  <SelectTrigger className="h-14 border-2 border-border/50 bg-input/50 text-foreground focus:border-primary/60 rounded-xl">
                     <SelectValue placeholder="Select duration" />
                   </SelectTrigger>
                   <SelectContent>
@@ -251,25 +267,41 @@ const EverythingBets = () => {
                 </Select>
               </div>
 
-              <div>
-                <Label htmlFor="stake" className="text-foreground font-bold mb-2 block">
-                  INITIAL STAKE (USDC)
+              {/* Initial Stake */}
+              <div className="space-y-3">
+                <Label htmlFor="stake" className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
+                  Initial Stake
                 </Label>
-                <Input
-                  id="stake"
-                  type="number"
-                  placeholder="100"
-                  value={stakeAmount}
-                  onChange={(e) => setStakeAmount(e.target.value)}
-                />
+                <div className="relative">
+                  <Input
+                    id="stake"
+                    type="number"
+                    placeholder="100"
+                    value={stakeAmount}
+                    onChange={(e) => setStakeAmount(e.target.value)}
+                    className="h-14 text-lg font-semibold pr-16 border-border/50 focus:border-primary/60 bg-input/50 rounded-xl"
+                  />
+                  <div className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-bold text-muted-foreground">
+                    USDC
+                  </div>
+                </div>
               </div>
 
+              {/* Create Button */}
               <Button
                 onClick={handleCreateMarket}
                 disabled={isProcessing}
-                className="w-full h-14 text-base mt-8"
+                className="w-full mt-4"
+                size="lg"
               >
-                {isProcessing ? "CREATING MARKET..." : "CREATE MARKET"}
+                {isProcessing ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin mr-2" />
+                    Creating Market...
+                  </>
+                ) : (
+                  "Create Market"
+                )}
               </Button>
             </div>
           </div>
@@ -279,54 +311,66 @@ const EverythingBets = () => {
       {/* Active Markets Section */}
       <section className="pb-24 px-6">
         <div className="max-w-7xl mx-auto">
-          <h2 className="text-3xl font-bold mb-8 text-primary">ACTIVE USER MARKETS</h2>
+          <div className="mb-12">
+            <h2 className="text-4xl font-bold tracking-tight mb-2">Active Markets</h2>
+            <p className="text-muted-foreground text-lg">Live binary prediction markets</p>
+          </div>
+          
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {activeMarkets.map((market, index) => (
               <div
                 key={market.id}
-                className="gold-card p-6 animate-fade-up hover:shadow-[0_0_30px_rgba(212,175,55,0.3)] transition-all duration-300"
+                className="glass-card p-8 animate-fade-up hover:border-primary/40 transition-all group"
                 style={{ animationDelay: `${index * 0.1}s` }}
               >
-                <h3 className="text-lg font-bold text-foreground mb-4">{market.question}</h3>
+                {/* Question */}
+                <h3 className="text-xl font-bold text-foreground mb-6 leading-tight min-h-[3.5rem]">
+                  {market.question}
+                </h3>
                 
-                <div className="space-y-3 mb-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">{market.optionA} Pool</span>
+                {/* Pools */}
+                <div className="space-y-3 mb-6">
+                  <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border border-border/30">
+                    <span className="text-sm font-semibold text-muted-foreground">{market.optionA}</span>
                     <span className="text-primary font-bold">{market.poolA} USDC</span>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">{market.optionB} Pool</span>
+                  <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border border-border/30">
+                    <span className="text-sm font-semibold text-muted-foreground">{market.optionB}</span>
                     <span className="text-primary font-bold">{market.poolB} USDC</span>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
+                {/* Time Left */}
+                <div className="flex items-center gap-2 text-sm text-muted-foreground mb-6 pb-6 border-b border-border/30">
                   <Clock className="w-4 h-4" />
-                  <span>{market.timeLeft}</span>
+                  <span className="font-medium">{market.timeLeft} remaining</span>
                 </div>
 
+                {/* Bet Buttons */}
                 <div className="grid grid-cols-2 gap-3">
                   <Button 
                     variant="outline" 
-                    className="border-2 border-primary hover:bg-primary hover:text-black transition-all"
+                    size="sm"
+                    className="group/btn"
                     onClick={() => {
                       setSelectedMarket(market);
                       setSelectedOption(market.optionA);
                       setStakeModalOpen(true);
                     }}
                   >
-                    Bet on {market.optionA}
+                    {market.optionA}
                   </Button>
                   <Button 
-                    variant="outline" 
-                    className="border-2 border-primary hover:bg-primary hover:text-black transition-all"
+                    variant="outline"
+                    size="sm" 
+                    className="group/btn"
                     onClick={() => {
                       setSelectedMarket(market);
                       setSelectedOption(market.optionB);
                       setStakeModalOpen(true);
                     }}
                   >
-                    Bet on {market.optionB}
+                    {market.optionB}
                   </Button>
                 </div>
               </div>
@@ -337,26 +381,45 @@ const EverythingBets = () => {
 
       {/* Stake Modal */}
       <Dialog open={stakeModalOpen} onOpenChange={setStakeModalOpen}>
-        <DialogContent className="bg-card border-primary/30">
+        <DialogContent className="bg-card border-border/50 rounded-2xl">
           <DialogHeader>
-            <DialogTitle className="text-primary">Place Your Bet</DialogTitle>
-            <DialogDescription className="text-muted-foreground">
+            <DialogTitle className="text-2xl font-bold">Place Your Bet</DialogTitle>
+            <DialogDescription className="text-muted-foreground text-base">
               {selectedMarket?.question}
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label className="text-foreground font-bold mb-2 block">BETTING ON</Label>
-              <div className="p-4 border-2 border-primary rounded-md bg-primary/10">
-                <span className="text-primary font-bold text-lg">{selectedOption}</span>
+          <div className="space-y-6 pt-4">
+            {/* Selected Option */}
+            <div className="space-y-3">
+              <Label className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
+                Betting On
+              </Label>
+              <div className="p-5 border-2 border-primary rounded-xl bg-primary/10">
+                <span className="text-primary font-bold text-xl">{selectedOption}</span>
               </div>
             </div>
-            <div>
-              <Label className="text-foreground font-bold mb-2 block">STAKE AMOUNT (USDC)</Label>
-              <Input type="number" placeholder="100" />
+            
+            {/* Amount Input */}
+            <div className="space-y-3">
+              <Label className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
+                Stake Amount
+              </Label>
+              <div className="relative">
+                <Input 
+                  type="number" 
+                  placeholder="100"
+                  className="h-14 text-lg font-semibold pr-16 bg-input/50 border-border/50 focus:border-primary/60 rounded-xl"
+                />
+                <div className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-bold text-muted-foreground">
+                  USDC
+                </div>
+              </div>
             </div>
+            
+            {/* Confirm Button */}
             <Button 
               className="w-full"
+              size="lg"
               onClick={() => {
                 toast({
                   title: "Bet Placed ⚡",
@@ -365,6 +428,7 @@ const EverythingBets = () => {
                 setStakeModalOpen(false);
               }}
             >
+              <Zap className="w-4 h-4 mr-2" />
               Confirm Bet
             </Button>
           </div>

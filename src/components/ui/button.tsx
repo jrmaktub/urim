@@ -5,22 +5,22 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg text-sm font-semibold tracking-normal ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-40 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl text-sm font-semibold tracking-tight ring-offset-background transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-40 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm hover:shadow-[0_0_20px_hsl(var(--primary)/0.4)] active:scale-[0.98]",
-        destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90 active:scale-[0.98]",
-        outline: "border-2 border-primary bg-transparent text-foreground hover:bg-primary/5 hover:border-primary/80 hover:shadow-[0_0_15px_hsl(var(--primary)/0.25)] active:scale-[0.98]",
-        secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80 shadow-sm active:scale-[0.98]",
-        ghost: "hover:bg-muted/50 hover:text-foreground active:scale-[0.98]",
+        default: "bg-primary text-primary-foreground hover:bg-primary/90 shadow-[0_8px_24px_hsl(var(--primary)/0.3)] hover:shadow-[0_12px_32px_hsl(var(--primary)/0.4)] hover:scale-[1.02] active:scale-[0.98]",
+        destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90 shadow-md hover:shadow-lg active:scale-[0.98]",
+        outline: "border-2 border-primary/60 bg-transparent text-foreground hover:bg-primary/8 hover:border-primary hover:shadow-[0_8px_24px_hsl(var(--primary)/0.2)] active:scale-[0.98]",
+        secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/90 shadow-md hover:shadow-lg active:scale-[0.98]",
+        ghost: "hover:bg-muted/60 hover:text-foreground active:scale-[0.98]",
         link: "text-primary underline-offset-4 hover:underline",
       },
       size: {
-        default: "h-11 px-6 py-2.5",
-        sm: "h-9 px-4 text-xs",
-        lg: "h-12 px-8 text-base",
-        icon: "h-11 w-11",
+        default: "h-12 px-6 py-3",
+        sm: "h-10 px-4 text-xs",
+        lg: "h-14 px-8 text-base",
+        icon: "h-12 w-12",
       },
     },
     defaultVariants: {

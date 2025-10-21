@@ -3,9 +3,10 @@ import { useNavigate } from "react-router-dom";
 import { useAccount, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
+import Hero from "@/components/Hero";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Sparkles, Clock, TrendingUp, Zap } from "lucide-react";
+import { Sparkles, Clock, TrendingUp, Zap, ChevronRight } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
   Dialog,
@@ -250,85 +251,174 @@ const Index = () => {
   return (
     <div className="min-h-screen w-full bg-background">
       <Navigation />
+      <Hero />
 
-      {/* Main Hero Section */}
-      <section className="pt-28 pb-16 px-6">
-        <div className="max-w-4xl mx-auto text-center space-y-8 animate-fade-in">
-          <h1 className="text-5xl md:text-6xl font-semibold tracking-tight leading-tight">
-            Predict the Future.
-          </h1>
-          <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-            Create AI-powered markets where every decision becomes a bet.
-          </p>
+      {/* Main Action Cards Section */}
+      <section className="max-w-6xl mx-auto px-6 pb-24 -mt-16">
+        <div className="grid md:grid-cols-2 gap-8">
+          {/* Quantum Bet Card */}
+          <div className="card-glow p-10 relative overflow-hidden group">
+            {/* AI Particle Effect Background */}
+            <div className="absolute -top-20 -right-20 w-64 h-64 bg-primary/15 rounded-full blur-3xl animate-float opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
+            <div className="absolute -bottom-10 -left-10 w-48 h-48 bg-primary/10 rounded-full blur-2xl animate-pulse" />
+            
+            <div className="relative z-10 space-y-6">
+              {/* Badge */}
+              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/15 border border-primary/30">
+                <Sparkles className="w-3.5 h-3.5 text-primary" />
+                <span className="text-xs font-bold text-primary uppercase tracking-wider">AI Powered</span>
+              </div>
+              
+              {/* Heading */}
+              <div>
+                <h2 className="text-3xl font-bold mb-3 tracking-tight">Quantum Scenarios</h2>
+                <p className="text-muted-foreground leading-relaxed">
+                  AI generates 3 possible futures based on your question. Choose your prediction and place your bet.
+                </p>
+              </div>
+              
+              {/* Input */}
+              <div className="space-y-3">
+                <Input
+                  placeholder="What event do you want to predict?"
+                  value={situation}
+                  onChange={(e) => setSituation(e.target.value)}
+                  className="h-14 text-base border-border/50 focus:border-primary/60 bg-input/50 rounded-xl transition-all"
+                />
+                
+                {/* Generate Button */}
+                <Button
+                  onClick={handleGenerateScenarios}
+                  disabled={isGenerating || !situation.trim()}
+                  variant="default"
+                  className="w-full group/btn"
+                  size="lg"
+                >
+                  {isGenerating ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin mr-2" />
+                      Generating AI Scenarios...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-4 h-4 mr-2 group-hover/btn:rotate-12 transition-transform" />
+                      Generate Quantum Scenarios
+                      <ChevronRight className="w-4 h-4 ml-1 group-hover/btn:translate-x-1 transition-transform" />
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          </div>
 
-          {/* Primary CTAs */}
-          <div className="max-w-2xl mx-auto space-y-4 pt-4">
-            <Input
-              placeholder="Will ETH surpass $4,000 next week?"
-              value={situation}
-              onChange={(e) => setSituation(e.target.value)}
-              className="h-14 text-base bg-card/50 border-border focus:border-primary"
-            />
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <Button
-                onClick={handleGenerateScenarios}
-                disabled={isGenerating}
-                size="lg"
-                variant="outline"
-              >
-                {isGenerating ? (
-                  <>
-                    <Sparkles className="w-4 h-4 animate-spin" />
-                    Generating...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="w-4 h-4" />
-                    Generate Quantum Scenarios
-                  </>
-                )}
-              </Button>
-              <Button
-                size="lg"
-                variant="secondary"
-                onClick={() => navigate('/everything-bets')}
-              >
-                Create Everything Bet
-              </Button>
+          {/* Everything Bet Card */}
+          <div className="glass-card p-10 relative overflow-hidden group hover:border-primary/30 transition-all">
+            <div className="relative z-10 space-y-6">
+              {/* Badge */}
+              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-secondary/50 border border-border/50">
+                <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Traditional</span>
+              </div>
+              
+              {/* Heading */}
+              <div>
+                <h2 className="text-3xl font-bold mb-3 tracking-tight">Everything Bets</h2>
+                <p className="text-muted-foreground leading-relaxed">
+                  Create simple Yes/No prediction markets on any topic. Perfect for binary outcomes.
+                </p>
+              </div>
+              
+              {/* Placeholder Visual */}
+              <div className="space-y-3">
+                <div className="h-14 flex items-center justify-center rounded-xl border border-border/30 bg-muted/20">
+                  <p className="text-sm text-muted-foreground font-medium">
+                    Yes / No binary markets
+                  </p>
+                </div>
+                
+                {/* Create Button */}
+                <Button
+                  onClick={() => navigate('/everything-bets')}
+                  variant="secondary"
+                  className="w-full group/btn"
+                  size="lg"
+                >
+                  Create Everything Bet
+                  <ChevronRight className="w-4 h-4 ml-1 group-hover/btn:translate-x-1 transition-transform" />
+                </Button>
+              </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Generated Scenarios */}
+      {/* Generated Scenarios - AI Effect */}
       {scenarios.length > 0 && (
-        <section className="pb-16 px-6">
-          <div className="max-w-5xl mx-auto">
-            <h2 className="text-3xl font-semibold mb-8 text-center">
-              AI Scenarios
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <section className="pb-20 px-6 relative">
+          {/* Glow Background for AI Section */}
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div className="w-[600px] h-[400px] bg-primary/5 rounded-full blur-[100px]" />
+          </div>
+          
+          <div className="max-w-6xl mx-auto relative z-10">
+            {/* Section Header */}
+            <div className="text-center mb-12 space-y-3">
+              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/15 border border-primary/30 mb-2">
+                <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                <span className="text-xs font-bold text-primary uppercase tracking-wider">AI Generated</span>
+              </div>
+              <h2 className="text-4xl font-bold tracking-tight">
+                Your Quantum Scenarios
+              </h2>
+              <p className="text-muted-foreground text-lg">
+                Select a scenario to create your market
+              </p>
+            </div>
+            
+            {/* Scenario Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {scenarios.map((scenario, index) => (
                 <div
                   key={scenario.id}
-                  className="card-minimal p-6 animate-fade-in hover:border-primary/50 transition-all"
-                  style={{ animationDelay: `${index * 0.1}s` }}
+                  className="card-glow p-8 animate-fade-up hover:scale-[1.02] transition-all"
+                  style={{ animationDelay: `${index * 0.15}s` }}
                 >
-                  <div className="mb-4">
-                    <div className="text-xs text-muted-foreground font-medium mb-2">
-                      {scenario.title}
+                  <div className="space-y-5">
+                    {/* Scenario Number Badge */}
+                    <div className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-primary/15 border border-primary/30">
+                      <span className="text-primary font-bold">{index + 1}</span>
                     </div>
-                    <h3 className="text-lg font-medium text-foreground">
-                      {scenario.summary}
-                    </h3>
+                    
+                    {/* Title */}
+                    <div>
+                      <div className="text-xs text-primary font-semibold mb-2 uppercase tracking-wider">
+                        {scenario.title}
+                      </div>
+                      <h3 className="text-xl font-bold text-foreground leading-tight">
+                        {scenario.summary}
+                      </h3>
+                    </div>
+                    
+                    {/* Create Button */}
+                    <Button 
+                      onClick={() => handleCreateQuantumMarket(scenario)}
+                      disabled={isCreatingMarket}
+                      className="w-full group/create"
+                      size="lg"
+                    >
+                      {isCreatingMarket ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin mr-2" />
+                          Creating...
+                        </>
+                      ) : (
+                        <>
+                          <Zap className="w-4 h-4 mr-2" />
+                          Create Market
+                          <ChevronRight className="w-4 h-4 ml-1 group-hover/create:translate-x-1 transition-transform" />
+                        </>
+                      )}
+                    </Button>
                   </div>
-                  <Button 
-                    onClick={() => handleCreateQuantumMarket(scenario)}
-                    disabled={isCreatingMarket}
-                    className="w-full"
-                  >
-                    {isCreatingMarket ? "Creating..." : "Create Market"}
-                  </Button>
                 </div>
               ))}
             </div>
@@ -338,12 +428,21 @@ const Index = () => {
 
       {/* Active Quantum Markets */}
       {quantumMarketIds.length > 0 && (
-        <section className="pb-16 px-6">
-          <div className="max-w-5xl mx-auto">
-            <h2 className="text-3xl font-semibold mb-8 text-center">
-              Quantum Markets
-            </h2>
-            <div className="space-y-4">
+        <section className="pb-20 px-6">
+          <div className="max-w-6xl mx-auto">
+            <div className="mb-12 flex items-center justify-between">
+              <div>
+                <h2 className="text-4xl font-bold tracking-tight mb-2">
+                  Quantum Markets
+                </h2>
+                <p className="text-muted-foreground">AI-generated prediction markets</p>
+              </div>
+              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/30">
+                <Sparkles className="w-3.5 h-3.5 text-primary" />
+                <span className="text-sm font-semibold text-primary">{quantumMarketIds.length} Active</span>
+              </div>
+            </div>
+            <div className="space-y-6">
               {quantumMarketIds.map((marketId, index) => (
                 <MarketCard
                   key={`quantum-${Number(marketId)}`}
@@ -360,12 +459,20 @@ const Index = () => {
 
       {/* Active Everything Markets */}
       {everythingMarketIds.length > 0 && (
-        <section className="pb-16 px-6">
-          <div className="max-w-5xl mx-auto">
-            <h2 className="text-3xl font-semibold mb-8 text-center">
-              Everything Markets
-            </h2>
-            <div className="space-y-4">
+        <section className="pb-24 px-6">
+          <div className="max-w-6xl mx-auto">
+            <div className="mb-12 flex items-center justify-between">
+              <div>
+                <h2 className="text-4xl font-bold tracking-tight mb-2">
+                  Everything Markets
+                </h2>
+                <p className="text-muted-foreground">Traditional binary prediction markets</p>
+              </div>
+              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-secondary/50 border border-border/50">
+                <span className="text-sm font-semibold text-muted-foreground">{everythingMarketIds.length} Active</span>
+              </div>
+            </div>
+            <div className="space-y-6">
               {everythingMarketIds.map((marketId, index) => (
                 <MarketCard
                   key={`everything-${Number(marketId)}`}
@@ -447,19 +554,24 @@ const MarketCard = ({ marketId, isQuantum, onPlaceBet, index }: MarketCardProps)
 
   return (
     <div
-      className="card-minimal p-6 animate-fade-in"
-      style={{ animationDelay: `${index * 0.05}s` }}
+      className="glass-card p-8 animate-fade-up hover:border-primary/40 transition-all"
+      style={{ animationDelay: `${index * 0.08}s` }}
     >
-      <div className="flex items-start justify-between mb-5">
-        <h3 className="text-xl font-medium text-foreground flex-1 leading-snug">
+      {/* Question Header */}
+      <div className="flex items-start justify-between mb-6">
+        <h3 className="text-2xl font-bold text-foreground flex-1 leading-tight">
           {marketInfo.question}
         </h3>
         {marketInfo.resolved && (
-          <span className="text-primary font-medium text-xs">RESOLVED</span>
+          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary/15 border border-primary/30">
+            <div className="w-2 h-2 rounded-full bg-primary" />
+            <span className="text-primary font-bold text-xs uppercase tracking-wider">Resolved</span>
+          </div>
         )}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-5">
+      {/* Outcomes Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         {marketInfo.outcomes.map((outcome, outcomeIndex) => (
           <OutcomeDisplay
             key={outcomeIndex}
@@ -474,9 +586,10 @@ const MarketCard = ({ marketId, isQuantum, onPlaceBet, index }: MarketCardProps)
         ))}
       </div>
 
-      <div className="flex items-center gap-2 text-xs text-muted-foreground border-t border-border pt-3">
-        <Clock className="w-3.5 h-3.5" />
-        <span>{timeLeft} remaining</span>
+      {/* Time Remaining */}
+      <div className="flex items-center gap-2 text-sm text-muted-foreground border-t border-border/30 pt-4">
+        <Clock className="w-4 h-4" />
+        <span className="font-medium">{timeLeft} remaining</span>
       </div>
     </div>
   );
@@ -497,24 +610,51 @@ const OutcomeDisplay = ({ marketId, outcomeIndex, outcomeName, isQuantum, resolv
   const poolFormatted = (Number(pool) / 1e6).toFixed(2);
 
   return (
-    <div className={`border ${isWinner ? 'border-primary' : 'border-border'} rounded-lg p-4 hover:border-primary/60 transition-all bg-card/30`}>
-      <div className="text-xs text-muted-foreground font-medium mb-2">
-        {isQuantum ? 'Scenario' : 'Outcome'} {outcomeIndex + 1}
-      </div>
-      <div className="text-base font-medium mb-3 leading-tight">{outcomeName}</div>
-      <div className="flex items-center gap-2 text-sm text-muted-foreground mb-3">
-        <TrendingUp className="w-3.5 h-3.5" />
-        <span>{poolFormatted} USDC</span>
-      </div>
-      {!resolved && (
-        <Button
-          onClick={onPlaceBet}
-          size="sm"
-          className="w-full"
-        >
-          Bet
-        </Button>
+    <div className={`relative border-2 ${
+      isWinner 
+        ? 'border-primary bg-primary/10' 
+        : 'border-border/50 bg-card/40'
+    } rounded-xl p-5 hover:border-primary/60 transition-all group`}>
+      {/* Winner Badge */}
+      {isWinner && (
+        <div className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-primary flex items-center justify-center shadow-lg">
+          <Sparkles className="w-3.5 h-3.5 text-primary-foreground" />
+        </div>
       )}
+      
+      <div className="space-y-4">
+        {/* Label */}
+        <div className="text-xs text-muted-foreground font-bold uppercase tracking-wider">
+          {isQuantum ? 'Scenario' : 'Outcome'} {outcomeIndex + 1}
+        </div>
+        
+        {/* Outcome Name */}
+        <div className="text-lg font-bold leading-tight min-h-[3rem] flex items-center">
+          {outcomeName}
+        </div>
+        
+        {/* Pool Size */}
+        <div className="flex items-center gap-2 text-sm">
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-muted/50 border border-border/30">
+            <TrendingUp className="w-3.5 h-3.5 text-primary" />
+            <span className="font-semibold text-foreground">{poolFormatted}</span>
+            <span className="text-muted-foreground">USDC</span>
+          </div>
+        </div>
+        
+        {/* Bet Button */}
+        {!resolved && (
+          <Button
+            onClick={onPlaceBet}
+            size="sm"
+            className="w-full group/bet"
+            variant={isWinner ? "default" : "outline"}
+          >
+            Place Bet
+            <ChevronRight className="w-3.5 h-3.5 ml-1 group-hover/bet:translate-x-1 transition-transform" />
+          </Button>
+        )}
+      </div>
     </div>
   );
 };
@@ -535,38 +675,70 @@ const BetModalContent = ({ marketId, isQuantum, selectedOutcome, setSelectedOutc
   if (!marketInfo) return null;
 
   return (
-    <div className="space-y-5">
-      <div>
-        <h3 className="text-base font-medium mb-3 leading-snug">{marketInfo.question}</h3>
-        <RadioGroup value={selectedOutcome} onValueChange={setSelectedOutcome}>
+    <div className="space-y-6">
+      {/* Market Question */}
+      <div className="pb-4 border-b border-border/50">
+        <h3 className="text-xl font-bold leading-snug text-foreground">
+          {marketInfo.question}
+        </h3>
+      </div>
+      
+      {/* Outcome Selection */}
+      <div className="space-y-3">
+        <Label className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
+          Select Outcome
+        </Label>
+        <RadioGroup value={selectedOutcome} onValueChange={setSelectedOutcome} className="space-y-2">
           {marketInfo.outcomes.map((outcome, index) => (
-            <div key={index} className="flex items-center space-x-2 mb-2">
+            <div 
+              key={index} 
+              className={`flex items-center space-x-3 p-4 rounded-xl border-2 transition-all cursor-pointer ${
+                selectedOutcome === String(index)
+                  ? 'border-primary bg-primary/10'
+                  : 'border-border/50 hover:border-primary/40 bg-card/40'
+              }`}
+            >
               <RadioGroupItem value={String(index)} id={`outcome-${index}`} />
-              <Label htmlFor={`outcome-${index}`} className="cursor-pointer text-sm">
+              <Label htmlFor={`outcome-${index}`} className="cursor-pointer text-base font-semibold flex-1">
                 {outcome}
               </Label>
+              {selectedOutcome === String(index) && (
+                <Sparkles className="w-4 h-4 text-primary" />
+              )}
             </div>
           ))}
         </RadioGroup>
       </div>
-      <div>
-        <Label htmlFor="amount" className="text-sm">Amount (USDC)</Label>
-        <Input
-          id="amount"
-          type="number"
-          placeholder="100"
-          value={betAmount}
-          onChange={(e) => setBetAmount(e.target.value)}
-          className="mt-1.5 bg-background border-border"
-        />
+      
+      {/* Amount Input */}
+      <div className="space-y-3">
+        <Label htmlFor="amount" className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
+          Bet Amount
+        </Label>
+        <div className="relative">
+          <Input
+            id="amount"
+            type="number"
+            placeholder="100"
+            value={betAmount}
+            onChange={(e) => setBetAmount(e.target.value)}
+            className="h-14 text-lg font-semibold pr-16 bg-input/50 border-border/50 focus:border-primary/60 rounded-xl"
+          />
+          <div className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-bold text-muted-foreground">
+            USDC
+          </div>
+        </div>
       </div>
+      
+      {/* Confirm Button */}
       <Button
         onClick={onConfirm}
-        className="w-full"
+        className="w-full group/confirm"
         size="lg"
       >
         <Zap className="w-4 h-4 mr-2" />
         Confirm Bet
+        <ChevronRight className="w-4 h-4 ml-1 group-hover/confirm:translate-x-1 transition-transform" />
       </Button>
     </div>
   );
