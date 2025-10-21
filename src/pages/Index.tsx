@@ -170,7 +170,7 @@ const Index = () => {
                 disabled={isGenerating}
                 size="lg"
                 variant="outline"
-                className="flex-1 h-14 border-2 border-primary hover:border-primary-glow glow-primary"
+                className="flex-1 h-14 border-2 border-primary hover:border-primary-glow hover:shadow-[0_0_30px_hsl(var(--primary)/0.6)] transition-all duration-300"
               >
                 {isGenerating ? (
                   <>
@@ -186,7 +186,7 @@ const Index = () => {
               </Button>
               <Button
                 size="lg"
-                className="flex-1 h-14 bg-gradient-to-r from-secondary to-secondary-glow hover:opacity-90 glow-teal"
+                className="flex-1 h-14 bg-secondary text-foreground hover:bg-secondary/90 hover:shadow-[0_0_25px_hsl(var(--primary)/0.4)] transition-all duration-300"
                 onClick={() => window.location.href = '/everything-bets'}
               >
                 Everything Bets

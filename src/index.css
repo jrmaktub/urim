@@ -8,8 +8,8 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    /* Urim Futuristic Dark Theme - ETH Online 2025 */
-    --background: 263 100% 3%; /* #0b0b0f deep black */
+    /* Urim Dark Cinematic Theme - ETH Online 2025 */
+    --background: 263 100% 3%; /* #0b0b0f pure black */
     --foreground: 210 17% 98%; /* #f9fafb white */
 
     --card: 240 10% 7%; /* #111114 card background */
@@ -24,16 +24,16 @@ All colors MUST be HSL.
     --primary-dark: 270 60% 45%; /* #7e22ce deep purple */
     --primary-glow: 270 100% 75%; /* neon violet */
 
-    --secondary: 173 58% 53%; /* #2dd4bf teal */
+    --secondary: 0 0% 18%; /* #2e2e2e gunmetal gray */
     --secondary-foreground: 0 0% 100%;
-    --secondary-glow: 173 80% 60%;
+    --secondary-glow: 270 80% 65%; /* purple glow on hover */
 
     --muted: 240 10% 10%;
     --muted-foreground: 0 0% 60%;
 
-    --accent: 173 58% 53%; /* teal accent */
+    --accent: 270 80% 65%; /* purple accent */
     --accent-foreground: 0 0% 100%;
-    --accent-glow: 173 80% 60%;
+    --accent-glow: 270 100% 75%;
 
     --destructive: 0 84% 60%;
     --destructive-foreground: 210 17% 98%;
@@ -46,12 +46,12 @@ All colors MUST be HSL.
 
     /* Gradients */
     --gradient-purple: linear-gradient(135deg, hsl(270 80% 65%) 0%, hsl(270 60% 45%) 100%);
-    --gradient-teal: linear-gradient(135deg, hsl(173 58% 53%) 0%, hsl(173 80% 60%) 100%);
+    --gradient-dark: linear-gradient(135deg, hsl(0 0% 18%) 0%, hsl(0 0% 12%) 100%);
     --gradient-glow: 0 0 40px hsl(270 80% 65% / 0.5);
     
     /* Shadows & Effects */
     --shadow-purple: 0 0 30px hsl(270 80% 65% / 0.4);
-    --shadow-teal: 0 0 30px hsl(173 58% 53% / 0.4);
+    --shadow-purple-soft: 0 0 20px hsl(270 80% 65% / 0.3);
     --shadow-card: 0 4px 20px hsl(0 0% 0% / 0.8);
     
     /* Transitions */
@@ -90,8 +90,8 @@ All colors MUST be HSL.
     box-shadow: var(--shadow-purple);
   }
 
-  .glow-teal {
-    box-shadow: var(--shadow-teal);
+  .glow-soft {
+    box-shadow: var(--shadow-purple-soft);
   }
 
   /* Animations */
