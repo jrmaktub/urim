@@ -30,20 +30,34 @@ serve(async (req) => {
         messages: [
           {
             role: "system",
-            content: `You are a quantum prediction AI for a prediction market platform. Generate exactly 3 distinct, mutually exclusive scenarios for the given question. Each scenario must have:
-- A clear, concise description (max 80 characters)
-- A probability percentage (must sum to 100% across all 3 scenarios)
-- A brief explanation (max 120 characters)
+            content: `You are a quantum prediction AI for a prediction market platform. Generate exactly 3 distinct, natural-sounding scenarios for the given question.
 
-Be creative, realistic, and adjust tone based on the question topic (crypto, politics, sports, etc.). Make scenarios compelling but believable.
+Each scenario should be:
+- One or two lines maximum
+- Natural and human, not robotic
+- Show you understand the context
+- Distinct from the other scenarios (e.g., Yes/Maybe/No or different outcomes)
 
-Respond ONLY with valid JSON in this exact format:
+Respond ONLY with valid JSON (no markdown, no code blocks):
 {
   "scenarios": [
     {
-      "description": "Scenario description",
-      "probability": 45,
-      "explanation": "Brief reason why this could happen"
+      "description": "Natural scenario description in one or two lines"
+    }
+  ]
+}
+
+Example for "Will Solana price go up tomorrow?":
+{
+  "scenarios": [
+    {
+      "description": "Yes — strong market momentum suggests a short-term rise."
+    },
+    {
+      "description": "Maybe — prices could stabilize before moving."
+    },
+    {
+      "description": "Unlikely — current indicators point to a correction."
     }
   ]
 }`
@@ -82,8 +96,16 @@ Respond ONLY with valid JSON in this exact format:
       throw new Error("No content in AI response");
     }
 
+    // Strip markdown code blocks if present
+    let cleanContent = content.trim();
+    if (cleanContent.startsWith('```json')) {
+      cleanContent = cleanContent.replace(/^```json\n/, '').replace(/\n```$/, '');
+    } else if (cleanContent.startsWith('```')) {
+      cleanContent = cleanContent.replace(/^```\n/, '').replace(/\n```$/, '');
+    }
+
     // Parse the JSON response from AI
-    const scenarios = JSON.parse(content);
+    const scenarios = JSON.parse(cleanContent);
 
     return new Response(JSON.stringify(scenarios), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

@@ -28,8 +28,6 @@ interface Scenario {
   id: number;
   title: string;
   summary: string;
-  probability: number;
-  explanation: string;
 }
 
 const Index = () => {
@@ -76,9 +74,7 @@ const Index = () => {
         const generatedScenarios = data.scenarios.map((s: any, idx: number) => ({
           id: idx + 1,
           title: `Scenario ${idx + 1}`,
-          summary: s.description,
-          probability: s.probability,
-          explanation: s.explanation
+          summary: s.description
         }));
         
         setScenarios(generatedScenarios);
@@ -422,20 +418,13 @@ const Index = () => {
                     style={{ animationDelay: `${index * 0.15}s` }}
                   >
                     <div className="space-y-5">
-                      {/* Probability Badge */}
-                      <div className={`text-5xl font-bold mb-3 transition-all duration-300 ${
-                        isSelected ? 'text-primary scale-110' : 'text-primary/70'
-                      }`}>
-                        {scenario.probability}%
-                      </div>
-                      
-                      {/* Summary */}
+                      {/* Scenario Content */}
                       <div>
                         <h3 className="text-lg font-semibold mb-3 leading-tight">
-                          {scenario.summary}
+                          {scenario.title}
                         </h3>
                         <p className="text-sm text-muted-foreground leading-relaxed">
-                          {scenario.explanation}
+                          {scenario.summary}
                         </p>
                       </div>
                       
