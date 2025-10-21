@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAccount } from "wagmi";
+import { useAccount, useWriteContract } from "wagmi";
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
@@ -11,13 +11,12 @@ import { CheckCircle2, Plus, X, Flag } from "lucide-react";
 import { FACTORY_ADDRESS, USDC_ADDRESS, MAX_OUTCOMES, BASE_SEPOLIA_CHAIN_ID } from "@/constants/contracts";
 import FactoryABI from "@/contracts/MarketFactory.json";
 import { Card } from "@/components/ui/card";
-import { sendTransaction } from "@/lib/baseAccount";
-import { encodeFunctionData } from "viem";
 
 const CreateBet = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const { chainId } = useAccount();
+  const { writeContractAsync } = useWriteContract();
   
   const [question, setQuestion] = useState("");
   const [outcomes, setOutcomes] = useState(["", ""]);
@@ -92,20 +91,16 @@ const CreateBet = () => {
     setIsCreating(true);
     
     try {
-      const data = encodeFunctionData({
-        abi: FactoryABI.abi,
+      const hash = await writeContractAsync({
+        address: FACTORY_ADDRESS as `0x${string}`,
+        abi: FactoryABI.abi as any,
         functionName: "createMarket",
         args: [question, outcomes, USDC_ADDRESS, BigInt(endTime)],
-      });
-
-      await sendTransaction({
-        to: FACTORY_ADDRESS,
-        data: data as `0x${string}`,
-      });
+      } as any);
       
       toast({
         title: "Market Created! 🎉",
-        description: "Your market is now live on Base Sepolia (no wallet pop-up!)",
+        description: "Your market is now live on Base Sepolia",
       });
       
       setTimeout(() => {

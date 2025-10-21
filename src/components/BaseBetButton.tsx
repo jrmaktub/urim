@@ -2,8 +2,7 @@ import { useState } from 'react';
 import { Button } from './ui/button';
 import { executeBaseBet, BetStatus } from '@/lib/baseBetHelper';
 import { useToast } from '@/hooks/use-toast';
-import { Badge } from './ui/badge';
-import { Copy } from 'lucide-react';
+import { useAccount, useWalletClient } from 'wagmi';
 
 interface BaseBetButtonProps {
   className?: string;
@@ -21,60 +20,33 @@ export default function BaseBetButton({
     isLoading: false,
     callsId: null,
   });
-  const [autoSpendEnabled, setAutoSpendEnabled] = useState(false);
   const { toast } = useToast();
+  const { address } = useAccount();
+  const { data: walletClient } = useWalletClient();
 
   const handleBet = async () => {
-    const result = await executeBaseBet((newStatus) => {
+    if (!address || !walletClient) {
+      toast({
+        title: '⚠️ Wallet Not Connected',
+        description: 'Please connect your wallet first.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const result = await executeBaseBet(walletClient, address, (newStatus) => {
       setStatus(newStatus);
     });
 
     if (result.success) {
-      setAutoSpendEnabled(true);
       toast({
         title: '✅ Bet Placed!',
-        description: 'Auto-Spend is now enabled. Next bets will be instant!',
-      });
-    } else if (result.needsPermission) {
-      toast({
-        title: '⚠️ Permission Required',
-        description: (
-          <div className="flex items-center gap-2">
-            <span className="flex-1 select-text">{result.error || 'Please approve USDC spending'}</span>
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-6 w-6 p-0"
-              onClick={() => {
-                navigator.clipboard.writeText(result.error || '');
-                toast({ title: 'Error copied to clipboard' });
-              }}
-            >
-              <Copy className="h-3 w-3" />
-            </Button>
-          </div>
-        ),
-        variant: 'destructive',
+        description: 'Your bet has been successfully placed.',
       });
     } else {
       toast({
         title: '❌ Bet Failed',
-        description: (
-          <div className="flex items-center gap-2">
-            <span className="flex-1 select-text">{result.error || 'Transaction failed'}</span>
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-6 w-6 p-0"
-              onClick={() => {
-                navigator.clipboard.writeText(result.error || '');
-                toast({ title: 'Error copied to clipboard' });
-              }}
-            >
-              <Copy className="h-3 w-3" />
-            </Button>
-          </div>
-        ),
+        description: result.error || 'Transaction failed',
         variant: 'destructive',
       });
     }
@@ -84,19 +56,13 @@ export default function BaseBetButton({
     <div className="flex flex-col gap-2">
       <Button
         onClick={handleBet}
-        disabled={status.isLoading}
+        disabled={status.isLoading || !address}
         size={size}
         variant={variant}
         className={className}
       >
         {status.isLoading ? 'Processing...' : 'Place Bet (1 USDC)'}
       </Button>
-      
-      {autoSpendEnabled && (
-        <Badge variant="outline" className="text-xs justify-center border-primary/50 text-primary">
-          Sub Account • Auto-Spend ✓
-        </Badge>
-      )}
 
       {status.message && (
         <p className="text-xs text-muted-foreground text-center">

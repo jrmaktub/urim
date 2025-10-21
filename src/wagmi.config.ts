@@ -1,15 +1,9 @@
-import { createConfig, http } from 'wagmi';
+import { getDefaultConfig } from '@rainbow-me/rainbowkit';
 import { baseSepolia } from 'wagmi/chains';
-import { baseAccount } from 'wagmi/connectors';
 
-export const config = createConfig({
+export const config = getDefaultConfig({
+  appName: 'Urim - Quantum Prediction Markets',
+  projectId: 'YOUR_PROJECT_ID', // Get from https://cloud.walletconnect.com
   chains: [baseSepolia],
-  transports: { 
-    [baseSepolia.id]: http() 
-  },
-  connectors: [
-    baseAccount({
-      appName: 'Urim - Quantum Prediction Markets',
-    }),
-  ],
+  ssr: false,
 });

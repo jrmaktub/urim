@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useAccount, useReadContract } from "wagmi";
+import { useAccount, useReadContract, useWriteContract } from "wagmi";
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
@@ -11,8 +11,6 @@ import { formatUsdc } from "@/lib/erc20";
 import { USDC_ADDRESS, BASE_SEPOLIA_CHAIN_ID } from "@/constants/contracts";
 import MarketABI from "@/contracts/Market.json";
 import ERC20ABI from "@/contracts/ERC20.json";
-import { sendTransaction } from "@/lib/baseAccount";
-import { encodeFunctionData } from "viem";
 import BaseBetButton from "@/components/BaseBetButton";
 
 const MarketDetail = () => {
@@ -20,6 +18,7 @@ const MarketDetail = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { address: userAddress, chainId } = useAccount();
+  const { writeContractAsync } = useWriteContract();
   
   const [timeLeft, setTimeLeft] = useState("");
 
@@ -76,24 +75,20 @@ const MarketDetail = () => {
   }, [endTime]);
 
   const handleClaim = async () => {
-    if (!address) return;
+    if (!address || !userAddress) return;
     
     setIsClaiming(true);
     
     try {
-      const data = encodeFunctionData({
-        abi: MarketABI.abi,
+      const hash = await writeContractAsync({
+        address: address as `0x${string}`,
+        abi: MarketABI.abi as any,
         functionName: "claim",
-      });
-
-      await sendTransaction({
-        to: address!,
-        data: data as `0x${string}`,
-      });
+      } as any);
       
       toast({
         title: "Winnings Claimed! 🏆",
-        description: "Your USDC has been transferred (no wallet pop-up!)",
+        description: "Your USDC has been transferred",
       });
     } catch (error) {
       console.error("Claim failed:", error);
