@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAccount, useWriteContract } from "wagmi";
+import { useAccount, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
@@ -116,7 +116,7 @@ const Index = () => {
       const priceFeedId = "0x0000000000000000000000000000000000000000000000000000000000000000" as `0x${string}`;
       const priceBoundaries: bigint[] = [];
 
-      await writeContractAsync({
+      const hash = await writeContractAsync({
         address: URIM_QUANTUM_MARKET_ADDRESS as `0x${string}`,
         abi: UrimQuantumMarketABI.abi as any,
         functionName: 'createQuantumMarket',
@@ -125,12 +125,22 @@ const Index = () => {
       } as any);
 
       toast({
+        title: "Transaction Submitted",
+        description: "Waiting for confirmation...",
+      });
+
+      toast({
         title: "Quantum Market Created! ⚡",
         description: "Your AI-generated market is now live on Base Sepolia.",
       });
 
       setScenarios([]);
       setSituation("");
+      
+      // Refresh to show new market
+      setTimeout(() => {
+        window.location.reload();
+      }, 2000);
     } catch (error: any) {
       console.error("Failed to create quantum market:", error);
       toast({
@@ -176,21 +186,27 @@ const Index = () => {
       const abi = selectedIsQuantum ? UrimQuantumMarketABI.abi : UrimMarketABI.abi;
       const functionName = selectedIsQuantum ? 'buyScenarioShares' : 'buyShares';
 
-      // Step 1: Approve USDC
+      // Step 1: Approve exact USDC amount
       toast({
         title: "Step 1/2",
         description: "Approving USDC...",
       });
 
-      await writeContractAsync({
+      const approveHash = await writeContractAsync({
         address: USDC_ADDRESS as `0x${string}`,
         abi: ERC20ABI.abi as any,
         functionName: 'approve',
-        args: [contractAddress, maxUint256],
+        args: [contractAddress, amount], // Approve exact amount, not max
         gas: BigInt(100000),
       } as any);
 
-      // Step 2: Place bet
+      // Wait for approval confirmation
+      toast({
+        title: "Waiting for approval...",
+        description: "Please wait for confirmation.",
+      });
+
+      // Step 2: Place bet after approval confirms
       toast({
         title: "Step 2/2",
         description: "Placing bet...",
@@ -199,7 +215,7 @@ const Index = () => {
       // For Quantum markets, scenarioIndex is uint8
       const outcomeIndex = selectedIsQuantum ? Number(selectedOutcome) : BigInt(selectedOutcome);
       
-      await writeContractAsync({
+      const betHash = await writeContractAsync({
         address: contractAddress as `0x${string}`,
         abi: abi as any,
         functionName,
@@ -207,12 +223,23 @@ const Index = () => {
         gas: BigInt(3000000),
       } as any);
 
+      // Wait for bet confirmation
+      toast({
+        title: "Confirming transaction...",
+        description: "Please wait for blockchain confirmation.",
+      });
+
       toast({
         title: "Bet Placed! ⚡",
-        description: `${betAmount} USDC successfully placed.`,
+        description: `${betAmount} USDC successfully placed. Check Base Sepolia Blockscout.`,
       });
       
       setBetModalOpen(false);
+      
+      // Refresh page to show updated markets
+      setTimeout(() => {
+        window.location.reload();
+      }, 2000);
     } catch (error: any) {
       console.error("Bet failed:", error);
       toast({
@@ -271,7 +298,7 @@ const Index = () => {
                 size="lg"
                 variant="outline"
                 className="flex-1 h-14 border-2 border-secondary hover:shadow-[0_0_25px_hsl(var(--primary)/0.4)] transition-all duration-300"
-                onClick={() => navigate('/create-bet')}
+                onClick={() => navigate('/everything-bets')}
               >
                 🌍 Create Everything Bet
               </Button>

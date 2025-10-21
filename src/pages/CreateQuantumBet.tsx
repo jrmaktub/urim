@@ -74,7 +74,7 @@ const CreateQuantumBet = () => {
       const priceFeedId = "0x0000000000000000000000000000000000000000000000000000000000000000" as `0x${string}`;
       const priceBoundaries: bigint[] = [];
 
-      await writeContractAsync({
+      const hash = await writeContractAsync({
         address: URIM_QUANTUM_MARKET_ADDRESS as `0x${string}`,
         abi: UrimQuantumMarketABI.abi as any,
         functionName: 'createQuantumMarket',
@@ -83,12 +83,19 @@ const CreateQuantumBet = () => {
       } as any);
 
       toast({
+        title: "Transaction Submitted",
+        description: "Waiting for confirmation...",
+      });
+
+      toast({
         title: "Quantum Market Created! ⚡",
         description: "Your market is now live on Base Sepolia.",
       });
 
-      // Navigate back to home
-      navigate('/');
+      // Navigate back to home after short delay
+      setTimeout(() => {
+        navigate('/');
+      }, 2000);
     } catch (error: any) {
       console.error("Failed to create quantum market:", error);
       toast({
