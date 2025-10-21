@@ -1,12 +1,13 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useAccount, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
 import Hero from "@/components/Hero";
+import PythPriceTicker from "@/components/PythPriceTicker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Sparkles, Clock, TrendingUp, Zap, ChevronRight } from "lucide-react";
+import { Sparkles, Clock, TrendingUp, Zap, ChevronRight, Users, DollarSign } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
   Dialog,
@@ -46,8 +47,15 @@ const Index = () => {
   const [betAmount, setBetAmount] = useState("");
   const [isCreatingMarket, setIsCreatingMarket] = useState(false);
   const [selectedScenarioId, setSelectedScenarioId] = useState<number | null>(null);
+  const [showQuantumEffect, setShowQuantumEffect] = useState(false);
+  const [showIntro, setShowIntro] = useState(true);
 
   const { everythingMarketIds, quantumMarketIds } = useAllMarkets();
+
+  useEffect(() => {
+    const timer = setTimeout(() => setShowIntro(false), 1500);
+    return () => clearTimeout(timer);
+  }, []);
 
   const handleGenerateScenarios = async () => {
     if (!situation.trim()) {
@@ -60,6 +68,7 @@ const Index = () => {
     }
 
     setIsGenerating(true);
+    setShowQuantumEffect(true);
     setScenarios([]);
     setSelectedScenarioId(null);
 
@@ -92,6 +101,7 @@ const Index = () => {
       });
     } finally {
       setIsGenerating(false);
+      setTimeout(() => setShowQuantumEffect(false), 2000);
     }
   };
 
@@ -259,7 +269,29 @@ const Index = () => {
 
   return (
     <div className="min-h-screen w-full bg-background">
+      {/* Intro Animation Overlay */}
+      {showIntro && (
+        <div className="fixed inset-0 z-50 bg-background flex items-center justify-center animate-fade-out" style={{ animationDelay: '1s' }}>
+          <div className="text-center space-y-4 animate-fade-in">
+            <div className="w-16 h-16 mx-auto rounded-2xl bg-primary/10 border border-primary/30 flex items-center justify-center">
+              <Sparkles className="w-8 h-8 text-primary animate-glow" />
+            </div>
+            <h1 className="text-4xl font-bold shimmer-text">URIM</h1>
+          </div>
+        </div>
+      )}
+
+      {/* Quantum Ripple Effect Overlay */}
+      {showQuantumEffect && (
+        <div className="fixed inset-0 z-40 pointer-events-none flex items-center justify-center">
+          <div className="absolute w-32 h-32 rounded-full border-4 border-primary/40 animate-quantum-ripple" />
+          <div className="absolute w-24 h-24 rounded-full border-4 border-primary/60 animate-quantum-ripple" style={{ animationDelay: '0.3s' }} />
+          <div className="absolute w-40 h-40 rounded-full bg-primary/5 animate-quantum-burst" />
+        </div>
+      )}
+
       <Navigation />
+      <PythPriceTicker />
       <Hero />
 
       {/* Main Action Cards Section */}
@@ -300,18 +332,25 @@ const Index = () => {
                   onClick={handleGenerateScenarios}
                   disabled={isGenerating || !situation.trim()}
                   variant="default"
-                  className="w-full group/btn relative overflow-hidden"
+                  className="w-full group/btn relative overflow-hidden animate-float hover:scale-[1.02]"
                   size="lg"
                 >
                   <span className="relative z-10 flex items-center">
                     {isGenerating ? (
                       <>
-                        <div className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin mr-2" />
-                        <span className="animate-pulse">Quantum AI Processing...</span>
+                        <Sparkles className="w-4 h-4 mr-2 animate-spin" />
+                        <span className="flex items-center gap-2">
+                          Generating Futures
+                          <span className="flex gap-1">
+                            <span className="w-1.5 h-1.5 bg-primary-foreground rounded-full animate-bounce" style={{ animationDelay: '0s' }} />
+                            <span className="w-1.5 h-1.5 bg-primary-foreground rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
+                            <span className="w-1.5 h-1.5 bg-primary-foreground rounded-full animate-bounce" style={{ animationDelay: '0.4s' }} />
+                          </span>
+                        </span>
                       </>
                     ) : (
                       <>
-                        <Sparkles className="w-4 h-4 mr-2 group-hover/btn:rotate-12 transition-transform animate-pulse" />
+                        <Sparkles className="w-4 h-4 mr-2 group-hover/btn:rotate-12 transition-transform" />
                         Generate Quantum Scenarios
                         <ChevronRight className="w-4 h-4 ml-1 group-hover/btn:translate-x-1 transition-transform" />
                       </>
@@ -319,19 +358,18 @@ const Index = () => {
                   </span>
                   {isGenerating && (
                     <>
-                      <div className="absolute inset-0 bg-gradient-to-r from-primary via-purple-500 to-primary bg-[length:200%_100%] animate-shimmer" />
-                      <div className="absolute inset-0 animate-glow-pulse" />
-                      {[...Array(8)].map((_, i) => (
+                      {[...Array(12)].map((_, i) => (
                         <div
                           key={i}
-                          className="absolute w-2 h-2 bg-white rounded-full animate-particle-float"
+                          className="absolute w-1.5 h-1.5 bg-primary-foreground rounded-full"
                           style={{
                             left: `${Math.random() * 100}%`,
-                            animationDelay: `${i * 0.2}s`,
-                            animationDuration: `${1.5 + Math.random()}s`
+                            animation: `particle-float ${1 + Math.random()}s ease-out infinite`,
+                            animationDelay: `${Math.random() * 0.5}s`
                           }}
                         />
                       ))}
+                      <div className="absolute inset-0 border-2 border-primary-foreground/30 rounded-xl animate-ping" />
                     </>
                   )}
                 </Button>
@@ -410,17 +448,22 @@ const Index = () => {
                   <div
                     key={scenario.id}
                     onClick={() => setSelectedScenarioId(scenario.id)}
-                    className={`cursor-pointer p-8 rounded-2xl border-2 transition-all duration-300 animate-fade-up ${
+                    className={`cursor-pointer p-8 rounded-2xl border-2 transition-all duration-300 animate-slide-in hover-glow ${
                       isSelected
-                        ? 'border-primary bg-primary/10 shadow-[0_8px_32px_hsl(var(--primary)/0.3)] scale-[1.02]'
-                        : 'border-border/50 bg-card/40 hover:border-primary/40 hover:bg-card/60'
+                        ? 'border-primary bg-primary/10 shadow-xl shadow-primary/30 scale-105'
+                        : 'border-border/50 bg-card/40 hover:border-primary/40 hover:bg-card/60 hover:-translate-y-1 hover:shadow-lg hover:shadow-primary/10'
                     }`}
                     style={{ animationDelay: `${index * 0.15}s` }}
                   >
                     <div className="space-y-5">
                       {/* Scenario Content */}
-                      <div>
-                        <h3 className="text-lg font-semibold mb-3 leading-tight">
+                      <div className="relative">
+                        <div className={`absolute -left-4 top-0 w-1 h-full rounded-full transition-all duration-300 ${
+                          isSelected ? 'bg-primary' : 'bg-primary/20'
+                        }`} />
+                        <h3 className={`text-lg font-semibold mb-3 leading-tight transition-all ${
+                          isSelected ? 'text-primary shimmer-text' : ''
+                        }`}>
                           {scenario.title}
                         </h3>
                         <p className="text-sm text-muted-foreground leading-relaxed">
@@ -430,7 +473,8 @@ const Index = () => {
                       
                       {/* Selection Indicator */}
                       {isSelected && (
-                        <div className="mt-4 pt-4 border-t border-primary/20 text-center">
+                        <div className="mt-4 pt-4 border-t border-primary/20 flex items-center justify-center gap-2 animate-fade-in">
+                          <Sparkles className="w-3 h-3 text-primary" />
                           <span className="text-xs font-semibold text-primary uppercase tracking-wider">
                             Selected
                           </span>
@@ -598,12 +642,12 @@ const MarketCard = ({ marketId, isQuantum, onPlaceBet, index }: MarketCardProps)
   return (
     <div
       onClick={() => navigate(isQuantum ? `/quantum-market/${marketId}` : `/everything-market/${marketId}`)}
-      className="glass-card p-8 animate-fade-up hover:border-primary/40 transition-all cursor-pointer"
+      className="glass-card p-8 animate-slide-in hover:border-primary/40 hover-glow cursor-pointer hover:-translate-y-1 hover:shadow-xl hover:shadow-primary/10 transition-all"
       style={{ animationDelay: `${index * 0.08}s` }}
     >
       {/* Question Header */}
       <div className="flex items-start justify-between mb-6">
-        <h3 className="text-2xl font-bold text-foreground flex-1 leading-tight">
+        <h3 className="text-2xl font-bold flex-1 leading-tight shimmer-text bg-gradient-to-r from-foreground to-foreground/60 bg-clip-text">
           {marketInfo.question}
         </h3>
         {marketInfo.resolved && (
@@ -661,9 +705,9 @@ const OutcomeDisplay = ({ marketId, outcomeIndex, outcomeName, isQuantum, resolv
       }}
       className={`relative border-2 ${
         isWinner 
-          ? 'border-primary bg-primary/10' 
+          ? 'border-primary bg-primary/10 shadow-lg shadow-primary/20' 
           : 'border-border/50 bg-card/40'
-      } rounded-xl p-5 hover:border-primary/60 transition-all group cursor-pointer`}
+      } rounded-xl p-5 hover:border-primary/60 hover:shadow-lg hover:shadow-primary/10 hover:-translate-y-1 transition-all group cursor-pointer`}
     >
       {/* Winner Badge */}
       {isWinner && (
@@ -685,9 +729,9 @@ const OutcomeDisplay = ({ marketId, outcomeIndex, outcomeName, isQuantum, resolv
         
         {/* Pool Size */}
         <div className="flex items-center gap-2 text-sm">
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-muted/50 border border-border/30">
-            <TrendingUp className="w-3.5 h-3.5 text-primary" />
-            <span className="font-semibold text-foreground">{poolFormatted}</span>
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-muted/50 border border-border/30 group-hover:border-primary/30 transition-all">
+            <TrendingUp className="w-3.5 h-3.5 text-primary group-hover:scale-110 transition-transform" />
+            <span className="font-semibold text-foreground shimmer-text">{poolFormatted}</span>
             <span className="text-muted-foreground">USDC</span>
           </div>
         </div>

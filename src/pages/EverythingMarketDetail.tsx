@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
-import { ArrowLeft, Users, DollarSign, TrendingUp, Clock } from 'lucide-react';
+import { ArrowLeft, Users, DollarSign, TrendingUp, Clock, Sparkles } from 'lucide-react';
 import { useMarketInfo, useOutcomePool } from '@/hooks/useMarkets';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
@@ -55,7 +55,7 @@ export default function EverythingMarketDetail() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background animate-fade-in">
       <Navigation />
       
       <main className="container mx-auto px-4 py-24">
@@ -69,10 +69,10 @@ export default function EverythingMarketDetail() {
         </Button>
 
         {/* Market Header */}
-        <div className="glass-card p-8 mb-8">
+        <div className="glass-card p-8 mb-8 hover-glow">
           <div className="flex items-start justify-between mb-6">
             <div className="flex-1">
-              <h1 className="text-4xl font-bold mb-4 bg-gradient-to-r from-primary to-purple-400 bg-clip-text text-transparent">
+              <h1 className="text-4xl font-bold mb-4 shimmer-text bg-gradient-to-r from-primary to-purple-400 bg-clip-text">
                 {market.question}
               </h1>
               <div className="flex items-center gap-4 text-sm text-muted-foreground">
@@ -94,8 +94,9 @@ export default function EverythingMarketDetail() {
             {!market.resolved && (
               <Button
                 onClick={() => setShowBetModal(true)}
-                className="bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20"
+                className="bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20 hover:scale-105 hover:shadow-primary/40 transition-all animate-float"
               >
+                <Sparkles className="w-4 h-4" />
                 Place Bet
               </Button>
             )}
@@ -112,11 +113,12 @@ export default function EverythingMarketDetail() {
             return (
               <Card
                 key={idx}
-                className={`glass-card p-6 transition-all duration-300 ${
+                className={`glass-card p-6 transition-all duration-300 hover-glow animate-slide-in ${
                   market.resolved && market.winningIndex === idx
-                    ? 'border-green-500 bg-green-500/5'
-                    : ''
+                    ? 'border-green-500 bg-green-500/5 shadow-lg shadow-green-500/20'
+                    : 'hover:-translate-y-1 hover:shadow-lg hover:shadow-primary/10'
                 }`}
+                style={{ animationDelay: `${idx * 0.1}s` }}
               >
                 <div className="flex items-start justify-between">
                   <div className="flex-1">

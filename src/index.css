@@ -164,6 +164,51 @@ All colors MUST be HSL.
     }
   }
 
+  @keyframes quantum-ripple {
+    0% {
+      transform: scale(0.8);
+      opacity: 1;
+    }
+    100% {
+      transform: scale(2.5);
+      opacity: 0;
+    }
+  }
+
+  @keyframes quantum-burst {
+    0% {
+      transform: scale(1) rotate(0deg);
+      opacity: 0;
+    }
+    50% {
+      opacity: 1;
+    }
+    100% {
+      transform: scale(1.5) rotate(180deg);
+      opacity: 0;
+    }
+  }
+
+  @keyframes shimmer-flow {
+    0% {
+      background-position: -200% center;
+    }
+    100% {
+      background-position: 200% center;
+    }
+  }
+
+  @keyframes slide-in-from-bottom {
+    0% {
+      opacity: 0;
+      transform: translateY(40px);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
   .animate-fade-in {
     animation: fade-in 0.6s cubic-bezier(0.4, 0, 0.2, 1);
   }
@@ -178,6 +223,58 @@ All colors MUST be HSL.
 
   .animate-float {
     animation: float 6s ease-in-out infinite;
+  }
+
+  .animate-quantum-ripple {
+    animation: quantum-ripple 2s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .animate-quantum-burst {
+    animation: quantum-burst 1.5s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .animate-shimmer {
+    animation: shimmer-flow 3s linear infinite;
+  }
+
+  .animate-slide-in {
+    animation: slide-in-from-bottom 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* Hover glow effect for cards */
+  .hover-glow {
+    position: relative;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .hover-glow::before {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    background: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-glow)));
+    border-radius: inherit;
+    opacity: 0;
+    transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: -1;
+  }
+
+  .hover-glow:hover::before {
+    opacity: 0.6;
+  }
+
+  /* Shimmer text effect */
+  .shimmer-text {
+    background: linear-gradient(
+      90deg,
+      hsl(var(--foreground)) 0%,
+      hsl(var(--primary)) 50%,
+      hsl(var(--foreground)) 100%
+    );
+    background-size: 200% auto;
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: shimmer-flow 3s linear infinite;
   }
 }
 
