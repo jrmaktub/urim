@@ -9,6 +9,8 @@ import Index from "./pages/Index";
 import EverythingBets from "./pages/EverythingBets";
 import CreateBet from "./pages/CreateBet";
 import MarketDetail from "./pages/MarketDetail";
+import QuantumMarketDetail from "./pages/QuantumMarketDetail";
+import EverythingMarketDetail from "./pages/EverythingMarketDetail";
 import NotFound from "./pages/NotFound";
 import { PythPriceTestnet }  from "./pages/PythPrice";
 
@@ -26,6 +28,8 @@ const App = () => (
             <Route path="/everything-bets" element={<EverythingBets />} />
             <Route path="/create-bet" element={<CreateBet />} />
             <Route path="/market/:address" element={<MarketDetail />} />
+            <Route path="/quantum-market/:id" element={<QuantumMarketDetail />} />
+            <Route path="/everything-market/:id" element={<EverythingMarketDetail />} />
             <Route path="/PythPrice" element={<PythPriceTestnet/>} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />

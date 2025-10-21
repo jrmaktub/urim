@@ -22,11 +22,14 @@ import UrimQuantumMarketABI from "@/contracts/UrimQuantumMarket.json";
 import UrimMarketABI from "@/contracts/UrimMarket.json";
 import ERC20ABI from "@/contracts/ERC20.json";
 import { parseUnits, maxUint256 } from "viem";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Scenario {
   id: number;
   title: string;
   summary: string;
+  probability: number;
+  explanation: string;
 }
 
 const Index = () => {
@@ -59,37 +62,36 @@ const Index = () => {
     }
 
     setIsGenerating(true);
+    setScenarios([]);
+    setSelectedScenarioId(null);
 
     try {
-      await new Promise((resolve) => setTimeout(resolve, 3000));
-
-      const generated: Scenario[] = [
-        {
-          id: 1,
-          title: "Scenario 1: High Probability",
-          summary: "Yes, within 30 days",
-        },
-        {
-          id: 2,
-          title: "Scenario 2: Medium Probability",
-          summary: "Yes, but after 30 days",
-        },
-        {
-          id: 3,
-          title: "Scenario 3: Low Probability",
-          summary: "No, it will not happen",
-        },
-      ];
-
-      setScenarios(generated);
-      toast({
-        title: "Futures Generated ⚡",
-        description: "AI has predicted 3 possible outcomes.",
+      const { data, error } = await supabase.functions.invoke('generate-scenarios', {
+        body: { question: situation }
       });
+
+      if (error) throw error;
+
+      if (data?.scenarios) {
+        const generatedScenarios = data.scenarios.map((s: any, idx: number) => ({
+          id: idx + 1,
+          title: `Scenario ${idx + 1}`,
+          summary: s.description,
+          probability: s.probability,
+          explanation: s.explanation
+        }));
+        
+        setScenarios(generatedScenarios);
+        toast({
+          title: "Scenarios generated!",
+          description: "Review the quantum predictions below",
+        });
+      }
     } catch (error) {
+      console.error('Error generating scenarios:', error);
       toast({
-        title: "Generation Failed",
-        description: "Please try again.",
+        title: "Generation failed",
+        description: error instanceof Error ? error.message : "Failed to generate scenarios",
         variant: "destructive",
       });
     } finally {
@@ -302,19 +304,38 @@ const Index = () => {
                   onClick={handleGenerateScenarios}
                   disabled={isGenerating || !situation.trim()}
                   variant="default"
-                  className="w-full group/btn"
+                  className="w-full group/btn relative overflow-hidden"
                   size="lg"
                 >
-                  {isGenerating ? (
+                  <span className="relative z-10 flex items-center">
+                    {isGenerating ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin mr-2" />
+                        <span className="animate-pulse">Quantum AI Processing...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-4 h-4 mr-2 group-hover/btn:rotate-12 transition-transform animate-pulse" />
+                        Generate Quantum Scenarios
+                        <ChevronRight className="w-4 h-4 ml-1 group-hover/btn:translate-x-1 transition-transform" />
+                      </>
+                    )}
+                  </span>
+                  {isGenerating && (
                     <>
-                      <div className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin mr-2" />
-                      Generating AI Scenarios...
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="w-4 h-4 mr-2 group-hover/btn:rotate-12 transition-transform" />
-                      Generate Quantum Scenarios
-                      <ChevronRight className="w-4 h-4 ml-1 group-hover/btn:translate-x-1 transition-transform" />
+                      <div className="absolute inset-0 bg-gradient-to-r from-primary via-purple-500 to-primary bg-[length:200%_100%] animate-shimmer" />
+                      <div className="absolute inset-0 animate-glow-pulse" />
+                      {[...Array(8)].map((_, i) => (
+                        <div
+                          key={i}
+                          className="absolute w-2 h-2 bg-white rounded-full animate-particle-float"
+                          style={{
+                            left: `${Math.random() * 100}%`,
+                            animationDelay: `${i * 0.2}s`,
+                            animationDuration: `${1.5 + Math.random()}s`
+                          }}
+                        />
+                      ))}
                     </>
                   )}
                 </Button>
@@ -401,34 +422,29 @@ const Index = () => {
                     style={{ animationDelay: `${index * 0.15}s` }}
                   >
                     <div className="space-y-5">
-                      {/* Scenario Number Badge */}
-                      <div className={`inline-flex items-center justify-center w-10 h-10 rounded-xl border transition-colors ${
-                        isSelected
-                          ? 'bg-primary/20 border-primary/50'
-                          : 'bg-primary/10 border-primary/30'
+                      {/* Probability Badge */}
+                      <div className={`text-5xl font-bold mb-3 transition-all duration-300 ${
+                        isSelected ? 'text-primary scale-110' : 'text-primary/70'
                       }`}>
-                        <span className={`font-bold transition-colors ${
-                          isSelected ? 'text-primary' : 'text-primary/70'
-                        }`}>{index + 1}</span>
+                        {scenario.probability}%
                       </div>
                       
-                      {/* Title */}
+                      {/* Summary */}
                       <div>
-                        <div className={`text-xs font-semibold mb-2 uppercase tracking-wider transition-colors ${
-                          isSelected ? 'text-primary' : 'text-primary/70'
-                        }`}>
-                          {scenario.title}
-                        </div>
-                        <h3 className="text-xl font-bold text-foreground leading-tight">
+                        <h3 className="text-lg font-semibold mb-3 leading-tight">
                           {scenario.summary}
                         </h3>
+                        <p className="text-sm text-muted-foreground leading-relaxed">
+                          {scenario.explanation}
+                        </p>
                       </div>
                       
                       {/* Selection Indicator */}
                       {isSelected && (
-                        <div className="flex items-center gap-2 text-sm text-primary font-semibold animate-fade-in">
-                          <Sparkles className="w-4 h-4" />
-                          <span>Selected</span>
+                        <div className="mt-4 pt-4 border-t border-primary/20 text-center">
+                          <span className="text-xs font-semibold text-primary uppercase tracking-wider">
+                            Selected
+                          </span>
                         </div>
                       )}
                     </div>
@@ -557,6 +573,7 @@ interface MarketCardProps {
 }
 
 const MarketCard = ({ marketId, isQuantum, onPlaceBet, index }: MarketCardProps) => {
+  const navigate = useNavigate();
   const marketInfo = useMarketInfo(marketId, isQuantum);
   const [timeLeft, setTimeLeft] = useState("");
 
@@ -591,7 +608,8 @@ const MarketCard = ({ marketId, isQuantum, onPlaceBet, index }: MarketCardProps)
 
   return (
     <div
-      className="glass-card p-8 animate-fade-up hover:border-primary/40 transition-all"
+      onClick={() => navigate(isQuantum ? `/quantum-market/${marketId}` : `/everything-market/${marketId}`)}
+      className="glass-card p-8 animate-fade-up hover:border-primary/40 transition-all cursor-pointer"
       style={{ animationDelay: `${index * 0.08}s` }}
     >
       {/* Question Header */}
@@ -647,11 +665,17 @@ const OutcomeDisplay = ({ marketId, outcomeIndex, outcomeName, isQuantum, resolv
   const poolFormatted = (Number(pool) / 1e6).toFixed(2);
 
   return (
-    <div className={`relative border-2 ${
-      isWinner 
-        ? 'border-primary bg-primary/10' 
-        : 'border-border/50 bg-card/40'
-    } rounded-xl p-5 hover:border-primary/60 transition-all group`}>
+    <div 
+      onClick={(e) => {
+        e.stopPropagation();
+        onPlaceBet();
+      }}
+      className={`relative border-2 ${
+        isWinner 
+          ? 'border-primary bg-primary/10' 
+          : 'border-border/50 bg-card/40'
+      } rounded-xl p-5 hover:border-primary/60 transition-all group cursor-pointer`}
+    >
       {/* Winner Badge */}
       {isWinner && (
         <div className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-primary flex items-center justify-center shadow-lg">
