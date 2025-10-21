@@ -7,62 +7,49 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle2, Plus, X, Flag } from "lucide-react";
-import { URIM_MARKET_ADDRESS, USDC_ADDRESS, MAX_OUTCOMES, BASE_SEPOLIA_CHAIN_ID } from "@/constants/contracts";
-import UrimMarketABI from "@/contracts/UrimMarket.json";
+import { Sparkles } from "lucide-react";
+import { URIM_QUANTUM_MARKET_ADDRESS, BASE_SEPOLIA_CHAIN_ID } from "@/constants/contracts";
+import UrimQuantumMarketABI from "@/contracts/UrimQuantumMarket.json";
 import { Card } from "@/components/ui/card";
 
 const CreateBet = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
-  const { chainId } = useAccount();
+  const { chainId, address } = useAccount();
   const { writeContractAsync } = useWriteContract();
   
   const [question, setQuestion] = useState("");
-  const [outcomes, setOutcomes] = useState(["", ""]);
-  const [endDateTime, setEndDateTime] = useState("");
-  const [createdMarketAddress, setCreatedMarketAddress] = useState<string | null>(null);
+  const [scenarios, setScenarios] = useState(["", "", ""]);
+  const [probabilities, setProbabilities] = useState(["33", "33", "34"]);
+  const [duration, setDuration] = useState("7");
   const [isCreating, setIsCreating] = useState(false);
 
-  const handleAddOutcome = () => {
-    if (outcomes.length < MAX_OUTCOMES) {
-      setOutcomes([...outcomes, ""]);
-    }
+  const handleScenarioChange = (index: number, value: string) => {
+    const newScenarios = [...scenarios];
+    newScenarios[index] = value;
+    setScenarios(newScenarios);
   };
 
-  const handleRemoveOutcome = (index: number) => {
-    if (outcomes.length > 2) {
-      setOutcomes(outcomes.filter((_, i) => i !== index));
-    }
-  };
-
-  const handleOutcomeChange = (index: number, value: string) => {
-    const newOutcomes = [...outcomes];
-    newOutcomes[index] = value;
-    setOutcomes(newOutcomes);
-  };
-
-  const fillHondurasPreset = () => {
-    setQuestion("Who will be the next President of Honduras?");
-    setOutcomes(["Rixi Moncada", "Salvador Nasralla", "Nasry Asfura"]);
-    
-    // Set end time to ~180 days from now
-    const futureDate = new Date();
-    futureDate.setDate(futureDate.getDate() + 180);
-    const dateStr = futureDate.toISOString().slice(0, 16);
-    setEndDateTime(dateStr);
-    
-    toast({
-      title: "Honduras Election Preset Loaded 🇭🇳",
-      description: "Market configured for Honduras presidential race",
-    });
+  const handleProbabilityChange = (index: number, value: string) => {
+    const newProbs = [...probabilities];
+    newProbs[index] = value;
+    setProbabilities(newProbs);
   };
 
   const handleCreateMarket = async () => {
-    if (!question || outcomes.some(o => !o.trim()) || !endDateTime) {
+    if (!address) {
+      toast({
+        title: "Connect Wallet",
+        description: "Please connect your wallet first.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!question || scenarios.some(s => !s.trim())) {
       toast({
         title: "Missing Information",
-        description: "Please fill in all fields before creating your market.",
+        description: "Please fill in all fields.",
         variant: "destructive",
       });
       return;
@@ -77,21 +64,35 @@ const CreateBet = () => {
       return;
     }
 
+    const totalProb = probabilities.reduce((sum, p) => sum + Number(p), 0);
+    if (totalProb !== 100) {
+      toast({
+        title: "Invalid Probabilities",
+        description: "Probabilities must sum to 100%.",
+        variant: "destructive",
+      });
+      return;
+    }
 
-    const endTime = Math.floor(new Date(endDateTime).getTime() / 1000);
-    
     setIsCreating(true);
     
     try {
-      const hash = await writeContractAsync({
-        address: URIM_MARKET_ADDRESS as `0x${string}`,
-        abi: UrimMarketABI.abi as any,
-        functionName: "createMarket",
-        args: [question, outcomes, BigInt(endTime)],
+      const durationSeconds = BigInt(Number(duration) * 24 * 60 * 60);
+      const probabilitiesArray = probabilities.map(p => BigInt(p));
+      
+      // Using empty price feed for now (0x0...0) and empty boundaries
+      const priceFeedId = "0x0000000000000000000000000000000000000000000000000000000000000000";
+      const priceBoundaries: bigint[] = [];
+
+      await writeContractAsync({
+        address: URIM_QUANTUM_MARKET_ADDRESS as `0x${string}`,
+        abi: UrimQuantumMarketABI.abi as any,
+        functionName: "createQuantumMarket",
+        args: [question, scenarios, probabilitiesArray, durationSeconds, priceFeedId, priceBoundaries],
       } as any);
       
       toast({
-        title: "Market Created! 🎉",
+        title: "Quantum Market Created ⚡",
         description: "Your market is now live on Base Sepolia",
       });
       
@@ -110,46 +111,6 @@ const CreateBet = () => {
     }
   };
 
-  if (createdMarketAddress) {
-    return (
-      <div className="min-h-screen w-full bg-background">
-        <Navigation />
-        <div className="flex items-center justify-center min-h-[calc(100vh-200px)] px-6">
-          <Card className="max-w-md w-full p-8 text-center animate-fade-up">
-            <CheckCircle2 className="w-16 h-16 text-primary mx-auto mb-6" />
-            <h2 className="text-3xl font-bold mb-4 text-primary">
-              Market Created Successfully
-            </h2>
-            <p className="text-muted-foreground mb-8">
-              Your market is now live on Base Sepolia. Start accepting bets!
-            </p>
-            <div className="space-y-4">
-              <Button
-                onClick={() => navigate(`/market/${createdMarketAddress}`)}
-                className="w-full"
-              >
-                View Market
-              </Button>
-              <Button
-                onClick={() => {
-                  setCreatedMarketAddress(null);
-                  setQuestion("");
-                  setOutcomes(["", ""]);
-                  setEndDateTime("");
-                }}
-                variant="outline"
-                className="w-full"
-              >
-                Create Another Market
-              </Button>
-            </div>
-          </Card>
-        </div>
-        <Footer />
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen w-full bg-background">
       <Navigation />
@@ -157,24 +118,13 @@ const CreateBet = () => {
       <div className="pt-32 pb-24 px-6">
         <div className="max-w-2xl mx-auto">
           <div className="text-center mb-12 animate-fade-up">
-            <h1 className="text-5xl font-bold mb-4 text-primary">
-              CREATE MARKET
+            <h1 className="text-5xl font-bold mb-4 text-primary flex items-center justify-center gap-3">
+              <Sparkles className="w-12 h-12" />
+              CREATE QUANTUM MARKET
             </h1>
             <p className="text-lg text-muted-foreground">
-              Create a prediction market settled in USDC on Base Sepolia
+              Create a quantum prediction market with AI-weighted scenarios
             </p>
-          </div>
-
-          {/* Honduras Election Preset */}
-          <div className="mb-8 animate-fade-up" style={{ animationDelay: "0.1s" }}>
-            <Button
-              onClick={fillHondurasPreset}
-              variant="outline"
-              className="w-full h-16 text-base border-2 border-primary/30 hover:border-primary"
-            >
-              <Flag className="w-5 h-5 mr-2" />
-              Create Honduras Presidential Market 🇭🇳
-            </Button>
           </div>
 
           <Card className="p-8 animate-fade-up" style={{ animationDelay: "0.2s" }}>
@@ -192,69 +142,58 @@ const CreateBet = () => {
                 />
               </div>
 
-              {/* Outcomes */}
+              {/* Scenarios */}
               <div>
-                <div className="flex items-center justify-between mb-2">
-                  <Label className="text-foreground font-bold">
-                    OUTCOMES ({outcomes.length}/{MAX_OUTCOMES})
-                  </Label>
-                  {outcomes.length < MAX_OUTCOMES && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={handleAddOutcome}
-                    >
-                      <Plus className="w-4 h-4 mr-1" />
-                      Add Outcome
-                    </Button>
-                  )}
-                </div>
+                <Label className="text-foreground font-bold mb-2 block">
+                  SCENARIOS (3 required)
+                </Label>
                 
-                <div className="space-y-3">
-                  {outcomes.map((outcome, index) => (
-                    <div key={index} className="flex gap-2">
+                <div className="space-y-4">
+                  {scenarios.map((scenario, index) => (
+                    <div key={index} className="space-y-2">
                       <Input
-                        placeholder={`Outcome ${index + 1}`}
-                        value={outcome}
-                        onChange={(e) => handleOutcomeChange(index, e.target.value)}
+                        placeholder={`Scenario ${index + 1}`}
+                        value={scenario}
+                        onChange={(e) => handleScenarioChange(index, e.target.value)}
                       />
-                      {outcomes.length > 2 && (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleRemoveOutcome(index)}
-                        >
-                          <X className="w-4 h-4" />
-                        </Button>
-                      )}
+                      <div className="flex items-center gap-2">
+                        <Label className="text-sm text-muted-foreground">Probability %:</Label>
+                        <Input
+                          type="number"
+                          min="0"
+                          max="100"
+                          className="w-24"
+                          value={probabilities[index]}
+                          onChange={(e) => handleProbabilityChange(index, e.target.value)}
+                        />
+                      </div>
                     </div>
                   ))}
                 </div>
               </div>
 
-              {/* End Time */}
+              {/* Duration */}
               <div>
-                <Label htmlFor="endTime" className="text-foreground font-bold mb-2 block">
-                  END TIME
+                <Label htmlFor="duration" className="text-foreground font-bold mb-2 block">
+                  DURATION (days)
                 </Label>
                 <Input
-                  id="endTime"
-                  type="datetime-local"
-                  value={endDateTime}
-                  onChange={(e) => setEndDateTime(e.target.value)}
-                  min={new Date().toISOString().slice(0, 16)}
+                  id="duration"
+                  type="number"
+                  min="1"
+                  max="365"
+                  value={duration}
+                  onChange={(e) => setDuration(e.target.value)}
                 />
               </div>
 
-              {/* Settlement Token Info */}
+              {/* Info */}
               <div className="bg-muted/30 p-4 rounded-lg">
                 <p className="text-sm text-muted-foreground">
-                  <span className="font-bold text-foreground">Settlement Token:</span> USDC (ERC-20)
+                  <span className="font-bold text-foreground">Settlement:</span> Manual resolution by contract owner
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  All bets will be placed and settled in USDC on Base Sepolia
+                  All bets placed in USDC on Base Sepolia
                 </p>
               </div>
 
@@ -264,7 +203,7 @@ const CreateBet = () => {
                 disabled={isCreating}
                 className="w-full h-14 text-base mt-8"
               >
-                {isCreating ? "CREATING MARKET..." : "CREATE MARKET"}
+                {isCreating ? "CREATING MARKET..." : "CREATE QUANTUM MARKET"}
               </Button>
             </div>
           </Card>

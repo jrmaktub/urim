@@ -108,14 +108,19 @@ const Index = () => {
     setIsCreatingMarket(true);
 
     try {
-      const endTime = Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60; // 7 days
+      const durationSeconds = BigInt(7 * 24 * 60 * 60); // 7 days
       const scenarioTexts = scenarios.map(s => s.summary);
+      const probabilitiesArray = [BigInt(33), BigInt(33), BigInt(34)]; // Default equal probabilities
+      
+      // Using empty price feed for now
+      const priceFeedId = "0x0000000000000000000000000000000000000000000000000000000000000000";
+      const priceBoundaries: bigint[] = [];
 
       await writeContractAsync({
         address: URIM_QUANTUM_MARKET_ADDRESS as `0x${string}`,
         abi: UrimQuantumMarketABI.abi as any,
         functionName: 'createQuantumMarket',
-        args: [situation, scenarioTexts, BigInt(endTime)],
+        args: [situation, scenarioTexts, probabilitiesArray, durationSeconds, priceFeedId, priceBoundaries],
       } as any);
 
       toast({
@@ -178,12 +183,14 @@ const Index = () => {
         args: [contractAddress, maxUint256],
       } as any);
 
-      // Place bet
+      // Place bet - for Quantum markets, scenarioIndex is uint8
+      const outcomeIndex = selectedIsQuantum ? Number(selectedOutcome) : BigInt(selectedOutcome);
+      
       await writeContractAsync({
         address: contractAddress as `0x${string}`,
         abi: abi as any,
         functionName,
-        args: [BigInt(selectedMarketId), BigInt(selectedOutcome), amount],
+        args: [BigInt(selectedMarketId), outcomeIndex, amount],
       } as any);
 
       toast({

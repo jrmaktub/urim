@@ -24,7 +24,7 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/everything-bets" element={<EverythingBets />} />
-            <Route path="/create" element={<CreateBet />} />
+            <Route path="/create-bet" element={<CreateBet />} />
             <Route path="/market/:address" element={<MarketDetail />} />
             <Route path="/PythPrice" element={<PythPriceTestnet/>} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

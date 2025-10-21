@@ -53,14 +53,16 @@ export function useMarketInfo(marketId: number, isQuantum: boolean) {
 
   if (!basicInfo || !outcomes) return null;
 
-  const [question, endTimestamp, resolved, winningIndex] = basicInfo as [string, bigint, boolean, bigint];
+  // Quantum markets return: [question, endTime, resolved, winningScenario, scenarioCount]
+  // Everything markets return: [question, endTimestamp, resolved, winningIndex]
+  const [question, endTimestamp, resolved, winningIndex] = basicInfo as [string, bigint, boolean, number | bigint];
 
   return {
     id: marketId,
     question,
     endTimestamp: Number(endTimestamp),
     resolved,
-    winningIndex: Number(winningIndex),
+    winningIndex: typeof winningIndex === 'bigint' ? Number(winningIndex) : winningIndex,
     outcomes: outcomes as string[],
     isQuantum,
   };
@@ -70,12 +72,17 @@ export function useOutcomePool(marketId: number, outcomeIndex: number, isQuantum
   const contractAddress = isQuantum ? URIM_QUANTUM_MARKET_ADDRESS : URIM_MARKET_ADDRESS;
   const abi = isQuantum ? UrimQuantumMarketABI.abi : UrimMarketABI.abi;
 
-  const { data: pool } = useReadContract({
+  // Quantum markets use getTotalSharesPerScenario which returns all shares at once
+  const { data: allShares } = useReadContract({
     address: contractAddress as `0x${string}`,
     abi,
-    functionName: isQuantum ? 'getScenarioPool' : 'getOutcomePool',
-    args: [BigInt(marketId), BigInt(outcomeIndex)],
+    functionName: isQuantum ? 'getTotalSharesPerScenario' : 'getOutcomePool',
+    args: isQuantum ? [BigInt(marketId)] : [BigInt(marketId), BigInt(outcomeIndex)],
   });
 
-  return (pool as bigint) || 0n;
+  if (isQuantum && allShares && Array.isArray(allShares)) {
+    return (allShares[outcomeIndex] as bigint) || 0n;
+  }
+
+  return (allShares as bigint) || 0n;
 }
