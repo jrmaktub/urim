@@ -76,6 +76,7 @@ export async function executeBaseBet(
       data: approveData,
       chain: baseSepolia,
       account: address,
+      gas: BigInt(100000),
     });
 
     console.info('✅ USDC approved:', approveTx);
@@ -94,6 +95,7 @@ export async function executeBaseBet(
       data: placeBetData,
       chain: baseSepolia,
       account: address,
+      gas: BigInt(3000000),
     });
 
     console.info('✅ Bet placed:', betTx);

@@ -1,18 +1,24 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAccount, useWriteContract } from "wagmi";
 import { Zap, Plus, X } from "lucide-react";
 import Navigation from "@/components/Navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
+import { URIM_QUANTUM_MARKET_ADDRESS } from "@/constants/contracts";
+import UrimQuantumMarketABI from "@/contracts/UrimQuantumMarket.json";
+import { parseUnits } from "viem";
 
 const CreateQuantumBet = () => {
   const { toast } = useToast();
+  const navigate = useNavigate();
+  const { address } = useAccount();
+  const { writeContractAsync } = useWriteContract();
   const [question, setQuestion] = useState("");
   const [outcomes, setOutcomes] = useState(["", ""]);
   const [aiGenerate, setAiGenerate] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [isSuccess, setIsSuccess] = useState(false);
-  const [previewData, setPreviewData] = useState<any>(null);
 
   const addOutcome = () => {
     if (outcomes.length < 6) {
@@ -33,6 +39,15 @@ const CreateQuantumBet = () => {
   };
 
   const handleGenerateQuantumBet = async () => {
+    if (!address) {
+      toast({
+        title: "Wallet Not Connected",
+        description: "Please connect your wallet first.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (!question || outcomes.filter(o => o.trim()).length < 2) {
       toast({
         title: "Missing fields",
@@ -44,96 +59,48 @@ const CreateQuantumBet = () => {
 
     setIsProcessing(true);
 
-    // Simulate AI generation or blockchain transaction
-    await new Promise((resolve) => setTimeout(resolve, 2500));
+    try {
+      const durationSeconds = BigInt(7 * 24 * 60 * 60); // 7 days
+      const scenarioTexts = outcomes.filter(o => o.trim());
+      
+      // Equal probabilities that sum to 100
+      const equalProb = Math.floor(100 / scenarioTexts.length);
+      const remainder = 100 - (equalProb * scenarioTexts.length);
+      const probabilitiesArray = scenarioTexts.map((_, i) => 
+        BigInt(i === 0 ? equalProb + remainder : equalProb)
+      );
+      
+      // Empty price feed (not using Pyth for now)
+      const priceFeedId = "0x0000000000000000000000000000000000000000000000000000000000000000" as `0x${string}`;
+      const priceBoundaries: bigint[] = [];
 
-    const generatedData = {
-      question,
-      outcomes: outcomes.filter(o => o.trim()),
-      probabilities: outcomes.filter(o => o.trim()).map(() => 
-        (Math.random() * 40 + 20).toFixed(1)
-      ),
-      totalPool: "1,234 USDC",
-    };
+      await writeContractAsync({
+        address: URIM_QUANTUM_MARKET_ADDRESS as `0x${string}`,
+        abi: UrimQuantumMarketABI.abi as any,
+        functionName: 'createQuantumMarket',
+        args: [question, scenarioTexts, probabilitiesArray, durationSeconds, priceFeedId, priceBoundaries],
+        gas: BigInt(3000000),
+      } as any);
 
-    setPreviewData(generatedData);
-    setIsProcessing(false);
-    setIsSuccess(true);
+      toast({
+        title: "Quantum Market Created! ⚡",
+        description: "Your market is now live on Base Sepolia.",
+      });
 
-    toast({
-      title: "Success",
-      description: "Quantum bet generated ✨",
-    });
+      // Navigate back to home
+      navigate('/');
+    } catch (error: any) {
+      console.error("Failed to create quantum market:", error);
+      toast({
+        title: "Transaction Failed",
+        description: error?.message || "Could not create market. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
-  if (isSuccess && previewData) {
-    return (
-      <div className="min-h-screen bg-background">
-        <Navigation />
-        
-        <main className="pt-32 pb-20 px-6">
-          <div className="max-w-2xl mx-auto">
-            {/* Header */}
-            <div className="text-center mb-8 animate-fade-up">
-              <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-primary to-primary-glow mb-4 animate-shimmer">
-                <Zap className="w-7 h-7 text-background" />
-              </div>
-              <h2 className="text-3xl font-bold mb-2 bg-gradient-to-r from-primary to-primary-glow bg-clip-text text-transparent">
-                Quantum Bet Created
-              </h2>
-              <p className="text-muted-foreground">
-                Your multi-outcome bet is now live
-              </p>
-            </div>
-
-            {/* Preview Card */}
-            <div className="glass-card border-primary/20 p-8 space-y-6 animate-fade-up">
-              <div className="space-y-4">
-                <h3 className="text-xl font-semibold">{previewData.question}</h3>
-                
-                <div className="space-y-3">
-                  {previewData.outcomes.map((outcome: string, index: number) => (
-                    <div 
-                      key={index}
-                      className="flex items-center justify-between p-4 rounded-lg bg-muted/30 border border-border/50 hover:border-primary/30 transition-all"
-                    >
-                      <span className="font-medium">{outcome}</span>
-                      <span className="text-primary font-semibold">
-                        {previewData.probabilities[index]}%
-                      </span>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="p-4 rounded-lg bg-primary/5 border border-primary/20 text-center">
-                  <p className="text-sm text-muted-foreground mb-1">Total Pool</p>
-                  <p className="text-2xl font-bold text-primary">
-                    {previewData.totalPool}
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex gap-3">
-                <Button 
-                  onClick={() => {
-                    setIsSuccess(false);
-                    setPreviewData(null);
-                  }}
-                  variant="outline"
-                  className="flex-1"
-                >
-                  Create Another
-                </Button>
-                <Button className="flex-1">
-                  Share Bet
-                </Button>
-              </div>
-            </div>
-          </div>
-        </main>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-background relative overflow-hidden">

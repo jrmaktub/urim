@@ -110,10 +110,10 @@ const Index = () => {
     try {
       const durationSeconds = BigInt(7 * 24 * 60 * 60); // 7 days
       const scenarioTexts = scenarios.map(s => s.summary);
-      const probabilitiesArray = [BigInt(33), BigInt(33), BigInt(34)]; // Default equal probabilities
+      const probabilitiesArray = [BigInt(33), BigInt(33), BigInt(34)]; // Equal probabilities summing to 100
       
-      // Using empty price feed for now
-      const priceFeedId = "0x0000000000000000000000000000000000000000000000000000000000000000";
+      // Empty price feed (not using Pyth for now)
+      const priceFeedId = "0x0000000000000000000000000000000000000000000000000000000000000000" as `0x${string}`;
       const priceBoundaries: bigint[] = [];
 
       await writeContractAsync({
@@ -121,20 +121,21 @@ const Index = () => {
         abi: UrimQuantumMarketABI.abi as any,
         functionName: 'createQuantumMarket',
         args: [situation, scenarioTexts, probabilitiesArray, durationSeconds, priceFeedId, priceBoundaries],
+        gas: BigInt(3000000),
       } as any);
 
       toast({
         title: "Quantum Market Created! ⚡",
-        description: "Your AI-generated market is now live.",
+        description: "Your AI-generated market is now live on Base Sepolia.",
       });
 
       setScenarios([]);
       setSituation("");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to create quantum market:", error);
       toast({
         title: "Transaction Failed",
-        description: "Could not create market. Please try again.",
+        description: error?.shortMessage || error?.message || "Could not create market. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -175,15 +176,27 @@ const Index = () => {
       const abi = selectedIsQuantum ? UrimQuantumMarketABI.abi : UrimMarketABI.abi;
       const functionName = selectedIsQuantum ? 'buyScenarioShares' : 'buyShares';
 
-      // Approve USDC first
+      // Step 1: Approve USDC
+      toast({
+        title: "Step 1/2",
+        description: "Approving USDC...",
+      });
+
       await writeContractAsync({
         address: USDC_ADDRESS as `0x${string}`,
         abi: ERC20ABI.abi as any,
         functionName: 'approve',
         args: [contractAddress, maxUint256],
+        gas: BigInt(100000),
       } as any);
 
-      // Place bet - for Quantum markets, scenarioIndex is uint8
+      // Step 2: Place bet
+      toast({
+        title: "Step 2/2",
+        description: "Placing bet...",
+      });
+
+      // For Quantum markets, scenarioIndex is uint8
       const outcomeIndex = selectedIsQuantum ? Number(selectedOutcome) : BigInt(selectedOutcome);
       
       await writeContractAsync({
@@ -191,6 +204,7 @@ const Index = () => {
         abi: abi as any,
         functionName,
         args: [BigInt(selectedMarketId), outcomeIndex, amount],
+        gas: BigInt(3000000),
       } as any);
 
       toast({
@@ -199,11 +213,11 @@ const Index = () => {
       });
       
       setBetModalOpen(false);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Bet failed:", error);
       toast({
         title: "Transaction Failed",
-        description: "Could not place bet. Please try again.",
+        description: error?.shortMessage || error?.message || "Could not place bet. Please try again.",
         variant: "destructive",
       });
     }
