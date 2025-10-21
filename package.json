@@ -17,7 +17,9 @@
     "typescript": "~5.8.0"
   },
   "dependencies": {
+    "@nomicfoundation/hardhat-verify": "^3.0.4",
     "@openzeppelin/contracts": "^5.4.0",
-    "@pythnetwork/pyth-sdk-solidity": "^4.2.0"
+    "@pythnetwork/pyth-sdk-solidity": "^4.2.0",
+    "dotenv": "^17.2.3"
   }
 }

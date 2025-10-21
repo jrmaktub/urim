@@ -1,0 +1,67 @@
+import hre, { network } from "hardhat";
+import { verifyContract } from "@nomicfoundation/hardhat-verify/verify";
+
+
+
+async function main() {
+  // Connect to your configured network (example: baseSepolia, hardhatOp, etc.)
+  const { ethers } = await network.connect({
+    network: "baseSepolia", // or "baseSepolia" if that’s your target
+    chainType: "op",      // OP-style chain
+  });
+  const pythContractAddress = ""
+  console.log("Deploying contracts using the OP chain type...");
+
+  const [deployer] = await ethers.getSigners();
+  console.log("Deployer address:", deployer.address);
+  const balance = await ethers.provider.getBalance(deployer.address);
+  console.log("Deployer balance:", balance.toString());
+
+  // === Deploy contracts sequentially ===
+  console.log("\n--- Deploying MockERC20 ---");
+  const MockERC20 = await ethers.getContractFactory("PYUSDToken"); // replace with actual name
+  const mockERC20 = await MockERC20.deploy(deployer);
+  await mockERC20.waitForDeployment();
+  console.log("MockERC20 deployed to:", await mockERC20.getAddress());
+
+  console.log("\n--- Deploying UrimMarket ---");
+  const UrimMarket = await ethers.getContractFactory("UrimMarket"); // replace with actual name
+  const urimMarket = await UrimMarket.deploy(mockERC20.getAddress(), "0xA2aa501b19aff244D90cc15a4Cf739D2725B5729"); // Second argument is pythContract Address
+  await urimMarket.waitForDeployment();
+  console.log("UrimMarket deployed to:", await urimMarket.getAddress());
+
+  console.log("\n--- Deploying UrimQuantumMarket  ---");
+  const UrimQuantumMarket = await ethers.getContractFactory("UrimQuantumMarket"); // replace with actual name
+  const urimQuantumMarket = await UrimQuantumMarket.deploy(mockERC20.getAddress(), "0xA2aa501b19aff244D90cc15a4Cf739D2725B5729"); // Second argument is pythContract Address
+  await urimQuantumMarket.waitForDeployment();
+  console.log("UrimQuantumMarket deployed to:", await urimQuantumMarket.getAddress());
+
+  console.log("\n✅ All contracts deployed successfully!");
+
+
+  // Verification part:
+
+    try {
+    console.log("Verifying mockERC20...");
+    await verifyContract({
+      address: await mockERC20.getAddress(),
+      constructorArgs: [await deployer.getAddress()],
+      provider: "etherscan",
+      
+    }, hre);
+    console.log("✅ MockERC20 verified successfully!");
+  } catch (error: any) {
+    if (error.message.toLowerCase().includes("already verified")) {
+      console.log("✅ MockERC20 is already verified!");
+    } else {
+      console.error("🔥 MockERC20 verification failed:", error);
+    }
+  }
+
+}
+
+// Run the deployer
+main().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});
