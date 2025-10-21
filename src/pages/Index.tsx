@@ -44,6 +44,7 @@ const Index = () => {
   const [selectedOutcome, setSelectedOutcome] = useState("");
   const [betAmount, setBetAmount] = useState("");
   const [isCreatingMarket, setIsCreatingMarket] = useState(false);
+  const [selectedScenarioId, setSelectedScenarioId] = useState<number | null>(null);
 
   const { everythingMarketIds, quantumMarketIds } = useAllMarkets();
 
@@ -96,11 +97,20 @@ const Index = () => {
     }
   };
 
-  const handleCreateQuantumMarket = async (selectedScenario: Scenario) => {
+  const handleCreateQuantumMarket = async () => {
     if (!address) {
       toast({
         title: "Wallet Not Connected",
         description: "Please connect your wallet first.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (selectedScenarioId === null) {
+      toast({
+        title: "No Scenario Selected",
+        description: "Please select a scenario first.",
         variant: "destructive",
       });
       return;
@@ -139,6 +149,7 @@ const Index = () => {
 
       setScenarios([]);
       setSituation("");
+      setSelectedScenarioId(null);
       
       // Refresh to show new market
       setTimeout(() => {
@@ -375,52 +386,78 @@ const Index = () => {
             </div>
             
             {/* Scenario Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {scenarios.map((scenario, index) => (
-                <div
-                  key={scenario.id}
-                  className="card-glow p-8 animate-fade-up hover:scale-[1.02] transition-all"
-                  style={{ animationDelay: `${index * 0.15}s` }}
-                >
-                  <div className="space-y-5">
-                    {/* Scenario Number Badge */}
-                    <div className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-primary/15 border border-primary/30">
-                      <span className="text-primary font-bold">{index + 1}</span>
-                    </div>
-                    
-                    {/* Title */}
-                    <div>
-                      <div className="text-xs text-primary font-semibold mb-2 uppercase tracking-wider">
-                        {scenario.title}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+              {scenarios.map((scenario, index) => {
+                const isSelected = selectedScenarioId === scenario.id;
+                return (
+                  <div
+                    key={scenario.id}
+                    onClick={() => setSelectedScenarioId(scenario.id)}
+                    className={`cursor-pointer p-8 rounded-2xl border-2 transition-all duration-300 animate-fade-up ${
+                      isSelected
+                        ? 'border-primary bg-primary/10 shadow-[0_8px_32px_hsl(var(--primary)/0.3)] scale-[1.02]'
+                        : 'border-border/50 bg-card/40 hover:border-primary/40 hover:bg-card/60'
+                    }`}
+                    style={{ animationDelay: `${index * 0.15}s` }}
+                  >
+                    <div className="space-y-5">
+                      {/* Scenario Number Badge */}
+                      <div className={`inline-flex items-center justify-center w-10 h-10 rounded-xl border transition-colors ${
+                        isSelected
+                          ? 'bg-primary/20 border-primary/50'
+                          : 'bg-primary/10 border-primary/30'
+                      }`}>
+                        <span className={`font-bold transition-colors ${
+                          isSelected ? 'text-primary' : 'text-primary/70'
+                        }`}>{index + 1}</span>
                       </div>
-                      <h3 className="text-xl font-bold text-foreground leading-tight">
-                        {scenario.summary}
-                      </h3>
-                    </div>
-                    
-                    {/* Create Button */}
-                    <Button 
-                      onClick={() => handleCreateQuantumMarket(scenario)}
-                      disabled={isCreatingMarket}
-                      className="w-full group/create"
-                      size="lg"
-                    >
-                      {isCreatingMarket ? (
-                        <>
-                          <div className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin mr-2" />
-                          Creating...
-                        </>
-                      ) : (
-                        <>
-                          <Zap className="w-4 h-4 mr-2" />
-                          Create Market
-                          <ChevronRight className="w-4 h-4 ml-1 group-hover/create:translate-x-1 transition-transform" />
-                        </>
+                      
+                      {/* Title */}
+                      <div>
+                        <div className={`text-xs font-semibold mb-2 uppercase tracking-wider transition-colors ${
+                          isSelected ? 'text-primary' : 'text-primary/70'
+                        }`}>
+                          {scenario.title}
+                        </div>
+                        <h3 className="text-xl font-bold text-foreground leading-tight">
+                          {scenario.summary}
+                        </h3>
+                      </div>
+                      
+                      {/* Selection Indicator */}
+                      {isSelected && (
+                        <div className="flex items-center gap-2 text-sm text-primary font-semibold animate-fade-in">
+                          <Sparkles className="w-4 h-4" />
+                          <span>Selected</span>
+                        </div>
                       )}
-                    </Button>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
+            </div>
+
+            {/* Create Market Button - Below Cards */}
+            <div className="flex justify-center">
+              <Button 
+                onClick={handleCreateQuantumMarket}
+                disabled={isCreatingMarket || selectedScenarioId === null}
+                className="px-12 group/create"
+                size="lg"
+              >
+                {isCreatingMarket ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin mr-2" />
+                    Creating Market...
+                  </>
+                ) : (
+                  <>
+                    <Zap className="w-4 h-4 mr-2" />
+                    Create Quantum Market
+                    <ChevronRight className="w-4 h-4 ml-1 group-hover/create:translate-x-1 transition-transform" />
+                  </>
+                )}
+              </Button>
             </div>
           </div>
         </section>
