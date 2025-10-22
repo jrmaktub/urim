@@ -332,7 +332,7 @@ const Index = () => {
                   onClick={handleGenerateScenarios}
                   disabled={isGenerating || !situation.trim()}
                   variant="default"
-                  className="w-full group/btn relative overflow-hidden animate-float hover:scale-[1.02]"
+                  className="w-full group/btn relative overflow-hidden hover:scale-[1.02] transition-all duration-300"
                   size="lg"
                 >
                   <span className="relative z-10 flex items-center">
@@ -358,18 +358,19 @@ const Index = () => {
                   </span>
                   {isGenerating && (
                     <>
-                      {[...Array(12)].map((_, i) => (
+                      {[...Array(8)].map((_, i) => (
                         <div
                           key={i}
-                          className="absolute w-1.5 h-1.5 bg-primary-foreground rounded-full"
+                          className="absolute w-1.5 h-1.5 bg-primary-foreground rounded-full animate-quantum-burst"
                           style={{
                             left: `${Math.random() * 100}%`,
-                            animation: `particle-float ${1 + Math.random()}s ease-out infinite`,
-                            animationDelay: `${Math.random() * 0.5}s`
+                            top: `${Math.random() * 100}%`,
+                            animationDelay: `${Math.random() * 0.3}s`,
+                            animationDuration: '1s'
                           }}
                         />
                       ))}
-                      <div className="absolute inset-0 border-2 border-primary-foreground/30 rounded-xl animate-ping" />
+                      <div className="absolute inset-0 border-2 border-primary-foreground/30 rounded-xl opacity-0 animate-ping" style={{ animationDuration: '1.5s' }} />
                     </>
                   )}
                 </Button>
