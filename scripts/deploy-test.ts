@@ -10,6 +10,7 @@ async function main() {
     chainType: "op",      // OP-style chain
   });
   const pythContractAddress = "0xA2aa501b19aff244D90cc15a4Cf739D2725B5729"
+  const USDC = "0x036CbD53842c5426634e7929541eC2318f3dCF7e" // Base-Sepolia USDC contract address
   console.log("Deploying contracts using the OP chain type...");
 
   const [deployer] = await ethers.getSigners();
@@ -18,21 +19,15 @@ async function main() {
   console.log("Deployer balance:", balance.toString());
 
   // === Deploy contracts sequentially ===
-  console.log("\n--- Deploying MockERC20 ---");
-  const MockERC20 = await ethers.getContractFactory("PYUSDToken"); // replace with actual name
-  const mockERC20 = await MockERC20.deploy(deployer);
-  await mockERC20.waitForDeployment();
-  console.log("MockERC20 deployed to:", await mockERC20.getAddress());
-
   console.log("\n--- Deploying UrimMarket ---");
   const UrimMarket = await ethers.getContractFactory("UrimMarket"); // replace with actual name
-  const urimMarket = await UrimMarket.deploy(mockERC20.getAddress(), pythContractAddress); 
+  const urimMarket = await UrimMarket.deploy(USDC, pythContractAddress); 
   await urimMarket.waitForDeployment();
   console.log("UrimMarket deployed to:", await urimMarket.getAddress());
 
   console.log("\n--- Deploying UrimQuantumMarket  ---");
   const UrimQuantumMarket = await ethers.getContractFactory("UrimQuantumMarket"); // replace with actual name
-  const urimQuantumMarket = await UrimQuantumMarket.deploy(mockERC20.getAddress(), "0xA2aa501b19aff244D90cc15a4Cf739D2725B5729"); // Second argument is pythContract Address
+  const urimQuantumMarket = await UrimQuantumMarket.deploy(USDC, pythContractAddress); 
   await urimQuantumMarket.waitForDeployment();
   console.log("UrimQuantumMarket deployed to:", await urimQuantumMarket.getAddress());
 
@@ -42,27 +37,10 @@ async function main() {
   // Verification part:
 
     try {
-    console.log("Verifying mockERC20...");
-    await verifyContract({
-      address: await mockERC20.getAddress(),
-      constructorArgs: [await deployer.getAddress()],
-      provider: "etherscan",
-      
-    }, hre);
-    console.log("✅ MockERC20 verified successfully!");
-  } catch (error: any) {
-    if (error.message.toLowerCase().includes("already verified")) {
-      console.log("✅ MockERC20 is already verified!");
-    } else {
-      console.error("🔥 MockERC20 verification failed:", error);
-    }
-  }
-
-    try {
     console.log("Verifying UrimMarket...");
     await verifyContract({
       address: await urimMarket.getAddress(),
-      constructorArgs: [await mockERC20.getAddress(), pythContractAddress],
+      constructorArgs: [USDC, pythContractAddress],
       provider: "etherscan",
       
     }, hre);
@@ -80,7 +58,7 @@ async function main() {
     console.log("Verifying UrimQuantumMarket...");
     await verifyContract({
       address: await urimQuantumMarket.getAddress(),
-      constructorArgs: [await mockERC20.getAddress(), pythContractAddress],
+      constructorArgs: [USDC, pythContractAddress],
       provider: "etherscan",
       
     }, hre);
