@@ -9,7 +9,7 @@ async function main() {
     network: "baseSepolia", // or "baseSepolia" if that’s your target
     chainType: "op",      // OP-style chain
   });
-  const pythContractAddress = ""
+  const pythContractAddress = "0xA2aa501b19aff244D90cc15a4Cf739D2725B5729"
   console.log("Deploying contracts using the OP chain type...");
 
   const [deployer] = await ethers.getSigners();
@@ -26,7 +26,7 @@ async function main() {
 
   console.log("\n--- Deploying UrimMarket ---");
   const UrimMarket = await ethers.getContractFactory("UrimMarket"); // replace with actual name
-  const urimMarket = await UrimMarket.deploy(mockERC20.getAddress(), "0xA2aa501b19aff244D90cc15a4Cf739D2725B5729"); // Second argument is pythContract Address
+  const urimMarket = await UrimMarket.deploy(mockERC20.getAddress(), pythContractAddress); 
   await urimMarket.waitForDeployment();
   console.log("UrimMarket deployed to:", await urimMarket.getAddress());
 
@@ -55,6 +55,41 @@ async function main() {
       console.log("✅ MockERC20 is already verified!");
     } else {
       console.error("🔥 MockERC20 verification failed:", error);
+    }
+  }
+
+    try {
+    console.log("Verifying UrimMarket...");
+    await verifyContract({
+      address: await urimMarket.getAddress(),
+      constructorArgs: [await mockERC20.getAddress(), pythContractAddress],
+      provider: "etherscan",
+      
+    }, hre);
+    console.log("✅ UrimMarket verified successfully!");
+  } catch (error: any) {
+    if (error.message.toLowerCase().includes("already verified")) {
+      console.log("✅ UrimMarket is already verified!");
+    } else {
+      console.error("🔥 UrimMarket verification failed:", error);
+    }
+  }
+
+
+    try {
+    console.log("Verifying UrimQuantumMarket...");
+    await verifyContract({
+      address: await urimQuantumMarket.getAddress(),
+      constructorArgs: [await mockERC20.getAddress(), pythContractAddress],
+      provider: "etherscan",
+      
+    }, hre);
+    console.log("✅ UrimQuantumMarket verified successfully!");
+  } catch (error: any) {
+    if (error.message.toLowerCase().includes("already verified")) {
+      console.log("✅ UrimQuantumMarket is already verified!");
+    } else {
+      console.error("🔥 UrimQuantumMarket verification failed:", error);
     }
   }
 

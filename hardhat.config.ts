@@ -10,18 +10,24 @@ const config: HardhatUserConfig = {
   plugins: [hardhatToolboxMochaEthersPlugin, hardhatVerify],
   solidity: {
     profiles: {
-      default: {
-        version: "0.8.28",
-      },
-      production: {
-        version: "0.8.28",
-        settings: {
-          optimizer: {
-            enabled: true,
-            runs: 200,
-          },
+    default: {
+      version: "0.8.28",
+      settings: {
+        optimizer: {
+          enabled: true,  // Make sure this matches what you deployed with
+          runs: 200,
         },
       },
+    },
+      // production: {
+      //   version: "0.8.28",
+      //   settings: {
+      //     optimizer: {
+      //       enabled: true,
+      //       runs: 200,
+      //     },
+      //   },
+      // },
     },
   },
   networks: {
@@ -51,20 +57,18 @@ const config: HardhatUserConfig = {
       apiKey: configVariable("ETHERSCAN_API_KEY"),
     }
   },
-  chainDescriptors: {
-    // Example chain
-    84532: {
-      name: "baseSepolia",
-      blockExplorers: {
-        etherscan: {
-          name: "BaseSepolia Scan",
-          url: "https://sepolia.basescan.org",
-          apiUrl: "https://api-sepolia.basescan.org",
-        },
-        // other explorers...
+chainDescriptors: {
+  84532: {
+    name: "baseSepolia",
+    blockExplorers: {
+      etherscan: {
+        name: "BaseSepolia Scan",
+        url: "https://sepolia.basescan.org",
+        apiUrl: "https://api.etherscan.io/v2/api", // Unified Etherscan V2 endpoint
       },
     },
   },
+},
 };
 
 export default config;
