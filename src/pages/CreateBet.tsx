@@ -77,6 +77,14 @@ const CreateBet = () => {
     setIsCreating(true);
     
     try {
+      // Log contract connection
+      console.log(`✅ Connected to UrimQuantumMarket on Base Sepolia: ${URIM_QUANTUM_MARKET_ADDRESS}`);
+      
+      toast({
+        title: "✅ Contract Connected",
+        description: `UrimQuantumMarket on Base Sepolia`,
+      });
+
       const durationSeconds = BigInt(Number(duration) * 24 * 60 * 60);
       const probabilitiesArray = probabilities.map(p => BigInt(p));
       

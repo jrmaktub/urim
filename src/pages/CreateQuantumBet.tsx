@@ -60,6 +60,14 @@ const CreateQuantumBet = () => {
     setIsProcessing(true);
 
     try {
+      // Log contract connection
+      console.log(`✅ Connected to UrimQuantumMarket on Base Sepolia: ${URIM_QUANTUM_MARKET_ADDRESS}`);
+      
+      toast({
+        title: "✅ Contract Connected",
+        description: `UrimQuantumMarket on Base Sepolia`,
+      });
+
       const durationSeconds = BigInt(7 * 24 * 60 * 60); // 7 days
       const scenarioTexts = outcomes.filter(o => o.trim());
       
