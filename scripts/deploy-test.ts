@@ -12,6 +12,7 @@ async function main() {
   const pythContractAddress = "0xA2aa501b19aff244D90cc15a4Cf739D2725B5729"
   const USDC = "0x036CbD53842c5426634e7929541eC2318f3dCF7e" // Base-Sepolia USDC contract address
   console.log("Deploying contracts using the OP chain type...");
+  const ETH_USD_BASE_SEPOLIA_ID = "0xff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace";
 
   const [deployer] = await ethers.getSigners();
   console.log("Deployer address:", deployer.address);
