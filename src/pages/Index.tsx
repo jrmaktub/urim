@@ -7,7 +7,7 @@ import Hero from "@/components/Hero";
 import PythPriceTicker from "@/components/PythPriceTicker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Sparkles, Clock, TrendingUp, Zap, ChevronRight, Users, DollarSign } from "lucide-react";
+import { Sparkles, Clock, TrendingUp, Zap, ChevronRight, Users, DollarSign, Brain, ChevronDown, ChevronUp } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
   Dialog,
@@ -29,6 +29,8 @@ interface Scenario {
   id: number;
   title: string;
   summary: string;
+  probability: number;
+  reasoning: string;
 }
 
 const Index = () => {
@@ -49,6 +51,7 @@ const Index = () => {
   const [selectedScenarioId, setSelectedScenarioId] = useState<number | null>(null);
   const [showQuantumEffect, setShowQuantumEffect] = useState(false);
   const [showIntro, setShowIntro] = useState(true);
+  const [expandedReasoning, setExpandedReasoning] = useState<number | null>(null);
 
   const { everythingMarketIds, quantumMarketIds } = useAllMarkets();
 
@@ -80,10 +83,17 @@ const Index = () => {
       if (error) throw error;
 
       if (data?.scenarios) {
+        // Calculate probabilities that sum to 100
+        const scenarioCount = data.scenarios.length;
+        const baseProb = Math.floor(100 / scenarioCount);
+        const remainder = 100 - (baseProb * scenarioCount);
+        
         const generatedScenarios = data.scenarios.map((s: any, idx: number) => ({
           id: idx + 1,
-          title: `Scenario ${idx + 1}`,
-          summary: s.description
+          title: s.title || `Scenario ${idx + 1}`,
+          summary: s.description,
+          probability: baseProb + (idx === 0 ? remainder : 0), // Add remainder to first scenario
+          reasoning: s.reasoning || `AI predicts a ${baseProb + (idx === 0 ? remainder : 0)}% likelihood based on current trends and historical patterns.`
         }));
         
         setScenarios(generatedScenarios);
@@ -283,10 +293,40 @@ const Index = () => {
 
       {/* Quantum Ripple Effect Overlay */}
       {showQuantumEffect && (
-        <div className="fixed inset-0 z-40 pointer-events-none flex items-center justify-center">
+        <div className="fixed inset-0 z-40 pointer-events-none flex items-center justify-center overflow-hidden">
+          {/* Central text */}
+          <div className="absolute z-20 text-center space-y-4 animate-fade-in">
+            <div className="flex items-center justify-center gap-3">
+              <Brain className="w-8 h-8 text-primary animate-pulse" />
+              <span className="text-2xl font-bold text-primary shimmer-text">
+                Running quantum simulation
+              </span>
+            </div>
+            <div className="flex gap-2 justify-center">
+              <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0s' }} />
+              <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
+              <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0.4s' }} />
+            </div>
+          </div>
+          
+          {/* Quantum ripples */}
           <div className="absolute w-32 h-32 rounded-full border-4 border-primary/40 animate-quantum-ripple" />
           <div className="absolute w-24 h-24 rounded-full border-4 border-primary/60 animate-quantum-ripple" style={{ animationDelay: '0.3s' }} />
           <div className="absolute w-40 h-40 rounded-full bg-primary/5 animate-quantum-burst" />
+          
+          {/* Particle swirls */}
+          {[...Array(12)].map((_, i) => (
+            <div
+              key={i}
+              className="absolute w-3 h-3 rounded-full bg-primary/60 animate-particle-swirl"
+              style={{
+                left: '50%',
+                top: '50%',
+                animationDelay: `${i * 0.25}s`,
+                animationDuration: '3s'
+              }}
+            />
+          ))}
         </div>
       )}
 
@@ -336,11 +376,11 @@ const Index = () => {
                   size="lg"
                 >
                   <span className="relative z-10 flex items-center">
-                    {isGenerating ? (
+                     {isGenerating ? (
                       <>
-                        <Sparkles className="w-4 h-4 mr-2 animate-spin" />
+                        <Brain className="w-4 h-4 mr-2 animate-pulse" />
                         <span className="flex items-center gap-2">
-                          Generating Futures
+                          Running quantum simulation
                           <span className="flex gap-1">
                             <span className="w-1.5 h-1.5 bg-primary-foreground rounded-full animate-bounce" style={{ animationDelay: '0s' }} />
                             <span className="w-1.5 h-1.5 bg-primary-foreground rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
@@ -445,44 +485,20 @@ const Index = () => {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
               {scenarios.map((scenario, index) => {
                 const isSelected = selectedScenarioId === scenario.id;
+                const isReasoningExpanded = expandedReasoning === scenario.id;
+                const glowIntensity = scenario.probability / 100;
+                
                 return (
-                  <div
+                  <ScenarioCard
                     key={scenario.id}
-                    onClick={() => setSelectedScenarioId(scenario.id)}
-                    className={`cursor-pointer p-8 rounded-2xl border-2 transition-all duration-300 animate-slide-in hover-glow ${
-                      isSelected
-                        ? 'border-primary bg-primary/10 shadow-xl shadow-primary/30 scale-105'
-                        : 'border-border/50 bg-card/40 hover:border-primary/40 hover:bg-card/60 hover:-translate-y-1 hover:shadow-lg hover:shadow-primary/10'
-                    }`}
-                    style={{ animationDelay: `${index * 0.15}s` }}
-                  >
-                    <div className="space-y-5">
-                      {/* Scenario Content */}
-                      <div className="relative">
-                        <div className={`absolute -left-4 top-0 w-1 h-full rounded-full transition-all duration-300 ${
-                          isSelected ? 'bg-primary' : 'bg-primary/20'
-                        }`} />
-                        <h3 className={`text-lg font-semibold mb-3 leading-tight transition-all ${
-                          isSelected ? 'text-primary shimmer-text' : ''
-                        }`}>
-                          {scenario.title}
-                        </h3>
-                        <p className="text-sm text-muted-foreground leading-relaxed">
-                          {scenario.summary}
-                        </p>
-                      </div>
-                      
-                      {/* Selection Indicator */}
-                      {isSelected && (
-                        <div className="mt-4 pt-4 border-t border-primary/20 flex items-center justify-center gap-2 animate-fade-in">
-                          <Sparkles className="w-3 h-3 text-primary" />
-                          <span className="text-xs font-semibold text-primary uppercase tracking-wider">
-                            Selected
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                    scenario={scenario}
+                    index={index}
+                    isSelected={isSelected}
+                    isReasoningExpanded={isReasoningExpanded}
+                    glowIntensity={glowIntensity}
+                    onSelect={() => setSelectedScenarioId(scenario.id)}
+                    onToggleReasoning={() => setExpandedReasoning(isReasoningExpanded ? null : scenario.id)}
+                  />
                 );
               })}
             </div>
@@ -595,6 +611,155 @@ const Index = () => {
       </Dialog>
 
       <Footer />
+    </div>
+  );
+};
+
+interface ScenarioCardProps {
+  scenario: Scenario;
+  index: number;
+  isSelected: boolean;
+  isReasoningExpanded: boolean;
+  glowIntensity: number;
+  onSelect: () => void;
+  onToggleReasoning: () => void;
+}
+
+const ScenarioCard = ({ 
+  scenario, 
+  index, 
+  isSelected, 
+  isReasoningExpanded, 
+  glowIntensity,
+  onSelect, 
+  onToggleReasoning 
+}: ScenarioCardProps) => {
+  const [displayedProb, setDisplayedProb] = useState(0);
+
+  // Animate probability count-up
+  useEffect(() => {
+    let start = 0;
+    const end = scenario.probability;
+    const duration = 1500; // 1.5 seconds
+    const startTime = Date.now();
+
+    const timer = setInterval(() => {
+      const elapsed = Date.now() - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      
+      // Ease-out curve
+      const easeOut = 1 - Math.pow(1 - progress, 3);
+      const current = Math.floor(start + (end - start) * easeOut);
+      
+      setDisplayedProb(current);
+      
+      if (progress >= 1) {
+        clearInterval(timer);
+        setDisplayedProb(end);
+      }
+    }, 16); // ~60fps
+
+    return () => clearInterval(timer);
+  }, [scenario.probability]);
+
+  return (
+    <div
+      onClick={onSelect}
+      className={`cursor-pointer p-8 rounded-2xl border-2 transition-all duration-300 animate-slide-in hover-glow relative overflow-hidden ${
+        isSelected
+          ? 'border-primary bg-primary/10 shadow-xl shadow-primary/30 scale-105'
+          : 'border-border/50 bg-card/40 hover:border-primary/40 hover:bg-card/60 hover:-translate-y-1 hover:shadow-lg hover:shadow-primary/10'
+      }`}
+      style={{ 
+        animationDelay: `${index * 0.15}s`,
+        boxShadow: isSelected 
+          ? `0 0 ${20 + glowIntensity * 40}px hsl(var(--primary) / ${0.2 + glowIntensity * 0.3})`
+          : undefined
+      }}
+    >
+      {/* Dynamic glow based on probability */}
+      <div 
+        className="absolute inset-0 rounded-2xl opacity-0 hover:opacity-100 transition-opacity duration-500 pointer-events-none"
+        style={{
+          background: `radial-gradient(circle at 50% 0%, hsl(var(--primary) / ${glowIntensity * 0.2}), transparent 70%)`
+        }}
+      />
+      
+      <div className="space-y-5 relative z-10">
+        {/* Probability Chip */}
+        <div className="flex items-center justify-between mb-2">
+          <div 
+            className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full border transition-all ${
+              isSelected 
+                ? 'bg-primary/20 border-primary/60' 
+                : 'bg-muted/50 border-border/50'
+            }`}
+          >
+            <Brain className={`w-3 h-3 ${isSelected ? 'text-primary' : 'text-muted-foreground'}`} />
+            <span className={`text-sm font-bold tabular-nums ${isSelected ? 'text-primary' : 'text-foreground'}`}>
+              {displayedProb}%
+            </span>
+          </div>
+          <div className={`w-2 h-2 rounded-full ${isSelected ? 'bg-primary animate-pulse' : 'bg-muted-foreground/30'}`} />
+        </div>
+
+        {/* Scenario Content */}
+        <div className="relative">
+          <div className={`absolute -left-4 top-0 w-1 h-full rounded-full transition-all duration-300`}
+            style={{
+              background: isSelected 
+                ? `linear-gradient(to bottom, hsl(var(--primary)), hsl(var(--primary) / ${glowIntensity}))`
+                : `hsl(var(--primary) / 0.2)`
+            }}
+          />
+          <h3 className={`text-lg font-semibold mb-3 leading-tight transition-all ${
+            isSelected ? 'text-primary shimmer-text' : ''
+          }`}>
+            {scenario.title}
+          </h3>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            {scenario.summary}
+          </p>
+        </div>
+        
+        {/* AI Reasoning Button */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleReasoning();
+          }}
+          className="w-full mt-4 pt-4 border-t border-border/30 flex items-center justify-between text-xs font-semibold text-primary hover:text-primary-glow transition-colors group"
+        >
+          <span className="flex items-center gap-2">
+            <Sparkles className="w-3 h-3" />
+            AI Reasoning
+          </span>
+          {isReasoningExpanded ? (
+            <ChevronUp className="w-3.5 h-3.5 group-hover:-translate-y-0.5 transition-transform" />
+          ) : (
+            <ChevronDown className="w-3.5 h-3.5 group-hover:translate-y-0.5 transition-transform" />
+          )}
+        </button>
+
+        {/* Expanded Reasoning */}
+        {isReasoningExpanded && (
+          <div className="mt-3 p-4 rounded-xl bg-primary/5 border border-primary/20 animate-fade-in">
+            <p className="text-xs text-muted-foreground leading-relaxed italic">
+              "{scenario.reasoning}"
+            </p>
+          </div>
+        )}
+        
+        {/* Selection Indicator */}
+        {isSelected && (
+          <div className="mt-4 pt-4 border-t border-primary/20 flex items-center justify-center gap-2 animate-fade-in">
+            <Sparkles className="w-3 h-3 text-primary" />
+            <span className="text-xs font-semibold text-primary uppercase tracking-wider">
+              Selected
+            </span>
+          </div>
+        )}
+      </div>
     </div>
   );
 };

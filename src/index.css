@@ -209,6 +209,39 @@ All colors MUST be HSL.
     }
   }
 
+  @keyframes particle-swirl {
+    0% {
+      transform: rotate(0deg) translateX(0) scale(0);
+      opacity: 0;
+    }
+    25% {
+      opacity: 1;
+      transform: rotate(90deg) translateX(30px) scale(1);
+    }
+    50% {
+      transform: rotate(180deg) translateX(0) scale(0.8);
+    }
+    75% {
+      opacity: 0.6;
+      transform: rotate(270deg) translateX(-30px) scale(0.6);
+    }
+    100% {
+      transform: rotate(360deg) translateX(0) scale(0);
+      opacity: 0;
+    }
+  }
+
+  @keyframes count-up {
+    from {
+      opacity: 0;
+      transform: scale(0.5);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
   .animate-fade-in {
     animation: fade-in 0.6s cubic-bezier(0.4, 0, 0.2, 1);
   }
@@ -239,6 +272,14 @@ All colors MUST be HSL.
 
   .animate-slide-in {
     animation: slide-in-from-bottom 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .animate-particle-swirl {
+    animation: particle-swirl 3s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  }
+
+  .animate-count-up {
+    animation: count-up 0.5s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   /* Hover glow effect for cards */
