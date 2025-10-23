@@ -22,8 +22,8 @@ import { useToast } from "@/hooks/use-toast";
 import { CheckCircle2, Clock, TrendingUp } from "lucide-react";
 
 import FetchUnifiedBalanceButton from '@/components/fetch-unified-balance-button';
-import BridgeButton from '@/components/BridgeButton';
-import Bridge from "@/components/BridgeButton";
+import Bridge from '@/components/BridgeButton';
+
 
 
 const EverythingBets = () => {
@@ -161,7 +161,7 @@ const EverythingBets = () => {
           <pre className="whitespace-pre-wrap">{JSON.stringify(balances, null, 2)}</pre>
         )}
         <FetchUnifiedBalanceButton className={btn} onResult={(r) => setBalances(r)} />
-          <BridgeButton />
+          <Bridge />
           <div className="gold-card p-8 animate-fade-up" style={{ animationDelay: "0.2s" }}>
             <div className="space-y-6">
               <div>
