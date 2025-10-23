@@ -1,4 +1,4 @@
-import { BridgeButton } from '@avail-project/nexus-widgets';
+import { BridgeButton, SUPPORTED_CHAINS } from '@avail-project/nexus-widgets';
 import { useAccount, useSwitchChain } from 'wagmi';
 import { baseSepolia } from 'wagmi/chains';
 
@@ -47,8 +47,8 @@ function Bridge() {
       <BridgeButton
         prefill={{
           chainId: 11155420, // OP Sepolia (destination)
-          token: 'ETH',
-          amount: '0.01',
+          token: 'USDC',
+          amount: '0.1',
         }}
       >
         {({ onClick, isLoading }) => (
@@ -57,7 +57,7 @@ function Bridge() {
             disabled={isLoading}
             className="w-full bg-purple-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
           >
-            {isLoading ? '⏳ Bridging…' : '🌉 Bridge 0.01 ETH to OP Sepolia'}
+            {isLoading ? '⏳ Bridging…' : '🌉 Bridge 0.1 USDC to OP Sepolia'}
           </button>
         )}
       </BridgeButton>

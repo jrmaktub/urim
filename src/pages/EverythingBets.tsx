@@ -23,6 +23,7 @@ import { CheckCircle2, Clock, TrendingUp } from "lucide-react";
 
 import FetchUnifiedBalanceButton from '@/components/fetch-unified-balance-button';
 import Bridge from '@/components/BridgeButton';
+import BridgeAndExecute from '@/components/BridgeAndExecute';
 
 
 
@@ -162,6 +163,7 @@ const EverythingBets = () => {
         )}
         <FetchUnifiedBalanceButton className={btn} onResult={(r) => setBalances(r)} />
           <Bridge />
+          {/* <BridgeAndExecute /> */}
           <div className="gold-card p-8 animate-fade-up" style={{ animationDelay: "0.2s" }}>
             <div className="space-y-6">
               <div>
