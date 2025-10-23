@@ -1,13 +1,13 @@
-import { getDefaultConfig } from '@rainbow-me/rainbowkit';
-import { baseSepolia } from 'wagmi/chains';
-import { http } from 'viem';
+import { createConfig, http } from 'wagmi';
+import { mainnet, base, baseSepolia } from 'wagmi/chains';
+import { baseAccount } from 'wagmi/connectors';
 
-export const config = getDefaultConfig({
-  appName: 'Urim - Quantum Prediction Markets',
-  projectId: 'YOUR_PROJECT_ID', // Get from https://cloud.walletconnect.com
-  chains: [baseSepolia],
-  transports: {
-    [baseSepolia.id]: http('https://base-sepolia.g.alchemy.com/v2/27SvVEbGAVC2VSJ8rPss0'),
+export const config = createConfig({
+  chains: [mainnet, base, baseSepolia],
+  transports: { 
+    [mainnet.id]: http(),
+    [base.id]: http(),
+    [baseSepolia.id]: http() 
   },
   ssr: false,
 });

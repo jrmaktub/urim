@@ -27,6 +27,12 @@ import UrimMarketABI from "@/contracts/UrimMarket.json";
 import ERC20ABI from "@/contracts/ERC20.json";
 import { parseUnits } from "viem";
 
+import FetchUnifiedBalanceButton from '@/components/fetch-unified-balance-button';
+import Bridge from '@/components/BridgeButton';
+import BridgeAndExecute from '@/components/BridgeAndExecute';
+
+
+
 const EverythingBets = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -43,7 +49,11 @@ const EverythingBets = () => {
   const [selectedMarket, setSelectedMarket] = useState<any>(null);
   const [stakeModalOpen, setStakeModalOpen] = useState(false);
   const [selectedOption, setSelectedOption] = useState<string>("");
+  const [balances, setBalances] = useState<any>(null);
 
+    const btn =
+    'px-4 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-700 ' +
+    'disabled:opacity-50 disabled:cursor-not-allowed';
   // Mock active markets
   const activeMarkets = [
     {
@@ -201,7 +211,12 @@ const EverythingBets = () => {
               Simple Yes/No prediction markets on any topic
             </p>
           </div>
-
+                  {balances && (
+          <pre className="whitespace-pre-wrap">{JSON.stringify(balances, null, 2)}</pre>
+        )}
+        <FetchUnifiedBalanceButton className={btn} onResult={(r) => setBalances(r)} />
+          <Bridge />
+          <BridgeAndExecute />
           {/* Form Card */}
           <div className="card-glow p-10 animate-fade-up" style={{ animationDelay: "0.15s" }}>
             <div className="space-y-7">

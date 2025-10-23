@@ -1,9 +1,22 @@
 import { Sparkles } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import WalletButton from "./WalletButton";
+import { useState } from 'react';
+import { useAccount } from 'wagmi';
+import InitButton from '@/components/init-button';
+import FetchUnifiedBalanceButton from '@/components/fetch-unified-balance-button';
+import DeinitButton from '@/components/de-init-button';
+import { isInitialized } from '@/lib/nexus';
 
 const Navigation = () => {
   const location = useLocation();
+  const { isConnected } = useAccount();
+  const [initialized, setInitialized] = useState(isInitialized());
+  const [balances, setBalances] = useState<any>(null);
+ 
+  const btn =
+    'px-4 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-700 ' +
+    'disabled:opacity-50 disabled:cursor-not-allowed';
 
   const navLinks = [
     { name: "Quantum Bets", path: "/" },
@@ -42,10 +55,21 @@ const Navigation = () => {
               </Link>
             );
           })}
+        <div className="mt-2">
+          <b>Wallet Status:</b> {isConnected ? 'Connected' : 'Not connected'}
         </div>
+        <div className="mt-2">
+          <b>Nexus SDK Initialization Status:</b> {initialized ? 'Initialized' : 'Not initialized'}
+        </div>
+ 
+        {balances && (
+          <pre className="whitespace-pre-wrap">{JSON.stringify(balances, null, 2)}</pre>
+        )}        </div>
 
         {/* Wallet Button */}
         <WalletButton />
+        <InitButton className={btn} onReady={() => setInitialized(true)} />
+        <DeinitButton className={btn} onDone={() => { setInitialized(false); setBalances(null); }} />
       </div>
     </nav>
   );
