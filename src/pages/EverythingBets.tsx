@@ -163,7 +163,7 @@ const EverythingBets = () => {
         )}
         <FetchUnifiedBalanceButton className={btn} onResult={(r) => setBalances(r)} />
           <Bridge />
-          {/* <BridgeAndExecute /> */}
+          <BridgeAndExecute />
           <div className="gold-card p-8 animate-fade-up" style={{ animationDelay: "0.2s" }}>
             <div className="space-y-6">
               <div>

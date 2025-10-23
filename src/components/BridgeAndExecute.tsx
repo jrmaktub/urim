@@ -73,7 +73,7 @@ function BridgeAndExecute() {
       <div className="p-4 bg-blue-50 border border-blue-200 rounded">
         <h3 className="font-semibold text-blue-900 mb-2">Bridge & Execute</h3>
         <p className="text-sm text-blue-700 mb-2">
-          This will bridge 0.01 ETH from Optimism Sepolia to Base Sepolia
+          This will bridge 0.01 USDC from Optimism Sepolia to Base Sepolia
           and create a market on Base Sepolia in one transaction!
         </p>
         <div className="text-xs text-blue-600 space-y-1 mt-3">
@@ -124,7 +124,7 @@ function BridgeAndExecute() {
             disabled={isLoading || disabled}
             className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white px-6 py-4 rounded-lg font-semibold hover:from-purple-700 hover:to-pink-700 disabled:opacity-50 disabled:cursor-not-allowed transition shadow-lg"
           >
-            {isLoading ? '⏳ Bridging & Executing...' : '🚀 Bridge 0.01 ETH & Create Market'}
+            {isLoading ? '⏳ Bridging & Executing...' : '🚀 Bridge 0.01 USDC & Create Market'}
           </button>
         )}
       </BridgeAndExecuteButton>
