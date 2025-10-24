@@ -4,7 +4,7 @@ import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Zap, ChevronRight, DollarSign } from "lucide-react";
+import { Zap, ChevronRight, DollarSign, Clock, TrendingUp } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
   Dialog,
@@ -18,8 +18,9 @@ import { URIM_QUANTUM_MARKET_ADDRESS, URIM_MARKET_ADDRESS, USDC_ADDRESS } from "
 import UrimQuantumMarketABI from "@/contracts/UrimQuantumMarket.json";
 import UrimMarketABI from "@/contracts/UrimMarket.json";
 import ERC20ABI from "@/contracts/ERC20.json";
-import { parseUnits } from "viem";
+import { parseUnits, formatUnits } from "viem";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useAllMarkets, useMarketInfo, useOutcomePool } from "@/hooks/useMarkets";
 
 interface UserBet {
   marketId: number;
@@ -42,6 +43,10 @@ const Index = () => {
   const [betAmount, setBetAmount] = useState("");
   const [userBets, setUserBets] = useState<UserBet[]>([]);
   const [activeTab, setActiveTab] = useState("everything");
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  // Fetch all markets from blockchain
+  const { everythingMarketIds, quantumMarketIds } = useAllMarkets();
 
   // Load user's bets from localStorage
   useEffect(() => {
@@ -60,7 +65,7 @@ const Index = () => {
     localStorage.setItem(`userBets_${address}`, JSON.stringify(newBets));
   };
 
-  const handlePlaceBet = () => {
+  const handlePlaceBet = (marketId: number, isQuantum: boolean) => {
     if (!address) {
       toast({
         title: "Wallet Not Connected",
@@ -70,18 +75,18 @@ const Index = () => {
       return;
     }
 
-    setSelectedMarketId(0); // Placeholder, will be filled from form
-    setSelectedIsQuantum(activeTab === "quantum");
+    setSelectedMarketId(marketId);
+    setSelectedIsQuantum(isQuantum);
     setSelectedOutcome("");
     setBetAmount("");
     setBetModalOpen(true);
   };
 
   const handleConfirmBet = async () => {
-    if (!selectedOutcome || !betAmount || selectedMarketId === null || selectedMarketId === 0) {
+    if (!selectedOutcome || !betAmount || selectedMarketId === null) {
       toast({
         title: "Missing Information",
-        description: "Please enter market ID, select an outcome, and enter bet amount.",
+        description: "Please select an outcome and enter bet amount.",
         variant: "destructive",
       });
       return;
@@ -137,13 +142,16 @@ const Index = () => {
 
       toast({
         title: "Bet Placed Successfully! ⚡",
-        description: "✅ Bet placed successfully on your selected outcome!",
+        description: "✅ Bet placed successfully.",
       });
       
       setBetModalOpen(false);
       setSelectedOutcome("");
       setBetAmount("");
       setSelectedMarketId(null);
+      
+      // Refresh markets to show updated pools
+      setRefreshKey(prev => prev + 1);
     } catch (error: any) {
       console.error("Bet failed:", error);
       toast({
@@ -173,18 +181,24 @@ const Index = () => {
           </TabsList>
 
           <TabsContent value="everything" className="space-y-8">
-            {/* Place Bet Button */}
-            <div className="glass-card p-8">
-              <Button
-                onClick={handlePlaceBet}
-                className="w-full"
-                size="lg"
-              >
-                <Zap className="w-4 h-4 mr-2" />
-                Place Bet
-                <ChevronRight className="w-4 h-4 ml-1" />
-              </Button>
-            </div>
+            {/* Live Markets from Blockchain */}
+            {everythingMarketIds.length > 0 ? (
+              <div className="space-y-4">
+                <h2 className="text-2xl font-bold">Live Markets</h2>
+                {everythingMarketIds.map((marketId) => (
+                  <MarketCard
+                    key={`everything-${Number(marketId)}-${refreshKey}`}
+                    marketId={Number(marketId)}
+                    isQuantum={false}
+                    onPlaceBet={handlePlaceBet}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="glass-card p-8 text-center">
+                <p className="text-muted-foreground">No active markets found on-chain</p>
+              </div>
+            )}
 
             {/* User's Bets */}
             {userBets.filter(bet => !bet.isQuantum).length > 0 && (
@@ -215,18 +229,24 @@ const Index = () => {
           </TabsContent>
 
           <TabsContent value="quantum" className="space-y-8">
-            {/* Place Bet Button */}
-            <div className="glass-card p-8">
-              <Button
-                onClick={handlePlaceBet}
-                className="w-full"
-                size="lg"
-              >
-                <Zap className="w-4 h-4 mr-2" />
-                Place Bet
-                <ChevronRight className="w-4 h-4 ml-1" />
-              </Button>
-            </div>
+            {/* Live Quantum Markets from Blockchain */}
+            {quantumMarketIds.length > 0 ? (
+              <div className="space-y-4">
+                <h2 className="text-2xl font-bold">Live Quantum Markets</h2>
+                {quantumMarketIds.map((marketId) => (
+                  <MarketCard
+                    key={`quantum-${Number(marketId)}-${refreshKey}`}
+                    marketId={Number(marketId)}
+                    isQuantum={true}
+                    onPlaceBet={handlePlaceBet}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="glass-card p-8 text-center">
+                <p className="text-muted-foreground">No active quantum markets found on-chain</p>
+              </div>
+            )}
 
             {/* User's Quantum Bets */}
             {userBets.filter(bet => bet.isQuantum).length > 0 && (
@@ -266,25 +286,15 @@ const Index = () => {
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label>Market ID</Label>
-              <Input
-                type="number"
-                placeholder="Enter market ID"
-                value={selectedMarketId || ""}
-                onChange={(e) => setSelectedMarketId(Number(e.target.value))}
-              />
-            </div>
-
-            <div className="space-y-2">
               <Label>Select Outcome</Label>
               <RadioGroup value={selectedOutcome} onValueChange={setSelectedOutcome}>
                 <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="yes" id="yes" />
-                  <Label htmlFor="yes">Yes</Label>
+                  <RadioGroupItem value="0" id="outcome-0" />
+                  <Label htmlFor="outcome-0">{selectedIsQuantum ? "Scenario 1" : "Yes"}</Label>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="no" id="no" />
-                  <Label htmlFor="no">No</Label>
+                  <RadioGroupItem value="1" id="outcome-1" />
+                  <Label htmlFor="outcome-1">{selectedIsQuantum ? "Scenario 2" : "No"}</Label>
                 </div>
               </RadioGroup>
             </div>
@@ -308,6 +318,137 @@ const Index = () => {
       </Dialog>
 
       <Footer />
+    </div>
+  );
+};
+
+interface MarketCardProps {
+  marketId: number;
+  isQuantum: boolean;
+  onPlaceBet: (marketId: number, isQuantum: boolean) => void;
+}
+
+const MarketCard = ({ marketId, isQuantum, onPlaceBet }: MarketCardProps) => {
+  const marketInfo = useMarketInfo(marketId, isQuantum);
+  const [timeLeft, setTimeLeft] = useState("");
+
+  useEffect(() => {
+    if (!marketInfo) return;
+
+    const updateCountdown = () => {
+      const now = Math.floor(Date.now() / 1000);
+      const diff = marketInfo.endTimestamp - now;
+
+      if (diff <= 0) {
+        setTimeLeft("Ended");
+        return;
+      }
+
+      const days = Math.floor(diff / 86400);
+      const hours = Math.floor((diff % 86400) / 3600);
+
+      if (days > 0) {
+        setTimeLeft(`${days}d ${hours}h`);
+      } else {
+        setTimeLeft(`${hours}h`);
+      }
+    };
+
+    updateCountdown();
+    const interval = setInterval(updateCountdown, 60000);
+    return () => clearInterval(interval);
+  }, [marketInfo]);
+
+  if (!marketInfo) return null;
+
+  return (
+    <div className="glass-card p-6 space-y-4">
+      {/* Header */}
+      <div className="flex items-start justify-between">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-muted-foreground">Market #{marketId}</span>
+            {marketInfo.resolved && (
+              <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-primary/15 border border-primary/30">
+                <span className="text-primary font-bold text-xs uppercase">Resolved</span>
+              </div>
+            )}
+          </div>
+          <h3 className="text-xl font-bold">{marketInfo.question}</h3>
+        </div>
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Clock className="w-4 h-4" />
+          <span>{timeLeft}</span>
+        </div>
+      </div>
+
+      {/* Outcomes */}
+      <div className="grid grid-cols-2 gap-3">
+        {marketInfo.outcomes.map((outcome, index) => (
+          <OutcomeCard
+            key={index}
+            marketId={marketId}
+            outcomeIndex={index}
+            outcomeName={outcome}
+            isQuantum={isQuantum}
+            resolved={marketInfo.resolved}
+            isWinner={marketInfo.resolved && marketInfo.winningIndex === index}
+            onPlaceBet={() => onPlaceBet(marketId, isQuantum)}
+          />
+        ))}
+      </div>
+    </div>
+  );
+};
+
+interface OutcomeCardProps {
+  marketId: number;
+  outcomeIndex: number;
+  outcomeName: string;
+  isQuantum: boolean;
+  resolved: boolean;
+  isWinner: boolean;
+  onPlaceBet: () => void;
+}
+
+const OutcomeCard = ({ marketId, outcomeIndex, outcomeName, isQuantum, resolved, isWinner, onPlaceBet }: OutcomeCardProps) => {
+  const pool = useOutcomePool(marketId, outcomeIndex, isQuantum);
+  const poolFormatted = Number(formatUnits(pool, 6)).toFixed(2);
+
+  return (
+    <div className={`p-4 rounded-xl border-2 space-y-3 ${
+      isWinner 
+        ? 'border-primary bg-primary/10' 
+        : 'border-border/50 bg-card/40'
+    }`}>
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <span className="text-sm font-semibold">{outcomeName}</span>
+          {isWinner && <span className="text-xs font-bold text-primary">WINNER</span>}
+        </div>
+        
+        <div className="flex items-center gap-2">
+          <TrendingUp className="w-4 h-4 text-muted-foreground" />
+          <div className="space-y-0.5">
+            <div className="text-xs text-muted-foreground">Pool</div>
+            <div className="text-lg font-bold text-primary">{poolFormatted} USDC</div>
+          </div>
+        </div>
+      </div>
+
+      {!resolved && (
+        <Button
+          onClick={(e) => {
+            e.stopPropagation();
+            onPlaceBet();
+          }}
+          variant="outline"
+          size="sm"
+          className="w-full"
+        >
+          Place Bet
+        </Button>
+      )}
     </div>
   );
 };
