@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { WagmiProvider } from 'wagmi';
 import Index from "./pages/Index";
+import QuantumBets from "./pages/QuantumBets";
 import EverythingBets from "./pages/EverythingBets";
 import CreateBet from "./pages/CreateBet";
 import MarketDetail from "./pages/MarketDetail";
@@ -76,11 +77,12 @@ const App = () => {
                 <BrowserRouter>
                   <Routes>
                     <Route path="/" element={<Index />} />
+                    <Route path="/quantum-bets" element={<QuantumBets />} />
                     <Route path="/everything-bets" element={<EverythingBets />} />
                     <Route path="/create-bet" element={<CreateBet />} />
                     <Route path="/market/:address" element={<MarketDetail />} />
                     <Route path="/quantum-market/:id" element={<QuantumMarketDetail />} />
-            <Route path="/everything-market/:id" element={<EverythingMarketDetail />} />
+                    <Route path="/everything-market/:id" element={<EverythingMarketDetail />} />
             <Route path="/PythPrice" element={<PythPriceTestnet />} />
                     <Route path="*" element={<NotFound />} />
                   </Routes>
