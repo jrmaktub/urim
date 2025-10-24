@@ -35,7 +35,9 @@ const Index = () => {
   const [generating, setGenerating] = useState(false);
   const [scenarios, setScenarios] = useState<string[]>([]);
   const [selectedScenario, setSelectedScenario] = useState<number | null>(null);
-  const [betAmounts, setBetAmounts] = useState<string[]>(["", "", ""]);
+  const [betAmounts, setBetAmounts] = useState<string[]>(["", ""]);
+  const [lowerBoundary, setLowerBoundary] = useState("3500");
+  const [upperBoundary, setUpperBoundary] = useState("4000");
   const [bettingIdx, setBettingIdx] = useState<number | null>(null);
 
   const { quantumMarketIds } = useAllMarkets();
@@ -46,12 +48,12 @@ const Index = () => {
     setScenarios([]);
     setTimeout(() => {
       setScenarios([
-        `Scenario 1: ${question} — optimistic outcome`,
-        `Scenario 2: ${question} — base case`,
-        `Scenario 3: ${question} — downside risk`,
+        `${question} — YES`,
+        `${question} — NO`,
       ]);
       setGenerating(false);
-    }, 1200);
+      toast({ title: "Scenarios generated!", description: "2 quantum scenarios ready. Select one to bet." });
+    }, 1500);
   };
 
   const createMarketAndBet = async (scenarioIndex: number) => {
@@ -69,16 +71,15 @@ const Index = () => {
 
     try {
       const duration = BigInt(7 * 24 * 60 * 60);
-      const equalProb = Math.floor(100 / scenarios.length);
-      const remainder = 100 - equalProb * scenarios.length;
-      const probs = scenarios.map((_, i) => BigInt(i === 0 ? equalProb + remainder : equalProb));
-      const priceFeedId = "0x0000000000000000000000000000000000000000000000000000000000000000" as `0x${string}`;
+      const probs = [BigInt(50), BigInt(50)]; // 50/50 for YES/NO
+      const priceFeedId = "0xff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace" as `0x${string}`; // ETH/USD
+      const priceBoundaries = [BigInt(parseInt(lowerBoundary) * 1e8), BigInt(parseInt(upperBoundary) * 1e8)];
 
       await writeContractAsync({
         address: URIM_QUANTUM_MARKET_ADDRESS as `0x${string}`,
         abi: UrimQuantumMarketABI.abi as any,
         functionName: "createQuantumMarket",
-        args: [question, scenarios, probs, duration, priceFeedId, []],
+        args: [question, scenarios, probs, duration, priceFeedId, priceBoundaries],
         gas: BigInt(3_000_000),
       } as any);
 
@@ -110,7 +111,7 @@ const Index = () => {
           </div>
         )
       });
-      setBetAmounts(["", "", ""]);
+      setBetAmounts(["", ""]);
     } catch (error: any) {
       console.error(error);
       toast({ title: "Transaction failed", description: error?.shortMessage || "Try again", variant: "destructive" });
@@ -124,7 +125,7 @@ const Index = () => {
       <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-transparent pointer-events-none" />
       <Navigation />
 
-      <section className="relative max-w-6xl mx-auto px-6 pt-36 pb-16">
+      <section className="relative max-w-6xl mx-auto px-6 pt-48 pb-16">
         {/* Two cards side-by-side */}
         <div className="grid md:grid-cols-2 gap-6 mb-12">
           {/* Left: Quantum Bets with Generator */}
@@ -133,7 +134,7 @@ const Index = () => {
               <Sparkles className="w-7 h-7 text-background" />
             </div>
             <h2 className="text-3xl font-bold">Quantum Bets</h2>
-            <p className="text-muted-foreground">Type a situation/question, trigger the effect, then pick one of 3 AI scenarios.</p>
+            <p className="text-muted-foreground">Ask a question and generate 2 quantum scenarios (UP/DOWN) with AI.</p>
 
             {/* Generator UI */}
             <div className="space-y-4 pt-4">
@@ -141,12 +142,33 @@ const Index = () => {
                 <Label className="text-sm font-semibold">Your Question</Label>
                 <div className="flex gap-2">
                   <Input
-                    placeholder="Will Solana go up tomorrow?"
+                    placeholder="Will ETH go up tomorrow?"
                     value={question}
                     onChange={(e) => setQuestion(e.target.value)}
                     className="flex-1"
                   />
                   <Button onClick={handleGenerate} disabled={generating}>Generate</Button>
+                </div>
+              </div>
+
+              {/* Price Boundaries */}
+              <div className="space-y-2">
+                <Label className="text-sm font-semibold">Price Boundaries (for Pyth Oracle)</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  <Input
+                    type="number"
+                    placeholder="Lower (e.g., 3500)"
+                    value={lowerBoundary}
+                    onChange={(e) => setLowerBoundary(e.target.value)}
+                    className="text-sm"
+                  />
+                  <Input
+                    type="number"
+                    placeholder="Upper (e.g., 4000)"
+                    value={upperBoundary}
+                    onChange={(e) => setUpperBoundary(e.target.value)}
+                    className="text-sm"
+                  />
                 </div>
               </div>
 
@@ -199,6 +221,23 @@ const Index = () => {
                           }}
                         >
                           {bettingIdx === i ? "Placing..." : "Place Bet"}
+                        </Button>
+                      </div>
+
+                      {/* Bridge & Execute Button with Avail */}
+                      <div className="mt-3 pt-3 border-t border-border/30">
+                        <p className="text-xs text-muted-foreground mb-2 text-center">
+                          Have tokens on another network? Bridge and bet instantly with Avail.
+                        </p>
+                        <Button
+                          variant="outline"
+                          className="w-full border-primary/30 hover:bg-primary/5 text-xs"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toast({ title: "Bridge & Execute", description: "Avail integration will be handled by Riki" });
+                          }}
+                        >
+                          🌉 Bridge & Execute Bet with Avail
                         </Button>
                       </div>
                     </Card>
@@ -395,7 +434,7 @@ function UserBetsCard({ marketId, userAddress }: { marketId: bigint; userAddress
   const { data: userShares } = useReadContract({
     address: URIM_QUANTUM_MARKET_ADDRESS as `0x${string}`,
     abi: UrimQuantumMarketABI.abi as any,
-    functionName: "getUserShares",
+    functionName: "getUserBalances",
     args: [marketId, userAddress],
   });
 
@@ -410,31 +449,42 @@ function UserBetsCard({ marketId, userAddress }: { marketId: bigint; userAddress
   if (!hasShares) return null;
 
   return (
-    <Card className="p-6 border border-border/50">
+    <Card className="p-6 border-2 border-purple-500/30 bg-gradient-to-br from-purple-500/5 to-transparent">
       <div className="mb-4">
-        <div className="text-xs text-muted-foreground mb-1">Market #{marketId.toString()}</div>
-        <div className="text-lg font-semibold mb-2">{question}</div>
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <span className="font-mono">{userAddress.slice(0, 6)}...{userAddress.slice(-4)}</span>
-          <span>•</span>
-          <Badge variant="outline" className="text-xs">Base Sepolia</Badge>
-          {/* ADD THIS */}
-          <button
-            onClick={() => window.open(getExplorerAddressUrl(userAddress), '_blank')}
-            className="text-primary hover:underline flex items-center gap-1"
-          >
-            <ExternalLink className="w-3 h-3" />
-          </button>
+        <div className="text-xs text-primary font-semibold mb-1">MARKET #{marketId.toString()}</div>
+        <div className="text-lg font-bold mb-3">{question}</div>
+        
+        {/* On-chain Details */}
+        <div className="space-y-2 text-sm">
+          <div className="flex items-center justify-between">
+            <span className="text-muted-foreground">Market ID:</span>
+            <span className="font-mono font-semibold">{marketId.toString()}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-muted-foreground">Bettor Wallet:</span>
+            <button
+              onClick={() => window.open(getExplorerAddressUrl(userAddress), '_blank')}
+              className="font-mono text-primary hover:underline flex items-center gap-1"
+            >
+              {userAddress.slice(0, 8)}...{userAddress.slice(-6)}
+              <ExternalLink className="w-3 h-3" />
+            </button>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-muted-foreground">Network:</span>
+            <Badge variant="outline" className="text-xs">Base Sepolia</Badge>
+          </div>
         </div>
       </div>
 
-      <div className="space-y-2">
+      <div className="space-y-3 mt-4">
+        <div className="text-xs font-semibold text-primary mb-2">YOUR BETS:</div>
         {outcomes.map((scenario, idx) => {
           if (shares[idx] === 0n) return null;
           const amount = Number(shares[idx]) / 1e6;
 
           return (
-            <div key={idx} className="p-3 rounded-lg bg-muted/50 border border-border/30">
+            <div key={idx} className="p-4 rounded-lg bg-primary/5 border-2 border-primary/20">
               <div className="flex items-center justify-between mb-1">
                 <div className="text-sm font-medium">{scenario}</div>
                 {resolved && winningIndex === idx && (
