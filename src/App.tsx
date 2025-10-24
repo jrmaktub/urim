@@ -9,7 +9,6 @@ import EverythingBets from "./pages/EverythingBets";
 import CreateBet from "./pages/CreateBet";
 import MarketDetail from "./pages/MarketDetail";
 import QuantumMarketDetail from "./pages/QuantumMarketDetail";
-import CreateQuantumBet from "./pages/CreateQuantumBet";
 import EverythingMarketDetail from "./pages/EverythingMarketDetail";
 import NotFound from "./pages/NotFound";
 import { PythPriceTestnet } from "./pages/PythPrice";
@@ -81,7 +80,6 @@ const App = () => {
                     <Route path="/create-bet" element={<CreateBet />} />
                     <Route path="/market/:address" element={<MarketDetail />} />
                     <Route path="/quantum-market/:id" element={<QuantumMarketDetail />} />
-                    <Route path="/create-quantum" element={<CreateQuantumBet />} />
             <Route path="/everything-market/:id" element={<EverythingMarketDetail />} />
             <Route path="/PythPrice" element={<PythPriceTestnet />} />
                     <Route path="*" element={<NotFound />} />

@@ -1,78 +1,131 @@
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useAccount } from "wagmi";
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
-import { Sparkles, TrendingUp, ArrowRight } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Sparkles, TrendingUp } from "lucide-react";
+
+interface UserBet {
+  marketId: number;
+  question: string;
+  outcome: string;
+  amount: string;
+  isQuantum: boolean;
+  timestamp: number;
+}
 
 const Index = () => {
-  const navigate = useNavigate();
+  const { address } = useAccount();
+  const [question, setQuestion] = useState("");
+  const [generating, setGenerating] = useState(false);
+  const [scenarios, setScenarios] = useState<string[]>([]);
+  const [userBets, setUserBets] = useState<UserBet[]>([]);
+
+  // Restore previously placed bets (local)
+  useEffect(() => {
+    if (!address) return;
+    const savedQuantum = localStorage.getItem(`quantumBets_${address}`);
+    const savedEverything = localStorage.getItem(`userBets_${address}`);
+    const q = savedQuantum ? JSON.parse(savedQuantum) : [];
+    const e = savedEverything ? JSON.parse(savedEverything) : [];
+    setUserBets([...(q || []), ...(e || [])]);
+  }, [address]);
+
+  const handleGenerate = () => {
+    if (!question.trim()) return;
+    setGenerating(true);
+    setScenarios([]);
+    setTimeout(() => {
+      // Minimal placeholder for the original animation/effect
+      setScenarios([
+        `Scenario 1: ${question} — optimistic outcome`,
+        `Scenario 2: ${question} — base case`,
+        `Scenario 3: ${question} — downside risk`,
+      ]);
+      setGenerating(false);
+    }, 1200);
+  };
 
   return (
     <div className="min-h-screen w-full bg-background relative overflow-hidden">
-      {/* Background gradient */}
       <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-transparent pointer-events-none" />
-      
       <Navigation />
 
-      {/* Hero Section */}
-      <section className="relative max-w-6xl mx-auto px-6 pt-32 pb-20">
-        <div className="text-center mb-16">
-          <h1 className="text-6xl font-bold mb-6 shimmer-text">
-            Predict. Bet. Win.
-          </h1>
-          <p className="text-muted-foreground text-xl max-w-2xl mx-auto">
-            AI-powered prediction markets on Base Sepolia. Simple, fast, and transparent.
-          </p>
-        </div>
-
-        {/* Cards Grid */}
-        <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto">
-          {/* Quantum Markets Card */}
-          <div className="glass-card p-8 space-y-6 group hover:border-primary/50 transition-all duration-300">
+      <section className="relative max-w-6xl mx-auto px-6 pt-28 pb-16">
+        {/* Two cards side-by-side */}
+        <div className="grid md:grid-cols-2 gap-6">
+          {/* Left: Quantum Bets */}
+          <div className="glass-card p-8 space-y-6">
             <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary to-primary-glow flex items-center justify-center glow-gold">
               <Sparkles className="w-7 h-7 text-background" />
             </div>
-            
+            <h2 className="text-3xl font-bold">Quantum Bets</h2>
+            <p className="text-muted-foreground">Type a situation/question, trigger the effect, then pick one of 3 AI scenarios.</p>
+
             <div className="space-y-3">
-              <h2 className="text-3xl font-bold">Quantum Markets</h2>
-              <p className="text-muted-foreground text-base leading-relaxed">
-                AI-generated prediction markets with multiple scenarios. Bet on complex outcomes with intelligent probability distributions.
-              </p>
+              <Label htmlFor="q" className="text-sm font-semibold">Your Question</Label>
+              <div className="flex gap-2">
+                <Input id="q" placeholder="Will ETH hit $4k this month?" value={question} onChange={(e) => setQuestion(e.target.value)} />
+                <Button onClick={handleGenerate}>Generate</Button>
+              </div>
             </div>
 
-            <Button
-              onClick={() => navigate('/quantum-market/0')}
-              className="w-full group-hover:shadow-[0_0_25px_hsl(var(--primary)/0.5)] transition-all"
-              size="lg"
-            >
-              Go to Markets
-              <ArrowRight className="w-4 h-4 ml-2" />
-            </Button>
+            {/* Cool visual effect + scenarios */}
+            {generating && (
+              <div className="h-24 rounded-xl border border-primary/30 bg-primary/5 animate-enter" />
+            )}
+            {!generating && scenarios.length > 0 && (
+              <div className="space-y-3 animate-fade-in">
+                {scenarios.map((sc, i) => (
+                  <div key={i} className="p-4 rounded-xl border-2 border-border/50 bg-card/40">
+                    <div className="text-sm font-semibold mb-1">Scenario {i + 1}</div>
+                    <div className="text-sm text-foreground/90">{sc}</div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
-          {/* Everything Bets Card */}
-          <div className="glass-card p-8 space-y-6 group hover:border-primary/50 transition-all duration-300">
+          {/* Right: Everything Bets */}
+          <div className="glass-card p-8 space-y-6">
             <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary to-primary-glow flex items-center justify-center glow-gold">
               <TrendingUp className="w-7 h-7 text-background" />
             </div>
-            
-            <div className="space-y-3">
-              <h2 className="text-3xl font-bold">Everything Bets</h2>
-              <p className="text-muted-foreground text-base leading-relaxed">
-                Traditional binary prediction markets. Simple Yes/No questions with real-time odds and instant settlement.
-              </p>
-            </div>
-
-            <Button
-              onClick={() => navigate('/everything-market/0')}
-              className="w-full group-hover:shadow-[0_0_25px_hsl(var(--primary)/0.5)] transition-all"
-              size="lg"
-            >
-              Go to Markets
-              <ArrowRight className="w-4 h-4 ml-2" />
-            </Button>
+            <h2 className="text-3xl font-bold">Everything Bets</h2>
+            <p className="text-muted-foreground">Traditional Yes/No markets. Keep using the existing flow.</p>
           </div>
         </div>
+
+        {/* Your Quantum Bets list (restored) */}
+        {userBets.filter((b) => b.isQuantum).length > 0 && (
+          <div className="mt-12 space-y-4">
+            <h3 className="text-2xl font-bold">Your Quantum Bets</h3>
+            {userBets.filter((b) => b.isQuantum).map((bet, idx) => (
+              <div key={idx} className="glass-card p-6 space-y-3">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <div className="text-xs text-muted-foreground">Market #{bet.marketId}</div>
+                    <div className="text-lg font-semibold">{bet.question}</div>
+                  </div>
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary/15 border border-primary/30">
+                    <span className="text-primary font-bold text-xs uppercase">Active</span>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <div>
+                    <span className="text-muted-foreground">Outcome: </span>
+                    <span className="font-semibold text-primary">{bet.outcome}</span>
+                  </div>
+                  <div>
+                    <span className="font-semibold">{bet.amount} USDC</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </section>
 
       <Footer />
