@@ -15,6 +15,7 @@ import { URIM_QUANTUM_MARKET_ADDRESS, USDC_ADDRESS } from "@/constants/contracts
 import UrimQuantumMarketABI from "@/contracts/UrimQuantumMarket.json";
 import ERC20ABI from "@/contracts/ERC20.json";
 import { parseUnits } from "viem";
+import ExplorerLink from "@/components/ExplorerLink";
 
 interface UserBet {
   marketId: number;
@@ -99,7 +100,15 @@ const Index = () => {
         gas: BigInt(500_000),
       } as any);
 
-      toast({ title: "Bet placed!", description: `${amount} USDC on ${scenarios[scenarioIndex]}` });
+      toast({
+        title: "Bet placed!",
+        description: (
+          <div className="space-y-2">
+            <p>{amount} USDC on {scenarios[scenarioIndex]}</p>
+            <p className="text-xs text-muted-foreground">Transaction submitted to blockchain</p>
+          </div>
+        )
+      });
       setBetAmounts(["", "", ""]);
     } catch (error: any) {
       console.error(error);
@@ -124,17 +133,17 @@ const Index = () => {
             </div>
             <h2 className="text-3xl font-bold">Quantum Bets</h2>
             <p className="text-muted-foreground">Type a situation/question, trigger the effect, then pick one of 3 AI scenarios.</p>
-            
+
             {/* Generator UI */}
             <div className="space-y-4 pt-4">
               <div className="space-y-2">
                 <Label className="text-sm font-semibold">Your Question</Label>
                 <div className="flex gap-2">
-                  <Input 
-                    placeholder="Will Solana go up tomorrow?" 
-                    value={question} 
-                    onChange={(e) => setQuestion(e.target.value)} 
-                    className="flex-1" 
+                  <Input
+                    placeholder="Will Solana go up tomorrow?"
+                    value={question}
+                    onChange={(e) => setQuestion(e.target.value)}
+                    className="flex-1"
                   />
                   <Button onClick={handleGenerate} disabled={generating}>Generate</Button>
                 </div>
@@ -156,13 +165,12 @@ const Index = () => {
               {!generating && scenarios.length > 0 && (
                 <div className="space-y-3 animate-fade-in">
                   {scenarios.map((sc, i) => (
-                    <Card 
-                      key={i} 
-                      className={`p-4 border-2 cursor-pointer transition-all ${
-                        selectedScenario === i 
-                          ? 'border-primary bg-primary/10 shadow-lg' 
+                    <Card
+                      key={i}
+                      className={`p-4 border-2 cursor-pointer transition-all ${selectedScenario === i
+                          ? 'border-primary bg-primary/10 shadow-lg'
                           : 'border-primary/20 hover:border-primary/50'
-                      }`}
+                        }`}
                       onClick={() => setSelectedScenario(i)}
                     >
                       <div className="text-xs font-bold text-primary mb-1">SCENARIO {i + 1}</div>
@@ -250,7 +258,7 @@ function MarketCard({ marketId, address }: { marketId: bigint; address: `0x${str
   const { writeContractAsync } = useWriteContract();
   const [bettingScenario, setBettingScenario] = useState<number | null>(null);
   const [betAmount, setBetAmount] = useState("");
-  
+
   const marketInfo = useMarketInfo(Number(marketId), true);
 
   if (!marketInfo) return null;
@@ -273,7 +281,7 @@ function MarketCard({ marketId, address }: { marketId: bigint; address: `0x${str
 
     try {
       const amountWei = parseUnits(betAmount, 6);
-      
+
       await writeContractAsync({
         address: USDC_ADDRESS as `0x${string}`,
         abi: ERC20ABI.abi as any,
@@ -363,7 +371,7 @@ function UserBetsCard({ marketId, userAddress }: { marketId: bigint; userAddress
   const { question, resolved, winningIndex, outcomes } = marketInfo;
   const shares = userShares as bigint[];
   const hasShares = shares.some(share => share > 0n);
-  
+
   if (!hasShares) return null;
 
   return (
@@ -382,7 +390,7 @@ function UserBetsCard({ marketId, userAddress }: { marketId: bigint; userAddress
         {outcomes.map((scenario, idx) => {
           if (shares[idx] === 0n) return null;
           const amount = Number(shares[idx]) / 1e6;
-          
+
           return (
             <div key={idx} className="p-3 rounded-lg bg-muted/50 border border-border/30">
               <div className="flex items-center justify-between mb-1">
