@@ -24,6 +24,7 @@ export default function QuantumBets() {
   const [scenarios, setScenarios] = useState<string[]>([]);
   const [betAmounts, setBetAmounts] = useState<string[]>(["", "", ""]);
   const [bettingIdx, setBettingIdx] = useState<number | null>(null);
+  const [selectedScenario, setSelectedScenario] = useState<number | null>(null);
 
   // Fetch all market IDs
   const { data: marketIdsData, refetch: refetchMarkets } = useReadContract({
@@ -33,6 +34,9 @@ export default function QuantumBets() {
   });
 
   const marketIds = (marketIdsData as bigint[]) || [];
+
+  // Fetch user's bets - we'll need to listen to ScenarioPurchased events
+  const [userBets, setUserBets] = useState<any[]>([]);
 
   const handleGenerate = () => {
     if (!question.trim()) return;
@@ -136,15 +140,30 @@ export default function QuantumBets() {
             </div>
 
             {generating && (
-              <div className="h-32 rounded-xl border-2 border-primary/30 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent animate-pulse flex items-center justify-center">
-                <div className="text-primary font-semibold animate-pulse">Generating quantum scenarios...</div>
+              <div className="relative h-32 rounded-xl border-2 border-primary/30 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/20 to-transparent animate-pulse" />
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="flex items-center gap-3">
+                    <Sparkles className="w-5 h-5 text-primary animate-pulse" />
+                    <div className="text-primary font-semibold animate-pulse">Generating quantum scenarios...</div>
+                    <Sparkles className="w-5 h-5 text-primary animate-pulse" />
+                  </div>
+                </div>
               </div>
             )}
 
             {!generating && scenarios.length > 0 && (
               <div className="grid md:grid-cols-3 gap-4 animate-fade-in">
                 {scenarios.map((sc, i) => (
-                  <Card key={i} className="p-6 border-2 border-primary/20 hover:border-primary/50 transition-all">
+                  <Card 
+                    key={i} 
+                    className={`p-6 border-2 cursor-pointer transition-all ${
+                      selectedScenario === i 
+                        ? 'border-primary bg-primary/10 shadow-lg' 
+                        : 'border-primary/20 hover:border-primary/50'
+                    }`}
+                    onClick={() => setSelectedScenario(i)}
+                  >
                     <div className="text-xs font-bold text-primary mb-1">SCENARIO {i + 1}</div>
                     <div className="text-sm mb-4 min-h-[3rem]">{sc}</div>
                     <div className="space-y-2">
@@ -154,17 +173,26 @@ export default function QuantumBets() {
                         placeholder="0.00"
                         value={betAmounts[i]}
                         onChange={(e) => {
+                          e.stopPropagation();
                           const newAmounts = [...betAmounts];
                           newAmounts[i] = e.target.value;
                           setBetAmounts(newAmounts);
                         }}
+                        onClick={(e) => e.stopPropagation()}
                         className="bg-background/50"
                       />
                     </div>
                     <Button
-                      className="mt-4 w-full bg-gradient-to-r from-primary to-primary-glow"
+                      className={`mt-4 w-full ${
+                        selectedScenario === i 
+                          ? 'bg-gradient-to-r from-primary to-primary-glow' 
+                          : 'bg-muted'
+                      }`}
                       disabled={bettingIdx !== null}
-                      onClick={() => createMarketAndBet(i)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        createMarketAndBet(i);
+                      }}
                     >
                       {bettingIdx === i ? "Placing..." : "Place Bet"}
                     </Button>
@@ -176,7 +204,7 @@ export default function QuantumBets() {
         </div>
 
         {/* Quantum Markets */}
-        <div className="space-y-6">
+        <div className="space-y-6 mb-12">
           <h2 className="text-2xl font-bold">Quantum Markets</h2>
           <div className="grid gap-4">
             {marketIds.length === 0 ? (
@@ -184,10 +212,26 @@ export default function QuantumBets() {
                 No markets yet. Create one above!
               </Card>
             ) : (
-              marketIds.map((id) => <MarketCard key={id.toString()} marketId={id} />)
+              marketIds.map((id) => <MarketCard key={id.toString()} marketId={id} address={address} />)
             )}
           </div>
         </div>
+
+        {/* Your Quantum Bets */}
+        {address && (
+          <div className="space-y-6">
+            <h2 className="text-2xl font-bold">Your Quantum Bets</h2>
+            <div className="grid gap-4">
+              {marketIds.length === 0 ? (
+                <Card className="p-8 text-center text-muted-foreground">
+                  No bets placed yet.
+                </Card>
+              ) : (
+                marketIds.map((id) => <UserBetsCard key={id.toString()} marketId={id} userAddress={address} />)
+              )}
+            </div>
+          </div>
+        )}
       </main>
 
       <Footer />
@@ -195,7 +239,11 @@ export default function QuantumBets() {
   );
 }
 
-function MarketCard({ marketId }: { marketId: bigint }) {
+function MarketCard({ marketId, address }: { marketId: bigint; address: `0x${string}` | undefined }) {
+  const { toast } = useToast();
+  const { writeContractAsync } = useWriteContract();
+  const [bettingScenario, setBettingScenario] = useState<number | null>(null);
+  const [betAmount, setBetAmount] = useState("");
   const { data: basicInfo } = useReadContract({
     address: URIM_QUANTUM_MARKET_ADDRESS as `0x${string}`,
     abi: UrimQuantumMarketABI.abi as any,
@@ -217,8 +265,50 @@ function MarketCard({ marketId }: { marketId: bigint }) {
   const now = Math.floor(Date.now() / 1000);
   const status = resolved ? "Resolved" : now < Number(endTime) ? "Active" : "Ended";
 
+  const placeBet = async (scenarioIdx: number) => {
+    if (!address) {
+      toast({ title: "Wallet not connected", variant: "destructive" });
+      return;
+    }
+    if (!betAmount || parseFloat(betAmount) <= 0) {
+      toast({ title: "Enter bet amount", variant: "destructive" });
+      return;
+    }
+
+    setBettingScenario(scenarioIdx);
+
+    try {
+      const amountWei = parseUnits(betAmount, 6);
+      
+      // Approve USDC
+      await writeContractAsync({
+        address: USDC_ADDRESS as `0x${string}`,
+        abi: ERC20ABI.abi as any,
+        functionName: "approve",
+        args: [URIM_QUANTUM_MARKET_ADDRESS, amountWei],
+      } as any);
+
+      // Buy shares
+      await writeContractAsync({
+        address: URIM_QUANTUM_MARKET_ADDRESS as `0x${string}`,
+        abi: UrimQuantumMarketABI.abi as any,
+        functionName: "buyScenarioShares",
+        args: [marketId, scenarioIdx, amountWei],
+        gas: BigInt(500_000),
+      } as any);
+
+      toast({ title: "Bet placed!", description: `${betAmount} USDC on ${scenarioList[scenarioIdx]}` });
+      setBetAmount("");
+    } catch (error: any) {
+      console.error(error);
+      toast({ title: "Transaction failed", description: error?.shortMessage || "Try again", variant: "destructive" });
+    } finally {
+      setBettingScenario(null);
+    }
+  };
+
   return (
-    <Card className="p-6">
+    <Card className="p-6 border-2 border-primary/30 bg-gradient-to-br from-primary/5 to-transparent">
       <div className="flex items-start justify-between mb-4">
         <div>
           <div className="text-xs text-muted-foreground">Market #{marketId.toString()}</div>
@@ -234,13 +324,101 @@ function MarketCard({ marketId }: { marketId: bigint }) {
         </div>
       </div>
 
-      <div className="space-y-2">
+      <div className="space-y-3">
         {scenarioList.map((scenario, idx) => (
-          <div key={idx} className={`p-3 rounded-lg border ${resolved && winningScenario === idx ? 'border-green-500 bg-green-500/10' : 'border-border/50'}`}>
-            <div className="text-sm font-medium">{scenario}</div>
-            {resolved && winningScenario === idx && <Badge className="mt-2 bg-green-500">Winner</Badge>}
+          <div key={idx} className={`p-4 rounded-lg border-2 ${resolved && winningScenario === idx ? 'border-green-500 bg-green-500/10' : 'border-primary/20 bg-background/50'}`}>
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-sm font-medium">{scenario}</div>
+              {resolved && winningScenario === idx && <Badge className="bg-green-500">Winner</Badge>}
+            </div>
+            {!resolved && status === "Active" && (
+              <div className="flex gap-2 mt-3">
+                <Input
+                  type="number"
+                  placeholder="Amount"
+                  value={betAmount}
+                  onChange={(e) => setBetAmount(e.target.value)}
+                  className="flex-1"
+                />
+                <Button
+                  onClick={() => placeBet(idx)}
+                  disabled={bettingScenario !== null}
+                  className="bg-gradient-to-r from-primary to-primary-glow"
+                >
+                  {bettingScenario === idx ? "Placing..." : "Place Bet"}
+                </Button>
+              </div>
+            )}
           </div>
         ))}
+      </div>
+    </Card>
+  );
+}
+
+function UserBetsCard({ marketId, userAddress }: { marketId: bigint; userAddress: `0x${string}` }) {
+  const { data: basicInfo } = useReadContract({
+    address: URIM_QUANTUM_MARKET_ADDRESS as `0x${string}`,
+    abi: UrimQuantumMarketABI.abi as any,
+    functionName: "getMarketBasicInfo",
+    args: [marketId],
+  });
+
+  const { data: scenarios } = useReadContract({
+    address: URIM_QUANTUM_MARKET_ADDRESS as `0x${string}`,
+    abi: UrimQuantumMarketABI.abi as any,
+    functionName: "getScenarios",
+    args: [marketId],
+  });
+
+  const { data: userShares } = useReadContract({
+    address: URIM_QUANTUM_MARKET_ADDRESS as `0x${string}`,
+    abi: UrimQuantumMarketABI.abi as any,
+    functionName: "getUserShares",
+    args: [marketId, userAddress],
+  });
+
+  if (!basicInfo || !scenarios || !userShares) return null;
+
+  const [question, endTime, resolved, winningScenario] = basicInfo as [string, bigint, boolean, number];
+  const scenarioList = scenarios as string[];
+  const shares = userShares as bigint[];
+
+  // Only show if user has shares in this market
+  const hasShares = shares.some(share => share > 0n);
+  if (!hasShares) return null;
+
+  return (
+    <Card className="p-6 border border-border/50">
+      <div className="mb-4">
+        <div className="text-xs text-muted-foreground mb-1">Market #{marketId.toString()}</div>
+        <div className="text-lg font-semibold mb-2">{question}</div>
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <span className="font-mono">{userAddress.slice(0, 6)}...{userAddress.slice(-4)}</span>
+          <span>•</span>
+          <Badge variant="outline" className="text-xs">Base Sepolia</Badge>
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        {scenarioList.map((scenario, idx) => {
+          if (shares[idx] === 0n) return null;
+          const amount = Number(shares[idx]) / 1e6; // Convert from 6 decimals
+          
+          return (
+            <div key={idx} className="p-3 rounded-lg bg-muted/50 border border-border/30">
+              <div className="flex items-center justify-between mb-1">
+                <div className="text-sm font-medium">{scenario}</div>
+                {resolved && winningScenario === idx && (
+                  <Badge className="bg-green-500 text-xs">Won</Badge>
+                )}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                Bet Amount: <span className="font-semibold text-foreground">{amount.toFixed(2)} USDC</span>
+              </div>
+            </div>
+          );
+        })}
       </div>
     </Card>
   );
