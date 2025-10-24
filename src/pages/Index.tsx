@@ -125,7 +125,7 @@ const Index = () => {
       <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-transparent pointer-events-none" />
       <Navigation />
 
-      <section className="relative max-w-6xl mx-auto px-6 pt-48 pb-16">
+      <section className="relative max-w-6xl mx-auto px-6 pt-32 pb-16">
         {/* Two cards side-by-side */}
         <div className="grid md:grid-cols-2 gap-6 mb-12">
           {/* Left: Quantum Bets with Generator */}
