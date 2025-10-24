@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useAccount } from "wagmi";
+import { Link } from "react-router-dom";
 import Navigation from "@/components/Navigation";
-import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -57,7 +57,7 @@ const Index = () => {
         {/* Two cards side-by-side */}
         <div className="grid md:grid-cols-2 gap-6">
           {/* Left: Quantum Bets */}
-          <div className="glass-card p-8 space-y-6">
+          <Link to="/" className="glass-card p-8 space-y-6">
             <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary to-primary-glow flex items-center justify-center glow-gold">
               <Sparkles className="w-7 h-7 text-background" />
             </div>
@@ -86,16 +86,16 @@ const Index = () => {
                 ))}
               </div>
             )}
-          </div>
+          </Link>
 
           {/* Right: Everything Bets */}
-          <div className="glass-card p-8 space-y-6">
+          <Link to="/everything-bets" className="glass-card p-8 space-y-6">
             <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary to-primary-glow flex items-center justify-center glow-gold">
               <TrendingUp className="w-7 h-7 text-background" />
             </div>
             <h2 className="text-3xl font-bold">Everything Bets</h2>
             <p className="text-muted-foreground">Traditional Yes/No markets. Keep using the existing flow.</p>
-          </div>
+          </Link>
         </div>
 
         {/* Your Quantum Bets list (restored) */}
