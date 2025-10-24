@@ -16,6 +16,7 @@ import UrimQuantumMarketABI from "@/contracts/UrimQuantumMarket.json";
 import ERC20ABI from "@/contracts/ERC20.json";
 import { parseUnits } from "viem";
 import ExplorerLink from "@/components/ExplorerLink";
+import { getExplorerTxUrl, getExplorerAddressUrl } from "@/constants/blockscout";
 
 interface UserBet {
   marketId: number;
@@ -168,8 +169,8 @@ const Index = () => {
                     <Card
                       key={i}
                       className={`p-4 border-2 cursor-pointer transition-all ${selectedScenario === i
-                          ? 'border-primary bg-primary/10 shadow-lg'
-                          : 'border-primary/20 hover:border-primary/50'
+                        ? 'border-primary bg-primary/10 shadow-lg'
+                        : 'border-primary/20 hover:border-primary/50'
                         }`}
                       onClick={() => setSelectedScenario(i)}
                     >
@@ -258,6 +259,7 @@ function MarketCard({ marketId, address }: { marketId: bigint; address: `0x${str
   const { writeContractAsync } = useWriteContract();
   const [bettingScenario, setBettingScenario] = useState<number | null>(null);
   const [betAmount, setBetAmount] = useState("");
+  const [lastTxHash, setLastTxHash] = useState<string | null>(null);
 
   const marketInfo = useMarketInfo(Number(marketId), true);
 
@@ -289,7 +291,7 @@ function MarketCard({ marketId, address }: { marketId: bigint; address: `0x${str
         args: [URIM_QUANTUM_MARKET_ADDRESS, amountWei],
       } as any);
 
-      await writeContractAsync({
+      const result = await writeContractAsync({
         address: URIM_QUANTUM_MARKET_ADDRESS as `0x${string}`,
         abi: UrimQuantumMarketABI.abi as any,
         functionName: "buyScenarioShares",
@@ -297,7 +299,26 @@ function MarketCard({ marketId, address }: { marketId: bigint; address: `0x${str
         gas: BigInt(500_000),
       } as any);
 
-      toast({ title: "Bet placed!", description: `${betAmount} USDC on ${outcomes[scenarioIdx]}` });
+      // Capture the transaction hash
+      const txHash = result as string; // The result is the tx hash
+      setLastTxHash(txHash);
+
+      toast({
+        title: "Bet placed!",
+        description: (
+          <div className="space-y-2">
+            <p>{betAmount} USDC on {outcomes[scenarioIdx]}</p>
+            {txHash && (
+              <button
+                onClick={() => window.open(getExplorerTxUrl(txHash), '_blank')}
+                className="text-xs text-primary hover:underline flex items-center gap-1"
+              >
+                View on Explorer →
+              </button>
+            )}
+          </div>
+        )
+      });
       setBetAmount("");
     } catch (error: any) {
       console.error(error);
@@ -352,6 +373,20 @@ function MarketCard({ marketId, address }: { marketId: bigint; address: `0x${str
           </div>
         ))}
       </div>
+      {lastTxHash && (
+        <div className="mt-4 pt-4 border-t">
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">Latest Transaction:</span>
+            <button
+              onClick={() => window.open(getExplorerTxUrl(lastTxHash), '_blank')}
+              className="text-primary hover:underline flex items-center gap-1 font-mono text-xs"
+            >
+              {lastTxHash.slice(0, 6)}...{lastTxHash.slice(-4)}
+              <ExternalLink className="w-3 h-3" />
+            </button>
+          </div>
+        </div>
+      )}
     </Card>
   );
 }
@@ -383,6 +418,13 @@ function UserBetsCard({ marketId, userAddress }: { marketId: bigint; userAddress
           <span className="font-mono">{userAddress.slice(0, 6)}...{userAddress.slice(-4)}</span>
           <span>•</span>
           <Badge variant="outline" className="text-xs">Base Sepolia</Badge>
+          {/* ADD THIS */}
+          <button
+            onClick={() => window.open(getExplorerAddressUrl(userAddress), '_blank')}
+            className="text-primary hover:underline flex items-center gap-1"
+          >
+            <ExternalLink className="w-3 h-3" />
+          </button>
         </div>
       </div>
 
