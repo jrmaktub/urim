@@ -14,18 +14,26 @@ export interface MarketBasicInfo {
 
 export function useAllMarkets() {
   // Fetch Everything Bet market IDs
-  const { data: everythingMarketIds } = useReadContract({
+  const { data: everythingMarketIds, error: everythingError } = useReadContract({
     address: URIM_MARKET_ADDRESS as `0x${string}`,
     abi: UrimMarketABI.abi,
     functionName: 'getAllMarketIds',
   });
 
   // Fetch Quantum Bet market IDs
-  const { data: quantumMarketIds } = useReadContract({
+  const { data: quantumMarketIds, error: quantumError } = useReadContract({
     address: URIM_QUANTUM_MARKET_ADDRESS as `0x${string}`,
     abi: UrimQuantumMarketABI.abi,
     functionName: 'getAllMarketIds',
   });
+
+  // Log errors for debugging but don't throw
+  if (everythingError) {
+    console.warn('Error fetching everything markets:', everythingError);
+  }
+  if (quantumError) {
+    console.warn('Error fetching quantum markets:', quantumError);
+  }
 
   return {
     everythingMarketIds: (everythingMarketIds as bigint[]) || [],
