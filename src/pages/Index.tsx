@@ -161,8 +161,8 @@ const Index = () => {
       });
 
       toast({
-        title: "Quantum Market Created! ⚡",
-        description: "Your AI-generated market is now live on Base Sepolia.",
+        title: "Quantum Bet placed successfully! ⚡",
+        description: "Your bet is placed on your selected future.",
       });
 
       setScenarios([]);
@@ -352,9 +352,9 @@ const Index = () => {
               
               {/* Heading */}
               <div>
-                <h2 className="text-3xl font-bold mb-3 tracking-tight">Quantum Scenarios</h2>
+                <h2 className="text-3xl font-bold mb-3 tracking-tight">Quantum Futures</h2>
                 <p className="text-muted-foreground leading-relaxed">
-                  AI generates 3 possible futures based on your question. Choose your prediction and place your bet.
+                  AI will predict 3 possible outcomes. Choose the one you believe will happen.
                 </p>
               </div>
               
@@ -391,7 +391,7 @@ const Index = () => {
                     ) : (
                       <>
                         <Sparkles className="w-4 h-4 mr-2 group-hover/btn:rotate-12 transition-transform" />
-                        Generate Quantum Scenarios
+                        Generate Quantum Futures
                         <ChevronRight className="w-4 h-4 ml-1 group-hover/btn:translate-x-1 transition-transform" />
                       </>
                     )}
@@ -474,10 +474,10 @@ const Index = () => {
                 <span className="text-xs font-bold text-primary uppercase tracking-wider">AI Generated</span>
               </div>
               <h2 className="text-4xl font-bold tracking-tight">
-                Your Quantum Scenarios
+                Your Quantum Futures
               </h2>
               <p className="text-muted-foreground text-lg">
-                Select a scenario to create your market
+                Select the future you believe will happen
               </p>
             </div>
             
@@ -503,7 +503,7 @@ const Index = () => {
               })}
             </div>
 
-            {/* Create Market Button - Below Cards */}
+            {/* Create Market & Place Bet Button - Below Cards */}
             <div className="flex justify-center">
               <Button 
                 onClick={handleCreateQuantumMarket}
@@ -519,7 +519,7 @@ const Index = () => {
                 ) : (
                   <>
                     <Zap className="w-4 h-4 mr-2" />
-                    Create Quantum Market
+                    Create Market & Place Bet
                     <ChevronRight className="w-4 h-4 ml-1 group-hover/create:translate-x-1 transition-transform" />
                   </>
                 )}
