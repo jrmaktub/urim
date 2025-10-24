@@ -94,7 +94,7 @@ const Index = () => {
       } as any);
 
       const latestId = quantumMarketIds.length > 0 ? quantumMarketIds[quantumMarketIds.length - 1] : 0n;
-      await writeContractAsync({
+      const txHash = await writeContractAsync({
         address: URIM_QUANTUM_MARKET_ADDRESS as `0x${string}`,
         abi: UrimQuantumMarketABI.abi as any,
         functionName: "buyScenarioShares",
@@ -103,11 +103,16 @@ const Index = () => {
       } as any);
 
       toast({
-        title: "Bet placed!",
+        title: "✅ Bet placed!",
         description: (
           <div className="space-y-2">
-            <p>{amount} USDC on {scenarios[scenarioIndex]}</p>
-            <p className="text-xs text-muted-foreground">Transaction submitted to blockchain</p>
+            <p>{amount} USDC on "{question}" — {scenarios[scenarioIndex]}</p>
+            <button
+              onClick={() => window.open(getExplorerTxUrl(txHash as string), '_blank')}
+              className="text-xs text-primary hover:underline flex items-center gap-1"
+            >
+              View on BlockScout →
+            </button>
           </div>
         )
       });
@@ -343,7 +348,7 @@ function MarketCard({ marketId, address }: { marketId: bigint; address: `0x${str
       setLastTxHash(txHash);
 
       toast({
-        title: "Bet placed!",
+        title: "✅ Bet placed!",
         description: (
           <div className="space-y-2">
             <p>{betAmount} USDC on {outcomes[scenarioIdx]}</p>
@@ -352,7 +357,7 @@ function MarketCard({ marketId, address }: { marketId: bigint; address: `0x${str
                 onClick={() => window.open(getExplorerTxUrl(txHash), '_blank')}
                 className="text-xs text-primary hover:underline flex items-center gap-1"
               >
-                View on Explorer →
+                View on BlockScout →
               </button>
             )}
           </div>
@@ -431,6 +436,8 @@ function MarketCard({ marketId, address }: { marketId: bigint; address: `0x${str
 }
 
 function UserBetsCard({ marketId, userAddress }: { marketId: bigint; userAddress: `0x${string}` }) {
+  const [blockscoutTxs, setBlockscoutTxs] = useState<any[]>([]);
+
   const { data: userShares } = useReadContract({
     address: URIM_QUANTUM_MARKET_ADDRESS as `0x${string}`,
     abi: UrimQuantumMarketABI.abi as any,
@@ -439,6 +446,30 @@ function UserBetsCard({ marketId, userAddress }: { marketId: bigint; userAddress
   });
 
   const marketInfo = useMarketInfo(Number(marketId), true);
+
+  useEffect(() => {
+    const fetchBlockscoutData = async () => {
+      try {
+        const response = await fetch(
+          `https://base-sepolia.blockscout.com/api?module=account&action=txlist&address=${userAddress}`
+        );
+        const data = await response.json();
+        
+        if (data.status === "1" && data.result) {
+          const filteredTxs = data.result.filter(
+            (tx: any) => tx.to?.toLowerCase() === URIM_QUANTUM_MARKET_ADDRESS.toLowerCase()
+          );
+          setBlockscoutTxs(filteredTxs);
+        }
+      } catch (error) {
+        console.error("Error fetching BlockScout data:", error);
+      }
+    };
+
+    if (userAddress) {
+      fetchBlockscoutData();
+    }
+  }, [userAddress]);
 
   if (!marketInfo || !userShares) return null;
 
@@ -482,6 +513,13 @@ function UserBetsCard({ marketId, userAddress }: { marketId: bigint; userAddress
         {outcomes.map((scenario, idx) => {
           if (shares[idx] === 0n) return null;
           const amount = Number(shares[idx]) / 1e6;
+          
+          // Find matching BlockScout transaction
+          const relatedTx = blockscoutTxs.find(tx => {
+            const txTimestamp = parseInt(tx.timeStamp) * 1000;
+            const now = Date.now();
+            return now - txTimestamp < 7 * 24 * 60 * 60 * 1000; // Last 7 days
+          });
 
           return (
             <div key={idx} className="p-4 rounded-lg bg-primary/5 border-2 border-primary/20">
@@ -497,6 +535,17 @@ function UserBetsCard({ marketId, userAddress }: { marketId: bigint; userAddress
               <div className="text-xs text-muted-foreground mt-1">
                 Network: <span className="font-semibold text-foreground">Base Sepolia</span>
               </div>
+              {relatedTx && (
+                <div className="mt-2 pt-2 border-t border-border/30">
+                  <button
+                    onClick={() => window.open(getExplorerTxUrl(relatedTx.hash), '_blank')}
+                    className="text-xs text-primary hover:underline flex items-center gap-1"
+                  >
+                    View Transaction on BlockScout
+                    <ExternalLink className="w-3 h-3" />
+                  </button>
+                </div>
+              )}
             </div>
           );
         })}
