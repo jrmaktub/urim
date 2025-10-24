@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAccount, useWriteContract } from "wagmi";
+import { useAccount, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
@@ -25,7 +25,8 @@ import { CheckCircle2, Clock, TrendingUp, Zap } from "lucide-react";
 import { URIM_MARKET_ADDRESS, USDC_ADDRESS } from "@/constants/contracts";
 import UrimMarketABI from "@/contracts/UrimMarket.json";
 import ERC20ABI from "@/contracts/ERC20.json";
-import { parseUnits } from "viem";
+import { parseUnits, formatUnits } from "viem";
+import { useAllMarkets, useMarketInfo, useOutcomePool } from "@/hooks/useMarkets";
 
 import FetchUnifiedBalanceButton from '@/components/fetch-unified-balance-button';
 import Bridge from '@/components/BridgeButton';
@@ -48,42 +49,18 @@ const EverythingBets = () => {
   const [isSuccess, setIsSuccess] = useState(false);
   const [selectedMarket, setSelectedMarket] = useState<any>(null);
   const [stakeModalOpen, setStakeModalOpen] = useState(false);
-  const [selectedOption, setSelectedOption] = useState<string>("");
+  const [selectedOption, setSelectedOption] = useState<number>(0);
+  const [selectedOutcomeIndex, setSelectedOutcomeIndex] = useState<number>(0);
+  const [betAmount, setBetAmount] = useState("");
   const [balances, setBalances] = useState<any>(null);
+  const [isBetting, setIsBetting] = useState(false);
 
-    const btn =
+  const btn =
     'px-4 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-700 ' +
     'disabled:opacity-50 disabled:cursor-not-allowed';
-  // Mock active markets
-  const activeMarkets = [
-    {
-      id: 1,
-      question: "Will ETH reach $5000 by end of 2025?",
-      optionA: "Yes",
-      optionB: "No",
-      poolA: "12,500",
-      poolB: "8,300",
-      timeLeft: "6d 14h",
-    },
-    {
-      id: 2,
-      question: "Bitcoin ETF approval boost BTC above $100k?",
-      optionA: "Yes",
-      optionB: "No",
-      poolA: "24,100",
-      poolB: "15,900",
-      timeLeft: "3d 8h",
-    },
-    {
-      id: 3,
-      question: "Base network to surpass 10M daily transactions?",
-      optionA: "Yes",
-      optionB: "No",
-      poolA: "7,200",
-      poolB: "5,800",
-      timeLeft: "12d 4h",
-    },
-  ];
+
+  // Load live markets from contract
+  const { everythingMarketIds } = useAllMarkets();
 
   const handleCreateMarket = async () => {
     if (!address) {
@@ -151,9 +128,60 @@ const EverythingBets = () => {
     }
   };
 
-  const handleMarketClick = (market: any) => {
-    setSelectedMarket(market);
-    setStakeModalOpen(true);
+  const handlePlaceBet = async () => {
+    if (!address || !selectedMarket || !betAmount) {
+      toast({
+        title: "Missing Information",
+        description: "Please enter a bet amount.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsBetting(true);
+
+    try {
+      // First approve USDC
+      const amount = parseUnits(betAmount, 6);
+      
+      await writeContractAsync({
+        address: USDC_ADDRESS as `0x${string}`,
+        abi: ERC20ABI.abi as any,
+        functionName: 'approve',
+        args: [URIM_MARKET_ADDRESS, amount],
+      } as any);
+
+      toast({
+        title: "Approval Confirmed",
+        description: "Now placing your bet...",
+      });
+
+      // Then buy shares
+      await writeContractAsync({
+        address: URIM_MARKET_ADDRESS as `0x${string}`,
+        abi: UrimMarketABI.abi as any,
+        functionName: 'buyShares',
+        args: [BigInt(selectedMarket.id), BigInt(selectedOutcomeIndex), amount],
+        gas: BigInt(500000),
+      } as any);
+
+      toast({
+        title: "Quantum Bet placed successfully! ⚡",
+        description: `You bet ${betAmount} USDC on "${selectedMarket.outcomes[selectedOutcomeIndex]}"`,
+      });
+
+      setStakeModalOpen(false);
+      setBetAmount("");
+    } catch (error: any) {
+      console.error("Failed to place bet:", error);
+      toast({
+        title: "Transaction Failed",
+        description: error?.shortMessage || error?.message || "Could not place bet. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsBetting(false);
+    }
   };
 
   if (isSuccess) {
@@ -208,7 +236,7 @@ const EverythingBets = () => {
               Create Everything Bet
             </h1>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-              Simple Yes/No prediction markets on any topic
+              AI will create 2 possible future outcomes. Choose one to place your bet.
             </p>
           </div>
                   {balances && (
@@ -315,7 +343,7 @@ const EverythingBets = () => {
                     Creating Market...
                   </>
                 ) : (
-                  "Create Market"
+                  "Generate AI Quantum Market"
                 )}
               </Button>
             </div>
@@ -332,63 +360,17 @@ const EverythingBets = () => {
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {activeMarkets.map((market, index) => (
-              <div
-                key={market.id}
-                className="glass-card p-8 animate-fade-up hover:border-primary/40 transition-all group"
-                style={{ animationDelay: `${index * 0.1}s` }}
-              >
-                {/* Question */}
-                <h3 className="text-xl font-bold text-foreground mb-6 leading-tight min-h-[3.5rem]">
-                  {market.question}
-                </h3>
-                
-                {/* Pools */}
-                <div className="space-y-3 mb-6">
-                  <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border border-border/30">
-                    <span className="text-sm font-semibold text-muted-foreground">{market.optionA}</span>
-                    <span className="text-primary font-bold">{market.poolA} USDC</span>
-                  </div>
-                  <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border border-border/30">
-                    <span className="text-sm font-semibold text-muted-foreground">{market.optionB}</span>
-                    <span className="text-primary font-bold">{market.poolB} USDC</span>
-                  </div>
-                </div>
-
-                {/* Time Left */}
-                <div className="flex items-center gap-2 text-sm text-muted-foreground mb-6 pb-6 border-b border-border/30">
-                  <Clock className="w-4 h-4" />
-                  <span className="font-medium">{market.timeLeft} remaining</span>
-                </div>
-
-                {/* Bet Buttons */}
-                <div className="grid grid-cols-2 gap-3">
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    className="group/btn"
-                    onClick={() => {
-                      setSelectedMarket(market);
-                      setSelectedOption(market.optionA);
-                      setStakeModalOpen(true);
-                    }}
-                  >
-                    {market.optionA}
-                  </Button>
-                  <Button 
-                    variant="outline"
-                    size="sm" 
-                    className="group/btn"
-                    onClick={() => {
-                      setSelectedMarket(market);
-                      setSelectedOption(market.optionB);
-                      setStakeModalOpen(true);
-                    }}
-                  >
-                    {market.optionB}
-                  </Button>
-                </div>
-              </div>
+            {everythingMarketIds.map((marketId, index) => (
+              <LiveMarketCard 
+                key={marketId.toString()} 
+                marketId={Number(marketId)} 
+                index={index}
+                onBetClick={(market, outcomeIndex) => {
+                  setSelectedMarket(market);
+                  setSelectedOutcomeIndex(outcomeIndex);
+                  setStakeModalOpen(true);
+                }}
+              />
             ))}
           </div>
         </div>
@@ -410,7 +392,9 @@ const EverythingBets = () => {
                 Betting On
               </Label>
               <div className="p-5 border-2 border-primary rounded-xl bg-primary/10">
-                <span className="text-primary font-bold text-xl">{selectedOption}</span>
+                <span className="text-primary font-bold text-xl">
+                  {selectedMarket?.outcomes?.[selectedOutcomeIndex]}
+                </span>
               </div>
             </div>
             
@@ -423,6 +407,8 @@ const EverythingBets = () => {
                 <Input 
                   type="number" 
                   placeholder="100"
+                  value={betAmount}
+                  onChange={(e) => setBetAmount(e.target.value)}
                   className="h-14 text-lg font-semibold pr-16 bg-input/50 border-border/50 focus:border-primary/60 rounded-xl"
                 />
                 <div className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-bold text-muted-foreground">
@@ -435,16 +421,20 @@ const EverythingBets = () => {
             <Button 
               className="w-full"
               size="lg"
-              onClick={() => {
-                toast({
-                  title: "Bet Placed ⚡",
-                  description: `You bet on "${selectedOption}"`,
-                });
-                setStakeModalOpen(false);
-              }}
+              onClick={handlePlaceBet}
+              disabled={isBetting || !betAmount}
             >
-              <Zap className="w-4 h-4 mr-2" />
-              Confirm Bet
+              {isBetting ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin mr-2" />
+                  Placing Bet...
+                </>
+              ) : (
+                <>
+                  <Zap className="w-4 h-4 mr-2" />
+                  Confirm Bet
+                </>
+              )}
             </Button>
           </div>
         </DialogContent>
@@ -454,5 +444,86 @@ const EverythingBets = () => {
     </div>
   );
 };
+
+// Component to display live market cards
+function LiveMarketCard({ marketId, index, onBetClick }: { 
+  marketId: number; 
+  index: number;
+  onBetClick: (market: any, outcomeIndex: number) => void;
+}) {
+  const marketInfo = useMarketInfo(marketId, false);
+  const pool0 = useOutcomePool(marketId, 0, false);
+  const pool1 = useOutcomePool(marketId, 1, false);
+
+  if (!marketInfo) {
+    return (
+      <div className="glass-card p-8 animate-fade-up" style={{ animationDelay: `${index * 0.1}s` }}>
+        <div className="animate-pulse space-y-4">
+          <div className="h-20 bg-muted/30 rounded"></div>
+          <div className="h-12 bg-muted/30 rounded"></div>
+          <div className="h-12 bg-muted/30 rounded"></div>
+        </div>
+      </div>
+    );
+  }
+
+  const now = Math.floor(Date.now() / 1000);
+  const timeLeft = marketInfo.endTimestamp - now;
+  const days = Math.floor(timeLeft / 86400);
+  const hours = Math.floor((timeLeft % 86400) / 3600);
+  const timeLeftStr = timeLeft > 0 ? `${days}d ${hours}h` : "Ended";
+
+  return (
+    <div
+      className="glass-card p-8 animate-fade-up hover:border-primary/40 transition-all group"
+      style={{ animationDelay: `${index * 0.1}s` }}
+    >
+      {/* Question */}
+      <h3 className="text-xl font-bold text-foreground mb-6 leading-tight min-h-[3.5rem]">
+        {marketInfo.question}
+      </h3>
+      
+      {/* Pools */}
+      <div className="space-y-3 mb-6">
+        <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border border-border/30">
+          <span className="text-sm font-semibold text-muted-foreground">{marketInfo.outcomes[0]}</span>
+          <span className="text-primary font-bold">{formatUnits(pool0, 6)} USDC</span>
+        </div>
+        <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border border-border/30">
+          <span className="text-sm font-semibold text-muted-foreground">{marketInfo.outcomes[1]}</span>
+          <span className="text-primary font-bold">{formatUnits(pool1, 6)} USDC</span>
+        </div>
+      </div>
+
+      {/* Time Left */}
+      <div className="flex items-center gap-2 text-sm text-muted-foreground mb-6 pb-6 border-b border-border/30">
+        <Clock className="w-4 h-4" />
+        <span className="font-medium">{timeLeftStr} remaining</span>
+      </div>
+
+      {/* Bet Buttons */}
+      <div className="grid grid-cols-2 gap-3">
+        <Button 
+          variant="outline" 
+          size="sm"
+          className="group/btn"
+          onClick={() => onBetClick(marketInfo, 0)}
+          disabled={marketInfo.resolved || timeLeft <= 0}
+        >
+          {marketInfo.outcomes[0]}
+        </Button>
+        <Button 
+          variant="outline"
+          size="sm" 
+          className="group/btn"
+          onClick={() => onBetClick(marketInfo, 1)}
+          disabled={marketInfo.resolved || timeLeft <= 0}
+        >
+          {marketInfo.outcomes[1]}
+        </Button>
+      </div>
+    </div>
+  );
+}
 
 export default EverythingBets;
