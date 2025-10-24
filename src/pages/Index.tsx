@@ -228,16 +228,13 @@ const Index = () => {
             )}
           </TabsContent>
 
-          <TabsContent value="quantum" className="space-y-8">
-            {/* Live Quantum Markets from Blockchain */}
+          <TabsContent value="quantum" className="min-h-[60vh] flex items-center justify-center">
             {quantumMarketIds.length > 0 ? (
-              <div className="space-y-4">
-                <h2 className="text-2xl font-bold">Live Quantum Markets</h2>
+              <div className="w-full max-w-md mx-auto space-y-6">
                 {quantumMarketIds.map((marketId) => (
-                  <MarketCard
+                  <QuantumBettingCard
                     key={`quantum-${Number(marketId)}-${refreshKey}`}
                     marketId={Number(marketId)}
-                    isQuantum={true}
                     onPlaceBet={handlePlaceBet}
                   />
                 ))}
@@ -448,6 +445,90 @@ const OutcomeCard = ({ marketId, outcomeIndex, outcomeName, isQuantum, resolved,
         >
           Place Bet
         </Button>
+      )}
+    </div>
+  );
+};
+
+interface QuantumBettingCardProps {
+  marketId: number;
+  onPlaceBet: (marketId: number, isQuantum: boolean) => void;
+}
+
+const QuantumBettingCard = ({ marketId, onPlaceBet }: QuantumBettingCardProps) => {
+  const marketInfo = useMarketInfo(marketId, true);
+  const [selectedOutcome, setSelectedOutcome] = useState<number | null>(null);
+
+  if (!marketInfo) return null;
+
+  const yesPool = useOutcomePool(marketId, 0, true);
+  const noPool = useOutcomePool(marketId, 1, true);
+  const yesPoolFormatted = Number(formatUnits(yesPool, 6)).toFixed(2);
+  const noPoolFormatted = Number(formatUnits(noPool, 6)).toFixed(2);
+
+  return (
+    <div className="space-y-6 text-center">
+      {/* Question */}
+      <div className="space-y-2">
+        <div className="text-xs font-semibold text-muted-foreground">Market #{marketId}</div>
+        <h2 className="text-2xl font-bold">{marketInfo.question}</h2>
+      </div>
+
+      {/* Yes/No Options */}
+      <div className="grid grid-cols-2 gap-4">
+        <button
+          onClick={() => setSelectedOutcome(0)}
+          className={`p-6 rounded-xl border-2 transition-all ${
+            selectedOutcome === 0
+              ? 'border-primary bg-primary/10 shadow-[0_0_25px_hsl(var(--primary)/0.5)]'
+              : 'border-border/50 bg-card/40 hover:border-primary/50'
+          }`}
+        >
+          <div className="text-3xl mb-2">✅</div>
+          <div className="text-xl font-bold">Yes</div>
+          <div className="text-xs text-muted-foreground mt-2">{yesPoolFormatted} USDC</div>
+        </button>
+
+        <button
+          onClick={() => setSelectedOutcome(1)}
+          className={`p-6 rounded-xl border-2 transition-all ${
+            selectedOutcome === 1
+              ? 'border-primary bg-primary/10 shadow-[0_0_25px_hsl(var(--primary)/0.5)]'
+              : 'border-border/50 bg-card/40 hover:border-primary/50'
+          }`}
+        >
+          <div className="text-3xl mb-2">❌</div>
+          <div className="text-xl font-bold">No</div>
+          <div className="text-xs text-muted-foreground mt-2">{noPoolFormatted} USDC</div>
+        </button>
+      </div>
+
+      {/* Bet Amount Input */}
+      {selectedOutcome !== null && (
+        <div className="space-y-4 animate-fade-in">
+          <div className="space-y-2">
+            <Label htmlFor="bet-amount" className="text-left block">Bet Amount</Label>
+            <div className="flex gap-2">
+              <Input
+                id="bet-amount"
+                type="number"
+                placeholder="0.00"
+                className="flex-1"
+              />
+              <div className="px-4 py-3 bg-card/40 border-2 border-primary/50 rounded-md text-sm font-semibold">
+                USDC
+              </div>
+            </div>
+          </div>
+
+          <Button
+            onClick={() => onPlaceBet(marketId, true)}
+            className="w-full"
+            size="lg"
+          >
+            Confirm Bet ⚡
+          </Button>
+        </div>
       )}
     </div>
   );
