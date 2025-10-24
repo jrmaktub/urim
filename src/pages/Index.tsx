@@ -7,7 +7,7 @@ import Hero from "@/components/Hero";
 import PythPriceTicker from "@/components/PythPriceTicker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Sparkles, Clock, TrendingUp, Zap, ChevronRight, Users, DollarSign, Brain, ChevronDown, ChevronUp } from "lucide-react";
+import { Sparkles, Clock, TrendingUp, Zap, ChevronRight, Users, DollarSign, Brain, ChevronDown, ChevronUp, AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
   Dialog,
@@ -254,9 +254,13 @@ const Index = () => {
         gas: BigInt(3000000),
       } as any);
 
+      const successMessage = selectedIsQuantum 
+        ? "✅ Bet placed successfully on your selected Quantum outcome!"
+        : "✅ Bet placed successfully!";
+      
       toast({
         title: "Bet Placed Successfully! ⚡",
-        description: `${betAmount} USDC bet placed. Refreshing markets...`,
+        description: successMessage,
       });
       
       setBetModalOpen(false);
@@ -414,6 +418,14 @@ const Index = () => {
                     </>
                   )}
                 </Button>
+                
+                {/* Price Feed Warning */}
+                <div className="flex items-start gap-2 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/30 text-sm">
+                  <AlertTriangle className="w-4 h-4 text-yellow-500 mt-0.5 flex-shrink-0" />
+                  <p className="text-yellow-600 dark:text-yellow-400">
+                    ⚠️ Missing Pyth Price Feed ID — winnings cannot be calculated until a valid feed is used.
+                  </p>
+                </div>
               </div>
             </div>
           </div>
