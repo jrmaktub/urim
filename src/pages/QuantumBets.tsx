@@ -80,11 +80,16 @@ export default function QuantumBets() {
       const probs = [BigInt(50), BigInt(50)]; // 50/50 for 2 scenarios
       const priceFeedId = "0x0000000000000000000000000000000000000000000000000000000000000000" as `0x${string}`;
 
+      // Use new createMarket with optionA/optionB
+      const optionA = scenarios[0] || "Yes";
+      const optionB = scenarios[1] || "No";
+      const targetPrice = BigInt(0); // Default target price
+      
       await writeContractAsync({
         address: URIM_QUANTUM_MARKET_ADDRESS as `0x${string}`,
         abi: UrimQuantumMarketABI.abi as any,
-        functionName: "createQuantumMarket",
-        args: [question, scenarios, probs, duration, priceFeedId, []],
+        functionName: "createMarket",
+        args: [question, optionA, optionB, duration, priceFeedId, targetPrice],
         gas: BigInt(3_000_000),
       } as any);
 
@@ -103,14 +108,15 @@ export default function QuantumBets() {
         args: [URIM_QUANTUM_MARKET_ADDRESS, amountWei],
       } as any);
 
-      // Buy shares
-            const handleBuyScenarioShares = async () => {
+      // Buy shares - use new buyShares function with isOptionA boolean
+            const handleBuyShares = async () => {
               try{
+            const isOptionA = scenarioIndex === 0; // First scenario is Option A
             const tx = await writeContractAsync({
               address: URIM_QUANTUM_MARKET_ADDRESS as `0x${string}`,
               abi: UrimQuantumMarketABI.abi as any,
-              functionName: "buyScenarioShares",
-              args: [latestId, scenarioIndex, amountWei],
+              functionName: "buyShares",
+              args: [latestId, isOptionA, amountWei],
               gas: BigInt(500_000),
             } as any);
       
@@ -122,14 +128,32 @@ export default function QuantumBets() {
               }
             }
       
-            await handleBuyScenarioShares();
+            await handleBuyShares();
       
             toast({ title: "Bet placed!", description: `${amount} USDC on ${scenarios[scenarioIndex]}` });
             setBetAmounts(["", "", ""]);
             await refetchMarkets();
     } catch (error: any) {
       console.error(error);
-      toast({ title: "Transaction failed", description: error?.shortMessage || "Try again", variant: "destructive" });
+      const errorMsg = error?.shortMessage || error?.message || "Try again";
+      const fullError = JSON.stringify(error, null, 2);
+      
+      toast({
+        title: "Transaction failed",
+        description: errorMsg,
+        variant: "destructive",
+        action: (
+          <button
+            onClick={() => {
+              navigator.clipboard.writeText(fullError);
+              toast({ title: "Error copied to clipboard" });
+            }}
+            className="ml-2 px-3 py-1 text-xs bg-destructive/20 hover:bg-destructive/30 rounded"
+          >
+            📋 Copy
+          </button>
+        ),
+      });
     } finally {
       setBettingIdx(null);
     }
@@ -263,26 +287,22 @@ function MarketCard({ marketId, address }: { marketId: bigint; address: `0x${str
   const { writeContractAsync } = useWriteContract();
   const [bettingScenario, setBettingScenario] = useState<number | null>(null);
   const [betAmount, setBetAmount] = useState("");
-  const { data: basicInfo } = useReadContract({
+  const { data: marketInfo } = useReadContract({
     address: URIM_QUANTUM_MARKET_ADDRESS as `0x${string}`,
     abi: UrimQuantumMarketABI.abi as any,
-    functionName: "getMarketBasicInfo",
+    functionName: "getMarketInfo",
     args: [marketId],
   });
 
-  const { data: scenarios } = useReadContract({
-    address: URIM_QUANTUM_MARKET_ADDRESS as `0x${string}`,
-    abi: UrimQuantumMarketABI.abi as any,
-    functionName: "getScenarios",
-    args: [marketId],
-  });
+  if (!marketInfo) return null;
 
-  if (!basicInfo || !scenarios) return null;
-
-  const [question, endTime, resolved, winningScenario] = basicInfo as [string, bigint, boolean, number];
-  const scenarioList = scenarios as string[];
+  const [question, optionA, optionB, endTime, outcome, totalOptionAShares, totalOptionBShares, resolved, cancelled] = marketInfo as [
+    string, string, string, bigint, number, bigint, bigint, boolean, boolean
+  ];
+  const scenarioList = [optionA, optionB];
   const now = Math.floor(Date.now() / 1000);
-  const status = resolved ? "Resolved" : now < Number(endTime) ? "Active" : "Ended";
+  const status = cancelled ? "Cancelled" : resolved ? "Resolved" : now < Number(endTime) ? "Active" : "Ended";
+  const winningScenario = outcome; // outcome is enum: 0=OptionA, 1=OptionB, 2=Tie
 
   const placeBet = async (scenarioIdx: number) => {
     if (!address) {
@@ -307,12 +327,13 @@ function MarketCard({ marketId, address }: { marketId: bigint; address: `0x${str
         args: [URIM_QUANTUM_MARKET_ADDRESS, amountWei],
       } as any);
 
-      // Buy shares
+      // Buy shares - use new buyShares function with isOptionA boolean
+      const isOptionA = scenarioIdx === 0;
       await writeContractAsync({
         address: URIM_QUANTUM_MARKET_ADDRESS as `0x${string}`,
         abi: UrimQuantumMarketABI.abi as any,
-        functionName: "buyScenarioShares",
-        args: [marketId, scenarioIdx, amountWei],
+        functionName: "buyShares",
+        args: [marketId, isOptionA, amountWei],
         gas: BigInt(500_000),
       } as any);
 
@@ -320,7 +341,25 @@ function MarketCard({ marketId, address }: { marketId: bigint; address: `0x${str
       setBetAmount("");
     } catch (error: any) {
       console.error(error);
-      toast({ title: "Transaction failed", description: error?.shortMessage || "Try again", variant: "destructive" });
+      const errorMsg = error?.shortMessage || error?.message || "Try again";
+      const fullError = JSON.stringify(error, null, 2);
+      
+      toast({
+        title: "Transaction failed",
+        description: errorMsg,
+        variant: "destructive",
+        action: (
+          <button
+            onClick={() => {
+              navigator.clipboard.writeText(fullError);
+              toast({ title: "Error copied to clipboard" });
+            }}
+            className="ml-2 px-3 py-1 text-xs bg-destructive/20 hover:bg-destructive/30 rounded"
+          >
+            📋 Copy
+          </button>
+        ),
+      });
     } finally {
       setBettingScenario(null);
     }
@@ -376,32 +415,29 @@ function MarketCard({ marketId, address }: { marketId: bigint; address: `0x${str
 }
 
 function UserBetsCard({ marketId, userAddress }: { marketId: bigint; userAddress: `0x${string}` }) {
-  const { data: basicInfo } = useReadContract({
+  const { data: marketInfo } = useReadContract({
     address: URIM_QUANTUM_MARKET_ADDRESS as `0x${string}`,
     abi: UrimQuantumMarketABI.abi as any,
-    functionName: "getMarketBasicInfo",
+    functionName: "getMarketInfo",
     args: [marketId],
   });
 
-  const { data: scenarios } = useReadContract({
+  const { data: userSharesData } = useReadContract({
     address: URIM_QUANTUM_MARKET_ADDRESS as `0x${string}`,
     abi: UrimQuantumMarketABI.abi as any,
-    functionName: "getScenarios",
-    args: [marketId],
-  });
-
-  const { data: userShares } = useReadContract({
-    address: URIM_QUANTUM_MARKET_ADDRESS as `0x${string}`,
-    abi: UrimQuantumMarketABI.abi as any,
-    functionName: "getUserShares",
+    functionName: "getSharesBalance",
     args: [marketId, userAddress],
   });
 
-  if (!basicInfo || !scenarios || !userShares) return null;
+  if (!marketInfo || !userSharesData) return null;
 
-  const [question, endTime, resolved, winningScenario] = basicInfo as [string, bigint, boolean, number];
-  const scenarioList = scenarios as string[];
-  const shares = userShares as bigint[];
+  const [question, optionA, optionB, endTime, outcome, totalOptionAShares, totalOptionBShares, resolved, cancelled] = marketInfo as [
+    string, string, string, bigint, number, bigint, bigint, boolean, boolean
+  ];
+  const scenarioList = [optionA, optionB];
+  const [optionAShares, optionBShares] = userSharesData as [bigint, bigint];
+  const shares = [optionAShares, optionBShares];
+  const winningScenario = outcome;
 
   // Only show if user has shares in this market
   const hasShares = shares.some(share => share > 0n);
