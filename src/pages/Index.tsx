@@ -41,10 +41,12 @@ const Index = () => {
   const [betAmounts, setBetAmounts] = useState<string[]>(["", ""]);
   const [bettingIdx, setBettingIdx] = useState<number | null>(null);
   
-  // Avail Nexus state
+  // Avail Nexus state - FIXED
   const [nexusInitialized, setNexusInitialized] = useState(false);
   const [unifiedBalance, setUnifiedBalance] = useState<string | null>(null);
   const [initializingNexus, setInitializingNexus] = useState(false);
+  const [balanceLoading, setBalanceLoading] = useState(false);
+  const [balanceError, setBalanceError] = useState<string | null>(null);
   
   // Pyth state
   const [currentPrice, setCurrentPrice] = useState<number>(0);
@@ -55,22 +57,36 @@ const Index = () => {
 
   const { quantumMarketIds, everythingMarketIds } = useAllMarkets();
 
-  // Check Nexus initialization on mount
+  // Check Nexus initialization on mount - FIXED
   useEffect(() => {
     const checkInit = async () => {
       const initialized = isInitialized();
       setNexusInitialized(initialized);
+      
       if (initialized) {
+        setBalanceLoading(true);
+        setBalanceError(null);
         try {
           const balances = await getUnifiedBalances();
+          console.log("Unified balances:", balances);
+          
           if (Array.isArray(balances) && balances.length > 0) {
-            const usdcBalance = balances.find((b: any) => b.asset === 'USDC');
+            const usdcBalance = balances.find((b: any) => b.asset === 'USDC' || b.symbol === 'USDC');
             if (usdcBalance) {
-              setUnifiedBalance(usdcBalance.balance);
+              setUnifiedBalance(usdcBalance.balance || usdcBalance.balance || "0");
+            } else {
+              // No USDC found, set to "0" instead of null
+              setUnifiedBalance("0");
             }
+          } else {
+            setUnifiedBalance("0");
           }
-        } catch (e) {
+        } catch (e: any) {
           console.error("Failed to fetch balances:", e);
+          setBalanceError(e.message || "Failed to fetch balance");
+          setUnifiedBalance("0");
+        } finally {
+          setBalanceLoading(false);
         }
       }
     };
@@ -105,24 +121,34 @@ const Index = () => {
     }
 
     setInitializingNexus(true);
+    setBalanceError(null);
     try {
       await initializeWithProvider(walletClient);
       setNexusInitialized(true);
       
+      setBalanceLoading(true);
       const balances = await getUnifiedBalances();
+      console.log("Unified balances after init:", balances);
+      
       if (Array.isArray(balances) && balances.length > 0) {
-        const usdcBalance = balances.find((b: any) => b.asset === 'USDC');
+        const usdcBalance = balances.find((b: any) => b.asset === 'USDC' || b.symbol === 'USDC');
         if (usdcBalance) {
-          setUnifiedBalance(usdcBalance.balance);
+          setUnifiedBalance(usdcBalance.balance || usdcBalance.balance || "0");
+        } else {
+          setUnifiedBalance("0");
         }
+      } else {
+        setUnifiedBalance("0");
       }
       
       toast({ title: "🌉 Nexus Initialized", description: "Avail bridge ready!" });
     } catch (error: any) {
       console.error("Nexus init failed:", error);
+      setBalanceError(error.message || "Initialization failed");
       toast({ title: "Initialization failed", description: error.message, variant: "destructive" });
     } finally {
       setInitializingNexus(false);
+      setBalanceLoading(false);
     }
   };
 
@@ -208,85 +234,95 @@ const Index = () => {
         args: [URIM_QUANTUM_MARKET_ADDRESS, amountWei],
       } as any);
 
+      const lastMarketId = quantumMarketIds.length > 0 ? quantumMarketIds[quantumMarketIds.length - 1] : BigInt(0);
+
       await writeContractAsync({
         address: URIM_QUANTUM_MARKET_ADDRESS as `0x${string}`,
         abi: UrimQuantumMarketABI.abi as any,
         functionName: "buyScenarioShares",
-        args: [BigInt(0), BigInt(scenarioIndex), amountWei],
-        gas: BigInt(500_000),
+        args: [lastMarketId, BigInt(scenarioIndex), amountWei],
+        gas: BigInt(3_000_000),
       } as any);
 
-      toast({ 
-        title: "✅ Bet placed successfully!", 
-        description: `${amount} USDC on "${scenarios[scenarioIndex]}"` 
+      toast({
+        title: "✅ Bet placed!",
+        description: `You bet ${amount} USDC on outcome #${scenarioIndex + 1}`,
       });
-      
-      setBetAmounts(["", ""]);
-      setScenarios([]);
-      setQuestion("");
     } catch (error: any) {
-      console.error("Transaction failed:", error);
-      toast({ 
-        title: "Transaction failed", 
-        description: error?.shortMessage || "Try again", 
-        variant: "destructive" 
+      console.error("Error placing bet:", error);
+      toast({
+        title: "Transaction failed",
+        description: error.message || "Please try again",
+        variant: "destructive",
       });
     } finally {
       setBettingIdx(null);
     }
   };
 
-  const roundedPrice = Math.round(currentPrice);
-  const threshold = roundedPrice + 50;
+  const threshold = Math.round(currentPrice + (currentPrice * 0.02));
 
   return (
-    <div className="min-h-screen w-full bg-background relative overflow-hidden">
-      <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-transparent pointer-events-none" />
-      
+    <div className="min-h-screen bg-gradient-to-b from-background via-background to-purple-950/10">
       <Navigation />
-
+      
       {/* Hero */}
-      <section className="relative max-w-6xl mx-auto px-6 pt-32 pb-12">
-        <div className="text-center mb-12 animate-fade-in">
-          <h1 className="text-5xl md:text-6xl font-bold mb-4 bg-gradient-to-r from-primary via-purple-400 to-primary bg-clip-text text-transparent">
-            URIM
-          </h1>
-          <p className="text-xl text-muted-foreground">
-            Quantum prediction markets powered by AI and Pyth oracles
-          </p>
-        </div>
+      <section className="max-w-4xl mx-auto px-6 pt-24 pb-12 text-center">
+        <Badge variant="outline" className="mb-4 text-xs uppercase tracking-wider border-primary">
+          Quantum prediction markets
+        </Badge>
+        <h1 className="text-6xl font-bold mb-4 bg-gradient-to-r from-white via-purple-200 to-purple-400 bg-clip-text text-transparent">
+          URIM
+        </h1>
+        <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
+          Quantum prediction markets powered by AI and Pyth oracles
+        </p>
       </section>
 
-      {/* Avail Nexus Integration */}
-      <section className="max-w-2xl mx-auto px-6 py-8">
-        <div className="rounded-2xl border border-primary/30 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent p-8 shadow-lg animate-fade-in">
+      {/* Avail Nexus Integration - FIXED */}
+      <section className="max-w-2xl mx-auto px-6 pb-16">
+        <div className="glass-card p-8">
           <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center">
-              <Sparkles className="w-5 h-5 text-primary animate-pulse" />
+            <div className="p-3 rounded-xl bg-gradient-to-br from-purple-600/20 to-purple-700/20 border border-purple-500/30">
+              <Zap className="w-6 h-6 text-purple-400" />
             </div>
-            <h2 className="text-2xl font-bold">⚡ Avail Nexus Integration</h2>
+            <h3 className="text-2xl font-bold">⚡ Avail Nexus Integration</h3>
           </div>
-          
+
           {!nexusInitialized ? (
-            <Button 
-              onClick={handleInitNexus} 
-              disabled={initializingNexus || !isConnected}
-              className="w-full bg-gradient-to-r from-primary to-primary-glow"
-              size="lg"
-            >
-              {initializingNexus ? "Initializing..." : "Initialize Nexus"}
-            </Button>
+            <div className="space-y-4">
+              <p className="text-muted-foreground">
+                Initialize Avail Nexus to access your unified balance across chains and enable seamless bridging.
+              </p>
+              <Button 
+                onClick={handleInitNexus}
+                disabled={initializingNexus || !isConnected}
+                className="w-full bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800"
+                size="lg"
+              >
+                {initializingNexus ? "Initializing..." : "Initialize Nexus"}
+              </Button>
+            </div>
           ) : (
-            <div className="space-y-4 animate-fade-in">
-              <div className="p-4 rounded-xl bg-background/50 border border-primary/20">
+            <div className="space-y-4">
+              <div className="p-4 rounded-lg bg-gradient-to-r from-purple-600/10 to-purple-700/10 border border-purple-500/20">
                 <div className="text-sm text-muted-foreground mb-1">Unified Balance</div>
-                <div className="text-2xl font-bold text-primary">
-                  {unifiedBalance ? `$${unifiedBalance} USDC` : "Loading..."}
-                </div>
+                {balanceLoading ? (
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
+                    <span className="text-lg font-bold">Loading...</span>
+                  </div>
+                ) : balanceError ? (
+                  <div className="text-red-400 text-sm">{balanceError}</div>
+                ) : (
+                  <div className="text-2xl font-bold">
+                    {parseFloat(unifiedBalance || "0").toFixed(2)} USDC
+                  </div>
+                )}
               </div>
-              
+
               {!isOnOptimismSepolia ? (
-                <Button
+                <Button 
                   onClick={() => switchChain({ chainId: optimismSepolia.id })}
                   className="w-full"
                   size="lg"
