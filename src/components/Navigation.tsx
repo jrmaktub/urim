@@ -4,7 +4,6 @@ import WalletButton from "./WalletButton";
 import { useState } from 'react';
 import { useAccount } from 'wagmi';
 import InitButton from '@/components/init-button';
-import FetchUnifiedBalanceButton from '@/components/fetch-unified-balance-button';
 import DeinitButton from '@/components/de-init-button';
 import { isInitialized } from '@/lib/nexus';
 
