@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAccount, useReadContract, useWriteContract } from "wagmi";
 import { Link } from "react-router-dom";
 import Navigation from "@/components/Navigation";
@@ -8,17 +8,26 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Sparkles, TrendingUp, Clock, ExternalLink } from "lucide-react";
+import { Sparkles, TrendingUp, Clock, ExternalLink, Zap } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAllMarkets, useMarketInfo } from "@/hooks/useMarkets";
-import { URIM_QUANTUM_MARKET_ADDRESS, USDC_ADDRESS } from "@/constants/contracts";
+import { URIM_QUANTUM_MARKET_ADDRESS, URIM_MARKET_ADDRESS, USDC_ADDRESS } from "@/constants/contracts";
 import UrimQuantumMarketABI from "@/contracts/UrimQuantumMarket.json";
+import UrimMarketABI from "@/contracts/UrimMarket.json";
 import ERC20ABI from "@/contracts/ERC20.json";
 import { parseUnits, formatUnits } from "viem";
 import { getExplorerTxUrl } from "@/constants/blockscout";
 import PythPriceTicker from "@/components/PythPriceTicker";
+import { EvmPriceServiceConnection } from "@pythnetwork/pyth-evm-js";
 
 const ETH_USD_PRICE_FEED = "0xff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace";
+const connection = new EvmPriceServiceConnection("https://hermes.pyth.network");
+
+interface AIBetIdea {
+  question: string;
+  outcomes: string[];
+  threshold?: number;
+}
 
 const Index = () => {
   const { address } = useAccount();
@@ -29,8 +38,58 @@ const Index = () => {
   const [scenarios, setScenarios] = useState<string[]>([]);
   const [betAmounts, setBetAmounts] = useState<string[]>(["", ""]);
   const [bettingIdx, setBettingIdx] = useState<number | null>(null);
+  const [currentPrice, setCurrentPrice] = useState<number>(0);
+  const [aiBetIdeas, setAiBetIdeas] = useState<AIBetIdea[]>([]);
+  const [creatingAIBet, setCreatingAIBet] = useState<number | null>(null);
 
-  const { quantumMarketIds } = useAllMarkets();
+  const { quantumMarketIds, everythingMarketIds } = useAllMarkets();
+
+  // Fetch current ETH price for AI bet generation
+  useEffect(() => {
+    const fetchPrice = async () => {
+      try {
+        const priceFeeds = await connection.getLatestPriceFeeds([ETH_USD_PRICE_FEED]);
+        if (priceFeeds && priceFeeds.length > 0) {
+          const priceFeed = priceFeeds[0];
+          const price = priceFeed.getPriceUnchecked();
+          const formattedPrice = Number(price.price) * Math.pow(10, price.expo);
+          setCurrentPrice(formattedPrice);
+        }
+      } catch (error) {
+        console.error("Error fetching price:", error);
+      }
+    };
+
+    fetchPrice();
+    const interval = setInterval(fetchPrice, 10000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Generate AI bet ideas based on current price
+  useEffect(() => {
+    if (currentPrice > 0) {
+      const roundedPrice = Math.round(currentPrice);
+      const threshold1 = roundedPrice + 50;
+      const threshold2 = roundedPrice - 50;
+      
+      setAiBetIdeas([
+        {
+          question: `Will ETH close above $${threshold1} tomorrow?`,
+          outcomes: ["YES", "NO"],
+          threshold: threshold1,
+        },
+        {
+          question: `Will ETH drop below $${threshold2} in 24h?`,
+          outcomes: ["YES", "NO"],
+          threshold: threshold2,
+        },
+        {
+          question: `Will ETH stay between $${threshold2}-$${threshold1} for 24h?`,
+          outcomes: ["YES", "NO"],
+        },
+      ]);
+    }
+  }, [currentPrice]);
 
   const handleGenerate = async () => {
     if (!question.trim()) {
@@ -68,10 +127,15 @@ const Index = () => {
     setBettingIdx(scenarioIndex);
 
     try {
+      // Auto-fetch price boundaries from current Pyth price
+      const delta = 500; // $500 range
+      const lowerBound = Math.floor(currentPrice - delta);
+      const upperBound = Math.ceil(currentPrice + delta);
+      const priceBoundaries = [BigInt(lowerBound * 100000000), BigInt(upperBound * 100000000)]; // 8 decimals
+
       // Create Quantum Market
-      const duration = BigInt(86400); // 1 day = 86400 seconds
-      const probs = [BigInt(50), BigInt(50)]; // 50/50 probabilities
-      const priceBoundaries = [BigInt(350000000000), BigInt(400000000000)]; // $3500 - $4000 with 8 decimals
+      const duration = BigInt(86400); // 1 day
+      const probs = [BigInt(50), BigInt(50)];
 
       const createTx = await writeContractAsync({
         address: URIM_QUANTUM_MARKET_ADDRESS as `0x${string}`,
@@ -95,10 +159,8 @@ const Index = () => {
         )
       });
 
-      // Wait for market creation to complete
       await new Promise(resolve => setTimeout(resolve, 3000));
 
-      // Approve USDC
       const amountWei = parseUnits(amount, 6);
       await writeContractAsync({
         address: USDC_ADDRESS as `0x${string}`,
@@ -107,7 +169,6 @@ const Index = () => {
         args: [URIM_QUANTUM_MARKET_ADDRESS, amountWei],
       } as any);
 
-      // Place bet on newly created market
       const latestId = quantumMarketIds.length > 0 ? quantumMarketIds[quantumMarketIds.length - 1] : BigInt(0);
       const newMarketId = latestId + BigInt(1);
       
@@ -133,7 +194,6 @@ const Index = () => {
         )
       });
 
-      // Reset form
       setBetAmounts(["", ""]);
       setQuestion("");
       setScenarios([]);
@@ -149,6 +209,51 @@ const Index = () => {
     }
   };
 
+  const createAIBet = async (ideaIndex: number) => {
+    if (!address) {
+      toast({ title: "Connect Wallet", variant: "destructive" });
+      return;
+    }
+
+    setCreatingAIBet(ideaIndex);
+
+    try {
+      const idea = aiBetIdeas[ideaIndex];
+      const duration = Math.floor(Date.now() / 1000) + 86400; // 24h from now
+
+      const createTx = await writeContractAsync({
+        address: URIM_MARKET_ADDRESS as `0x${string}`,
+        abi: UrimMarketABI.abi as any,
+        functionName: "createMarket",
+        args: [idea.question, idea.outcomes, BigInt(duration)],
+      } as any);
+
+      toast({
+        title: "⚡ Market Created!",
+        description: (
+          <div className="space-y-2">
+            <p>{idea.question}</p>
+            <button
+              onClick={() => window.open(getExplorerTxUrl(createTx as string), '_blank')}
+              className="text-xs text-primary hover:underline flex items-center gap-1"
+            >
+              View on BlockScout →
+            </button>
+          </div>
+        )
+      });
+    } catch (error: any) {
+      console.error(error);
+      toast({ 
+        title: "Transaction failed", 
+        description: error?.shortMessage || "Try again", 
+        variant: "destructive" 
+      });
+    } finally {
+      setCreatingAIBet(null);
+    }
+  };
+
   return (
     <div className="min-h-screen w-full bg-background relative overflow-hidden">
       {/* Background gradient */}
@@ -158,8 +263,45 @@ const Index = () => {
       <PythPriceTicker />
 
       <section className="relative max-w-6xl mx-auto px-6 pt-32 pb-16">
+        {/* AI-Generated Bet Ideas */}
+        {currentPrice > 0 && aiBetIdeas.length > 0 && (
+          <div className="mb-12 space-y-6 animate-fade-in">
+            <div className="flex items-center gap-3">
+              <Zap className="w-6 h-6 text-primary" />
+              <h2 className="text-2xl font-bold">AI-Generated Bet Ideas</h2>
+            </div>
+            <div className="grid md:grid-cols-3 gap-4">
+              {aiBetIdeas.map((idea, idx) => (
+                <Card
+                  key={idx}
+                  className="p-5 border-primary/20 hover:border-primary/40 transition-all bg-background/95 hover:shadow-lg hover:shadow-primary/10 group"
+                >
+                  <div className="space-y-4">
+                    <div className="text-sm font-semibold leading-snug">{idea.question}</div>
+                    <div className="flex gap-2 text-xs">
+                      {idea.outcomes.map((outcome, i) => (
+                        <Badge key={i} variant="outline" className="border-primary/30">
+                          {outcome}
+                        </Badge>
+                      ))}
+                    </div>
+                    <Button
+                      size="sm"
+                      disabled={creatingAIBet !== null}
+                      onClick={() => createAIBet(idx)}
+                      className="w-full bg-gradient-to-r from-primary to-primary/70 hover:shadow-lg hover:shadow-primary/20"
+                    >
+                      {creatingAIBet === idx ? <Sparkles className="w-4 h-4 animate-spin" /> : "Create Market"}
+                    </Button>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Two main cards */}
-        <div className="grid md:grid-cols-2 gap-6 mb-12 animate-fade-in">
+        <div className="grid md:grid-cols-2 gap-6 mb-12 animate-fade-in" style={{ animationDelay: "0.1s" }}>
           
           {/* QUANTUM PYTH CARD */}
           <div className="glass-card p-8 space-y-6 border-primary/20 hover:border-primary/40 transition-all">
@@ -290,18 +432,38 @@ const Index = () => {
         {/* ACTIVE QUANTUM MARKETS */}
         <div className="space-y-6 mb-12 animate-fade-in" style={{ animationDelay: "0.2s" }}>
           <h2 className="text-2xl font-bold flex items-center gap-2">
-            <Clock className="w-6 h-6 text-primary" />
+            <Sparkles className="w-6 h-6 text-primary" />
             Quantum Markets
           </h2>
           
           <div className="grid gap-4">
             {quantumMarketIds.length === 0 ? (
               <Card className="p-8 text-center text-muted-foreground border-dashed">
-                No active markets yet. Create one above!
+                No active Quantum markets yet. Create one above!
               </Card>
             ) : (
               quantumMarketIds.map((id) => (
-                <MarketCard key={id.toString()} marketId={id} address={address} />
+                <QuantumMarketCard key={id.toString()} marketId={id} address={address} />
+              ))
+            )}
+          </div>
+        </div>
+
+        {/* ACTIVE EVERYTHING MARKETS */}
+        <div className="space-y-6 mb-12 animate-fade-in" style={{ animationDelay: "0.3s" }}>
+          <h2 className="text-2xl font-bold flex items-center gap-2">
+            <TrendingUp className="w-6 h-6 text-primary" />
+            Everything Bets Markets
+          </h2>
+          
+          <div className="grid gap-4">
+            {everythingMarketIds.length === 0 ? (
+              <Card className="p-8 text-center text-muted-foreground border-dashed">
+                No active Everything Bets markets yet. <Link to="/everything-bets" className="text-primary hover:underline">Create one</Link>!
+              </Card>
+            ) : (
+              everythingMarketIds.map((id) => (
+                <EverythingMarketCard key={id.toString()} marketId={id} address={address} />
               ))
             )}
           </div>
@@ -335,8 +497,8 @@ const Index = () => {
   );
 };
 
-// Market Card Component
-function MarketCard({ marketId, address }: { marketId: bigint; address: `0x${string}` | undefined }) {
+// Quantum Market Card Component
+function QuantumMarketCard({ marketId, address }: { marketId: bigint; address: `0x${string}` | undefined }) {
   const { toast } = useToast();
   const { writeContractAsync } = useWriteContract();
   const [betAmount, setBetAmount] = useState("");
@@ -453,6 +615,141 @@ function MarketCard({ marketId, address }: { marketId: bigint; address: `0x${str
                     className="bg-gradient-to-r from-primary to-primary/70"
                   >
                     {isPlacingBet && selectedScenario === idx ? "..." : "Bet"}
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {resolved && (
+          <div className="bg-primary/10 border border-primary/30 rounded-lg p-4">
+            <div className="text-sm font-semibold text-primary">
+              ✅ Winner: {outcomes[winningIndex]}
+            </div>
+          </div>
+        )}
+      </div>
+    </Card>
+  );
+}
+
+// Everything Market Card Component
+function EverythingMarketCard({ marketId, address }: { marketId: bigint; address: `0x${string}` | undefined }) {
+  const { toast } = useToast();
+  const { writeContractAsync } = useWriteContract();
+  const [betAmount, setBetAmount] = useState("");
+  const [selectedOutcome, setSelectedOutcome] = useState<number | null>(null);
+  const [isPlacingBet, setIsPlacingBet] = useState(false);
+
+  const marketInfo = useMarketInfo(Number(marketId), false);
+
+  const placeBet = async (outcomeIdx: number) => {
+    if (!address) {
+      toast({ title: "Connect Wallet", variant: "destructive" });
+      return;
+    }
+
+    if (!betAmount || parseFloat(betAmount) <= 0) {
+      toast({ title: "Enter bet amount", variant: "destructive" });
+      return;
+    }
+
+    setIsPlacingBet(true);
+
+    try {
+      const amountWei = parseUnits(betAmount, 6);
+
+      await writeContractAsync({
+        address: USDC_ADDRESS as `0x${string}`,
+        abi: ERC20ABI.abi as any,
+        functionName: "approve",
+        args: [URIM_MARKET_ADDRESS, amountWei],
+      } as any);
+
+      const txHash = await writeContractAsync({
+        address: URIM_MARKET_ADDRESS as `0x${string}`,
+        abi: UrimMarketABI.abi as any,
+        functionName: "buyShares",
+        args: [marketId, BigInt(outcomeIdx), amountWei],
+      } as any);
+
+      toast({
+        title: "✅ Bet placed!",
+        description: (
+          <div className="space-y-2">
+            <p>{betAmount} USDC on {marketInfo?.outcomes[outcomeIdx]}</p>
+            <button
+              onClick={() => window.open(getExplorerTxUrl(txHash as string), '_blank')}
+              className="text-xs text-primary hover:underline flex items-center gap-1"
+            >
+              View on BlockScout →
+            </button>
+          </div>
+        )
+      });
+
+      setBetAmount("");
+      setSelectedOutcome(null);
+    } catch (error: any) {
+      console.error(error);
+      toast({ title: "Transaction failed", description: error?.shortMessage || "Try again", variant: "destructive" });
+    } finally {
+      setIsPlacingBet(false);
+    }
+  };
+
+  if (!marketInfo) {
+    return (
+      <Card className="p-6 animate-pulse">
+        <div className="h-4 bg-primary/10 rounded w-3/4 mb-4"></div>
+        <div className="h-3 bg-primary/10 rounded w-1/2"></div>
+      </Card>
+    );
+  }
+
+  const { question, outcomes, endTimestamp, resolved, winningIndex } = marketInfo;
+  const isExpired = endTimestamp < Math.floor(Date.now() / 1000);
+
+  return (
+    <Card className="p-6 border-primary/20 hover:border-primary/40 transition-all animate-fade-in">
+      <div className="space-y-4">
+        <div>
+          <h3 className="text-lg font-bold mb-2">{question}</h3>
+          <div className="flex items-center gap-4 text-sm text-muted-foreground">
+            <Badge variant={resolved ? "default" : isExpired ? "secondary" : "outline"}>
+              {resolved ? "Resolved" : isExpired ? "Expired" : "Active"}
+            </Badge>
+            <span className="flex items-center gap-1">
+              <Clock className="w-3 h-3" />
+              {new Date(endTimestamp * 1000).toLocaleDateString()}
+            </span>
+          </div>
+        </div>
+
+        {!resolved && !isExpired && (
+          <div className="grid grid-cols-2 gap-3">
+            {outcomes.map((outcome, idx) => (
+              <div key={idx} className="space-y-2">
+                <div className="text-sm font-semibold text-primary">{outcome}</div>
+                <div className="flex gap-2">
+                  <Input
+                    type="number"
+                    placeholder="USDC"
+                    value={selectedOutcome === idx ? betAmount : ""}
+                    onChange={(e) => {
+                      setSelectedOutcome(idx);
+                      setBetAmount(e.target.value);
+                    }}
+                    className="flex-1 bg-background/50 text-xs"
+                  />
+                  <Button
+                    size="sm"
+                    disabled={isPlacingBet || selectedOutcome !== idx || !betAmount}
+                    onClick={() => placeBet(idx)}
+                    className="bg-gradient-to-r from-primary to-primary/70"
+                  >
+                    {isPlacingBet && selectedOutcome === idx ? "..." : "Bet"}
                   </Button>
                 </div>
               </div>

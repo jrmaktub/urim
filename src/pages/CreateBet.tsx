@@ -7,8 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Sparkles } from "lucide-react";
-import { URIM_MARKET_ADDRESS, BASE_SEPOLIA_CHAIN_ID } from "@/constants/contracts";
+import { TrendingUp, Plus, X } from "lucide-react";
+import { URIM_MARKET_ADDRESS } from "@/constants/contracts";
 import UrimMarketABI from "@/contracts/UrimMarket.json";
 import { Card } from "@/components/ui/card";
 import { getExplorerTxUrl } from "@/constants/blockscout";
@@ -16,12 +16,12 @@ import { getExplorerTxUrl } from "@/constants/blockscout";
 const CreateBet = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
-  const { chainId, address } = useAccount();
+  const { address } = useAccount();
   const { writeContractAsync } = useWriteContract();
   
   const [question, setQuestion] = useState("");
-  const [outcomes, setOutcomes] = useState(["", ""]);
-  const [duration, setDuration] = useState("7");
+  const [outcomes, setOutcomes] = useState(["YES", "NO"]);
+  const [duration, setDuration] = useState("24");
   const [isCreating, setIsCreating] = useState(false);
 
   const handleOutcomeChange = (index: number, value: string) => {
@@ -46,25 +46,16 @@ const CreateBet = () => {
     if (!address) {
       toast({
         title: "Connect Wallet",
-        description: "Please connect your wallet first.",
         variant: "destructive",
       });
       return;
     }
 
-    if (!question || outcomes.some(s => !s.trim())) {
+    const validOutcomes = outcomes.filter(o => o.trim());
+    if (!question.trim() || validOutcomes.length < 2) {
       toast({
         title: "Missing Information",
-        description: "Please fill in all fields.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (chainId !== BASE_SEPOLIA_CHAIN_ID) {
-      toast({
-        title: "Wrong Network",
-        description: "Please switch to Base Sepolia testnet.",
+        description: "Please fill in question and at least 2 outcomes.",
         variant: "destructive",
       });
       return;
@@ -73,21 +64,21 @@ const CreateBet = () => {
     setIsCreating(true);
     
     try {
-      const durationSeconds = BigInt(Number(duration) * 24 * 60 * 60);
-      const endTimestamp = BigInt(Math.floor(Date.now() / 1000)) + durationSeconds;
+      const durationInSeconds = parseInt(duration) * 3600;
+      const endTimestamp = Math.floor(Date.now() / 1000) + durationInSeconds;
       
       const txHash = await writeContractAsync({
         address: URIM_MARKET_ADDRESS as `0x${string}`,
         abi: UrimMarketABI.abi as any,
         functionName: "createMarket",
-        args: [question, outcomes, endTimestamp],
+        args: [question, validOutcomes, BigInt(endTimestamp)],
       } as any);
       
       toast({
-        title: "⚡ Market Created",
+        title: "⚡ Market Created!",
         description: (
           <div className="space-y-2">
-            <p>Your market is now live on Base Sepolia</p>
+            <p>{question}</p>
             <button
               onClick={() => window.open(getExplorerTxUrl(txHash as string), '_blank')}
               className="text-xs text-primary hover:underline flex items-center gap-1"
@@ -98,14 +89,12 @@ const CreateBet = () => {
         )
       });
       
-      setTimeout(() => {
-        navigate("/");
-      }, 1500);
-    } catch (error) {
-      console.error("Failed to create market:", error);
+      setTimeout(() => navigate("/"), 2000);
+    } catch (error: any) {
+      console.error(error);
       toast({
-        title: "Transaction Failed",
-        description: "Could not create market. Please try again.",
+        title: "Transaction failed",
+        description: error?.shortMessage || "Try again",
         variant: "destructive",
       });
     } finally {
@@ -114,117 +103,119 @@ const CreateBet = () => {
   };
 
   return (
-    <div className="min-h-screen w-full bg-background">
+    <div className="min-h-screen w-full bg-background relative overflow-hidden">
+      <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-transparent pointer-events-none" />
+      
       <Navigation />
       
-      <div className="pt-32 pb-24 px-6">
-        <div className="max-w-2xl mx-auto">
-          <div className="text-center mb-12 animate-fade-up">
-            <h1 className="text-5xl font-bold mb-4 text-primary flex items-center justify-center gap-3">
-              <Sparkles className="w-12 h-12" />
-              CREATE EVERYTHING BET
-            </h1>
-            <p className="text-lg text-muted-foreground">
-              Create a prediction market for any question
+      <section className="relative max-w-4xl mx-auto px-6 pt-32 pb-16">
+        <Card className="p-8 border-primary/20 bg-background/95 space-y-8 hover:border-primary/30 transition-all animate-fade-in">
+          <div className="space-y-2">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center shadow-lg shadow-primary/20">
+                <TrendingUp className="w-6 h-6 text-background" />
+              </div>
+              <h1 className="text-3xl font-bold">Create Everything Bet</h1>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Create a custom prediction market for any question.
             </p>
           </div>
 
-          <Card className="p-8 animate-fade-up" style={{ animationDelay: "0.2s" }}>
-            <div className="space-y-6">
-              {/* Question */}
-              <div>
-                <Label htmlFor="question" className="text-foreground font-bold mb-2 block">
-                  QUESTION
-                </Label>
-                <Input
-                  id="question"
-                  placeholder="What event do you want to predict?"
-                  value={question}
-                  onChange={(e) => setQuestion(e.target.value)}
-                />
-              </div>
+          <div className="space-y-6">
+            <div className="space-y-3">
+              <Label htmlFor="question" className="text-sm font-semibold">
+                Question
+              </Label>
+              <Input
+                id="question"
+                placeholder="e.g., Will BTC reach $100k by end of 2024?"
+                value={question}
+                onChange={(e) => setQuestion(e.target.value)}
+                className="bg-background/50 border-primary/20 focus:border-primary/40"
+              />
+            </div>
 
-              {/* Outcomes */}
-              <div>
-                <Label className="text-foreground font-bold mb-2 block">
-                  OPTIONS (2-3 outcomes)
-                </Label>
-                
-                <div className="space-y-3">
-                  {outcomes.map((outcome, index) => (
-                    <div key={index} className="flex gap-2">
-                      <Input
-                        placeholder={`Option ${index + 1}`}
-                        value={outcome}
-                        onChange={(e) => handleOutcomeChange(index, e.target.value)}
-                      />
-                      {outcomes.length > 2 && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => removeOutcome(index)}
-                        >
-                          Remove
-                        </Button>
-                      )}
-                    </div>
-                  ))}
-                  {outcomes.length < 3 && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={addOutcome}
-                      className="w-full"
-                    >
-                      + Add Option
-                    </Button>
-                  )}
-                </div>
-              </div>
-
-              {/* Duration */}
-              <div>
-                <Label htmlFor="duration" className="text-foreground font-bold mb-2 block">
-                  DURATION (days)
-                </Label>
-                <Input
-                  id="duration"
-                  type="number"
-                  min="1"
-                  max="365"
-                  value={duration}
-                  onChange={(e) => setDuration(e.target.value)}
-                />
-              </div>
-
-              {/* Create Button */}
-              <Button
-                onClick={handleCreateMarket}
-                disabled={isCreating}
-                className="w-full h-14 text-base mt-8"
-              >
-                {isCreating ? "CREATING MARKET..." : "CREATE MARKET"}
-              </Button>
-
-              {/* Avail Bridge */}
-              <div className="mt-6 pt-6 border-t border-border/30">
-                <Button
-                  variant="outline"
-                  className="w-full h-12"
-                  onClick={() => {
-                    toast({
-                      title: "Avail Bridge",
-                      description: "Bridge & Execute functionality coming soon."
-                    });
-                  }}
-                >
-                  Bridge & Execute with Avail
-                </Button>
+            <div className="space-y-3">
+              <Label className="text-sm font-semibold">Outcomes</Label>
+              <div className="space-y-2">
+                {outcomes.map((outcome, index) => (
+                  <div key={index} className="flex gap-2">
+                    <Input
+                      placeholder={`Outcome ${index + 1}`}
+                      value={outcome}
+                      onChange={(e) => handleOutcomeChange(index, e.target.value)}
+                      className="flex-1 bg-background/50 border-primary/20 focus:border-primary/40"
+                    />
+                    {outcomes.length > 2 && (
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() => removeOutcome(index)}
+                        className="border-destructive/30 hover:bg-destructive/10 hover:border-destructive/50"
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    )}
+                  </div>
+                ))}
+                {outcomes.length < 3 && (
+                  <Button
+                    variant="outline"
+                    onClick={addOutcome}
+                    className="w-full border-primary/30 hover:bg-primary/5 hover:border-primary/50"
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Outcome
+                  </Button>
+                )}
               </div>
             </div>
-          </Card>
-        </div>
-      </div>
+
+            <div className="space-y-3">
+              <Label htmlFor="duration" className="text-sm font-semibold">
+                Duration (hours)
+              </Label>
+              <Input
+                id="duration"
+                type="number"
+                placeholder="24"
+                value={duration}
+                onChange={(e) => setDuration(e.target.value)}
+                className="bg-background/50 border-primary/20 focus:border-primary/40"
+              />
+            </div>
+
+            <Button
+              onClick={handleCreateMarket}
+              disabled={isCreating}
+              className="w-full bg-gradient-to-r from-primary to-primary/70 hover:shadow-lg hover:shadow-primary/20 transition-all"
+              size="lg"
+            >
+              {isCreating ? "Creating..." : "Create Market"}
+            </Button>
+
+            <div className="pt-4 border-t border-border/30">
+              <Button
+                variant="outline"
+                className="w-full border-primary/30 hover:bg-primary/5 hover:border-primary/50 transition-all group"
+                onClick={() => {
+                  toast({ 
+                    title: "🪐 Bridge & Execute", 
+                    description: "Cross-chain bridging with Avail coming soon!" 
+                  });
+                }}
+              >
+                <span className="mr-2">🪐</span>
+                Bridge & Execute with Avail
+                <span className="ml-2 text-xs text-muted-foreground group-hover:text-primary transition-colors">
+                  (Cross-chain in one click)
+                </span>
+              </Button>
+            </div>
+          </div>
+        </Card>
+      </section>
 
       <Footer />
     </div>
