@@ -8,6 +8,7 @@ import { Sparkles, Zap, RefreshCw, ChevronUp } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAllMarkets } from "@/hooks/useMarkets";
 import { URIM_QUANTUM_MARKET_ADDRESS, URIM_MARKET_ADDRESS, USDC_ADDRESS } from "@/constants/contracts";
+import { getExplorerTxUrl } from "@/constants/blockscout";
 import UrimQuantumMarketABI from "@/contracts/UrimQuantumMarket.json";
 import UrimMarketABI from "@/contracts/UrimMarket.json";
 import ERC20ABI from "@/contracts/ERC20.json";
@@ -253,7 +254,7 @@ const Index = () => {
       const priceFeedId = ETH_USD_PRICE_FEED as `0x${string}`;
       const targetPrice = Math.round(currentPrice);
 
-      const tx = await writeContractAsync({
+      const txHash = await writeContractAsync({
         address: URIM_QUANTUM_MARKET_ADDRESS as `0x${string}`,
         abi: UrimQuantumMarketABI.abi as any,
         functionName: "createQuantumMarket",
@@ -261,7 +262,22 @@ const Index = () => {
         gas: BigInt(3_000_000),
       } as any);
 
-      toast({ title: "✅ New Quantum Market Created!", description: "You can now place bets on the outcomes" });
+      toast({ 
+        title: "✅ New Quantum Market Created!", 
+        description: (
+          <div className="flex flex-col gap-2">
+            <span>You can now place bets on the outcomes</span>
+            <a 
+              href={getExplorerTxUrl(txHash)} 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-primary hover:underline"
+            >
+              View on BlockScout →
+            </a>
+          </div>
+        )
+      });
 
       // Wait for the market to be created and get the ID
       setTimeout(() => {
@@ -312,7 +328,7 @@ const Index = () => {
       // Convert threshold to Pyth price format (price * 10^8)
       const targetPrice = BigInt(Math.round(market.threshold * 1e8));
 
-      await writeContractAsync({
+      const txHash = await writeContractAsync({
         address: URIM_QUANTUM_MARKET_ADDRESS as `0x${string}`,
         abi: UrimQuantumMarketABI.abi as any,
         functionName: "createMarket",
@@ -320,7 +336,22 @@ const Index = () => {
         gas: BigInt(3_000_000),
       } as any);
 
-      toast({ title: "✅ Pyth Market Created!", description: "Market is now ready for betting" });
+      toast({ 
+        title: "✅ Pyth Market Created!", 
+        description: (
+          <div className="flex flex-col gap-2">
+            <span>Market is now ready for betting</span>
+            <a 
+              href={getExplorerTxUrl(txHash)} 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-primary hover:underline"
+            >
+              View on BlockScout →
+            </a>
+          </div>
+        )
+      });
 
       // Wait a bit for the blockchain to update, then fetch new market ID
       setTimeout(() => {
@@ -361,21 +392,33 @@ const Index = () => {
         address: USDC_ADDRESS as `0x${string}`,
         abi: ERC20ABI.abi as any,
         functionName: "approve",
-        args: [URIM_MARKET_ADDRESS, amountWei],
+        args: [URIM_QUANTUM_MARKET_ADDRESS, amountWei],
       } as any);
 
       // Place bet
-      await writeContractAsync({
-        address: URIM_MARKET_ADDRESS as `0x${string}`,
-        abi: UrimMarketABI.abi as any,
-        functionName: "buyShares",
+      const txHash = await writeContractAsync({
+        address: URIM_QUANTUM_MARKET_ADDRESS as `0x${string}`,
+        abi: UrimQuantumMarketABI.abi as any,
+        functionName: "buyScenarioShares",
         args: [market.marketId, BigInt(outcomeIndex), amountWei],
         gas: BigInt(3_000_000),
       } as any);
 
       toast({
         title: "✅ Bet Placed!",
-        description: `You bet ${market.betAmount} USDC on ${market.selectedOutcome.toUpperCase()}`,
+        description: (
+          <div className="flex flex-col gap-2">
+            <span>You bet {market.betAmount} USDC on {market.selectedOutcome.toUpperCase()}</span>
+            <a 
+              href={getExplorerTxUrl(txHash)} 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-primary hover:underline"
+            >
+              View on BlockScout →
+            </a>
+          </div>
+        )
       });
 
       setPythMarkets(prev => prev.map((m, i) => i === marketIndex ? { ...m, betAmount: '', betting: false } : m));
@@ -449,7 +492,7 @@ const Index = () => {
       } as any);
 
       // Place bet
-      await writeContractAsync({
+      const txHash = await writeContractAsync({
         address: URIM_QUANTUM_MARKET_ADDRESS as `0x${string}`,
         abi: UrimQuantumMarketABI.abi as any,
         functionName: "buyScenarioShares",
@@ -459,7 +502,19 @@ const Index = () => {
 
       toast({
         title: "✅ Bet placed!",
-        description: `You bet ${amount} USDC on ${scenarioIndex === 0 ? 'YES' : 'NO'}`,
+        description: (
+          <div className="flex flex-col gap-2">
+            <span>You bet {amount} USDC on {scenarioIndex === 0 ? 'YES' : 'NO'}</span>
+            <a 
+              href={getExplorerTxUrl(txHash)} 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-primary hover:underline"
+            >
+              View on BlockScout →
+            </a>
+          </div>
+        )
       });
 
       setLiveQuantumMarkets(prev => prev.map((m, i) => {
@@ -546,7 +601,7 @@ const Index = () => {
               </div>
               <h3 className="text-2xl font-bold">⚡ Avail Nexus Integration</h3>
             </div>
-            {nexusInitialized && (
+          {nexusInitialized && (
               <Button
                 onClick={fetchBalances}
                 disabled={balanceLoading}
@@ -559,21 +614,7 @@ const Index = () => {
             )}
           </div>
 
-          {!nexusInitialized ? (
-            <div className="space-y-4">
-              <p className="text-muted-foreground">
-                Initialize Avail Nexus to access your unified balance across chains and enable seamless bridging.
-              </p>
-              <Button 
-                onClick={handleInitNexus}
-                disabled={initializingNexus || !isConnected}
-                className="w-full bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800"
-                size="lg"
-              >
-                {initializingNexus ? "Initializing..." : "Initialize Nexus"}
-              </Button>
-            </div>
-          ) : (
+          {nexusInitialized && (
             <div className="space-y-4">
               {balanceLoading ? (
                 <div className="flex items-center justify-center gap-3 py-8">
@@ -642,16 +683,10 @@ const Index = () => {
               )}
 
               <div className="pt-4">
-                {!isOnOptimismSepolia ? (
-                  <Button 
-                    onClick={() => switchChain({ chainId: optimismSepolia.id })}
-                    className="w-full"
-                    size="lg"
-                    variant="outline"
-                  >
-                    Switch to Optimism Sepolia
-                  </Button>
-                ) : (
+                <div className="text-sm text-muted-foreground text-center mb-3">
+                  Use "Bridge & Bet" buttons in markets below to bridge from Optimism Sepolia
+                </div>
+                {isOnOptimismSepolia && (
                   <BridgeAndExecuteButton
                     contractAddress={URIM_QUANTUM_MARKET_ADDRESS as `0x${string}`}
                     contractAbi={UrimQuantumMarketABI.abi as any}
@@ -672,7 +707,7 @@ const Index = () => {
                         className="w-full bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800"
                         size="lg"
                       >
-                        {isLoading ? "🌉 Bridging..." : "Bridge & Bet with Avail"}
+                        {isLoading ? "🌉 Bridging..." : "Bridge & Bet Example"}
                       </Button>
                     )}
                   </BridgeAndExecuteButton>

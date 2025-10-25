@@ -2,8 +2,9 @@ import { BridgeAndExecuteButton } from '@avail-project/nexus-widgets';
 import { useAccount, useSwitchChain } from 'wagmi';
 import { optimismSepolia, baseSepolia } from 'wagmi/chains';
 import { parseUnits } from 'viem';
+import { URIM_QUANTUM_MARKET_ADDRESS } from '@/constants/contracts';
 
-const URIM_QUANTUM_MARKET: `0x${string}` = '0xc0c5a6a7faa3255305be6e1cd7dd3c2e4a81f776';
+const URIM_QUANTUM_MARKET: `0x${string}` = URIM_QUANTUM_MARKET_ADDRESS as `0x${string}`;
 
 const QUANTUM_MARKET_ABI = [{
   name: 'buyScenarioShares',
