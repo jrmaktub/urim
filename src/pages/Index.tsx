@@ -19,6 +19,8 @@ import { parseUnits, formatUnits } from "viem";
 import { getExplorerTxUrl } from "@/constants/blockscout";
 import PythPriceTicker from "@/components/PythPriceTicker";
 import { EvmPriceServiceConnection } from "@pythnetwork/pyth-evm-js";
+import { initializeWithProvider, isInitialized } from "@/lib/nexus";
+import { BridgeAndExecuteButton } from '@avail-project/nexus-widgets';
 
 const ETH_USD_PRICE_FEED = "0xff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace";
 const connection = new EvmPriceServiceConnection("https://hermes.pyth.network");
@@ -30,7 +32,7 @@ interface AIBetIdea {
 }
 
 const Index = () => {
-  const { address } = useAccount();
+  const { address, connector } = useAccount();
   const { toast } = useToast();
   const { writeContractAsync } = useWriteContract();
   const [question, setQuestion] = useState("");
@@ -42,6 +44,24 @@ const Index = () => {
   const [aiBetIdeas, setAiBetIdeas] = useState<AIBetIdea[]>([]);
   const [creatingAIBet, setCreatingAIBet] = useState<number | null>(null);
   const [pythBetAmounts, setPythBetAmounts] = useState<{ [key: number]: number }>({});
+
+  // Auto-initialize Nexus SDK on wallet connect
+  useEffect(() => {
+    const initNexus = async () => {
+      if (address && connector && !isInitialized()) {
+        try {
+          const provider = await connector.getProvider();
+          if (provider) {
+            await initializeWithProvider(provider);
+            console.log("Nexus SDK initialized");
+          }
+        } catch (error) {
+          console.error("Failed to initialize Nexus:", error);
+        }
+      }
+    };
+    initNexus();
+  }, [address, connector]);
 
   const { quantumMarketIds, everythingMarketIds } = useAllMarkets();
 
@@ -221,12 +241,37 @@ const Index = () => {
 
     try {
       const duration = Math.floor(Date.now() / 1000) + 86400; // 24h from now
+      const amountWei = parseUnits(amount.toString(), 6);
 
+      // Create market on UrimMarket (Quantum Pyth)
       const createTx = await writeContractAsync({
         address: URIM_MARKET_ADDRESS as `0x${string}`,
         abi: UrimMarketABI.abi as any,
         functionName: "createMarket",
         args: [idea.question, idea.outcomes, BigInt(duration)],
+      } as any);
+
+      toast({ title: "⏳ Market created, placing bet..." });
+      await new Promise(resolve => setTimeout(resolve, 3000));
+
+      // Approve USDC
+      await writeContractAsync({
+        address: USDC_ADDRESS as `0x${string}`,
+        abi: ERC20ABI.abi as any,
+        functionName: "approve",
+        args: [URIM_MARKET_ADDRESS, amountWei],
+      } as any);
+
+      // Get latest market ID
+      const latestId = everythingMarketIds.length > 0 ? everythingMarketIds[everythingMarketIds.length - 1] : BigInt(0);
+      const newMarketId = latestId + BigInt(1);
+
+      // Buy shares
+      const betTx = await writeContractAsync({
+        address: URIM_MARKET_ADDRESS as `0x${string}`,
+        abi: UrimMarketABI.abi as any,
+        functionName: "buyShares",
+        args: [newMarketId, BigInt(outcomeIndex), amountWei],
       } as any);
 
       toast({
@@ -235,7 +280,7 @@ const Index = () => {
           <div className="space-y-2">
             <p>{amount} USDC on "{idea.outcomes[outcomeIndex]}"</p>
             <button
-              onClick={() => window.open(getExplorerTxUrl(createTx as string), '_blank')}
+              onClick={() => window.open(getExplorerTxUrl(betTx as string), '_blank')}
               className="text-xs text-primary hover:underline flex items-center gap-1"
             >
               View on BlockScout →
@@ -376,19 +421,46 @@ const Index = () => {
 
                       {/* Avail Bridge Button */}
                       <div className="pt-3 border-t border-border/30">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="w-full border-primary/30 hover:bg-primary/5 hover:border-primary/50 text-xs"
-                          onClick={() => {
-                            toast({ 
-                              title: "🪐 Bridge & Execute with Avail", 
-                              description: "Bridge and bet across chains in one click." 
-                            });
+                        <BridgeAndExecuteButton
+                          contractAddress={URIM_QUANTUM_MARKET_ADDRESS}
+                          contractAbi={UrimQuantumMarketABI.abi as any}
+                          functionName="createQuantumMarket"
+                          buildFunctionParams={() => {
+                            const delta = 500;
+                            const lowerBound = Math.floor(currentPrice - delta);
+                            const upperBound = Math.ceil(currentPrice + delta);
+                            const priceBoundaries = [BigInt(lowerBound * 100000000), BigInt(upperBound * 100000000)];
+                            const duration = BigInt(86400);
+                            const probs = [BigInt(50), BigInt(50)];
+                            
+                            return {
+                              functionParams: [question, scenarios, probs, duration, ETH_USD_PRICE_FEED as `0x${string}`, priceBoundaries]
+                            };
+                          }}
+                          prefill={{
+                            toChainId: 84532, // Base Sepolia
+                            token: 'USDC',
+                            amount: betAmounts[i] || '0.1'
                           }}
                         >
-                          🪐 Bridge & Execute with Avail
-                        </Button>
+                          {({ onClick, isLoading, disabled }) => (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="w-full border-primary/30 hover:bg-primary/5 hover:border-primary/50 text-xs"
+                              onClick={() => {
+                                onClick();
+                                toast({
+                                  title: "✅ Bridging & executing via Avail",
+                                  description: "View transaction on Blockscout after confirmation"
+                                });
+                              }}
+                              disabled={isLoading || disabled}
+                            >
+                              {isLoading ? '⏳ Bridging...' : '🪐 Bridge & Execute with Avail'}
+                            </Button>
+                          )}
+                        </BridgeAndExecuteButton>
                       </div>
                     </Card>
                   ))}
