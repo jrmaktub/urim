@@ -21,6 +21,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { optimismSepolia, baseSepolia } from 'wagmi/chains';
 import Bridge from '@/components/BridgeButton';
 
+import LiveQuantumMarkets from "@/components/LiveQuantumMarkets";
 
 const ETH_USD_PRICE_FEED = "0xff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace";
 const connection = new EvmPriceServiceConnection("https://hermes.pyth.network");
@@ -1008,6 +1009,11 @@ const Index = () => {
             </div>
           ))}
         </div>
+      </section>
+
+      {/* Live Quantum Markets */}
+      <section className="max-w-6xl mx-auto px-6 pb-16">
+        <LiveQuantumMarkets />
       </section>
 
       <Footer />
