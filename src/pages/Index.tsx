@@ -47,7 +47,14 @@ const Index = () => {
   const [bettingIdx, setBettingIdx] = useState<number | null>(null);
   const [bridgingIdx, setBridgingIdx] = useState<number | null>(null);
   const [creatingQuantumMarket, setCreatingQuantumMarket] = useState(false);
-  const [quantumMarketId, setQuantumMarketId] = useState<bigint | null>(null);
+  const [liveQuantumMarkets, setLiveQuantumMarkets] = useState<Array<{
+    marketId: bigint;
+    question: string;
+    scenarios: string[];
+    betAmounts: string[];
+    bettingIdx: number | null;
+    bridgingIdx: number | null;
+  }>>([]);
   
   const [nexusInitialized, setNexusInitialized] = useState(false);
   const [processedBalances, setProcessedBalances] = useState<ProcessedBalance[]>([]);
@@ -223,7 +230,6 @@ const Index = () => {
 
     setGenerating(true);
     setScenarios([]);
-    setQuantumMarketId(null);
     setCreatingQuantumMarket(true);
 
     try {
@@ -255,13 +261,20 @@ const Index = () => {
         gas: BigInt(3_000_000),
       } as any);
 
-      toast({ title: "✅ Market created successfully", description: "You can now place bets on the outcomes" });
+      toast({ title: "✅ New Quantum Market Created!", description: "You can now place bets on the outcomes" });
 
       // Wait for the market to be created and get the ID
       setTimeout(() => {
         if (quantumMarketIds && quantumMarketIds.length > 0) {
           const newMarketId = quantumMarketIds[quantumMarketIds.length - 1];
-          setQuantumMarketId(newMarketId);
+          setLiveQuantumMarkets(prev => [...prev, {
+            marketId: newMarketId,
+            question: question.trim(),
+            scenarios: finalScenarios,
+            betAmounts: ["", ""],
+            bettingIdx: null,
+            bridgingIdx: null,
+          }]);
         }
       }, 2000);
 
@@ -403,19 +416,24 @@ const Index = () => {
     }
   };
 
-  const placeBet = async (scenarioIndex: number) => {
-    if (!address || !quantumMarketId) {
-      toast({ title: "Market not ready", description: "Please wait for market creation.", variant: "destructive" });
+  const placeBet = async (marketIndex: number, scenarioIndex: number) => {
+    if (!address) {
+      toast({ title: "Connect wallet", variant: "destructive" });
       return;
     }
 
-    const amount = betAmounts[scenarioIndex];
+    const market = liveQuantumMarkets[marketIndex];
+    if (!market) return;
+
+    const amount = market.betAmounts[scenarioIndex];
     if (!amount || parseFloat(amount) <= 0) {
       toast({ title: "Enter bet amount", variant: "destructive" });
       return;
     }
 
-    setBettingIdx(scenarioIndex);
+    setLiveQuantumMarkets(prev => prev.map((m, i) => 
+      i === marketIndex ? { ...m, bettingIdx: scenarioIndex } : m
+    ));
 
     try {
       toast({ title: "Placing bet...", description: "Confirm transactions in wallet" });
@@ -435,7 +453,7 @@ const Index = () => {
         address: URIM_QUANTUM_MARKET_ADDRESS as `0x${string}`,
         abi: UrimQuantumMarketABI.abi as any,
         functionName: "buyScenarioShares",
-        args: [quantumMarketId, BigInt(scenarioIndex), amountWei],
+        args: [market.marketId, BigInt(scenarioIndex), amountWei],
         gas: BigInt(3_000_000),
       } as any);
 
@@ -444,11 +462,14 @@ const Index = () => {
         description: `You bet ${amount} USDC on ${scenarioIndex === 0 ? 'YES' : 'NO'}`,
       });
 
-      setBetAmounts(prev => {
-        const newAmounts = [...prev];
-        newAmounts[scenarioIndex] = '';
-        return newAmounts;
-      });
+      setLiveQuantumMarkets(prev => prev.map((m, i) => {
+        if (i === marketIndex) {
+          const newAmounts = [...m.betAmounts];
+          newAmounts[scenarioIndex] = '';
+          return { ...m, betAmounts: newAmounts };
+        }
+        return m;
+      }));
     } catch (error: any) {
       console.error("Error placing bet:", error);
       toast({
@@ -457,29 +478,36 @@ const Index = () => {
         variant: "destructive",
       });
     } finally {
-      setBettingIdx(null);
+      setLiveQuantumMarkets(prev => prev.map((m, i) => 
+        i === marketIndex ? { ...m, bettingIdx: null } : m
+      ));
     }
   };
 
-  const bridgeAndBet = async (scenarioIndex: number) => {
-    if (!address || !quantumMarketId) {
-      toast({ title: "Market not ready", description: "Please wait for market creation.", variant: "destructive" });
+  const bridgeAndBet = async (marketIndex: number, scenarioIndex: number) => {
+    if (!address) {
+      toast({ title: "Connect wallet", variant: "destructive" });
       return;
     }
 
-    const amount = betAmounts[scenarioIndex];
+    const market = liveQuantumMarkets[marketIndex];
+    if (!market) return;
+
+    const amount = market.betAmounts[scenarioIndex];
     if (!amount || parseFloat(amount) <= 0) {
       toast({ title: "Enter bet amount", variant: "destructive" });
       return;
     }
 
-    setBridgingIdx(scenarioIndex);
+    setLiveQuantumMarkets(prev => prev.map((m, i) => 
+      i === marketIndex ? { ...m, bridgingIdx: scenarioIndex } : m
+    ));
 
     try {
       toast({ title: "🌉 Bridging with Avail...", description: "This may take a moment" });
       
       // For now, fall back to direct bet (full bridge+execute integration to be added)
-      await placeBet(scenarioIndex);
+      await placeBet(marketIndex, scenarioIndex);
     } catch (error: any) {
       console.error("Bridge failed:", error);
       toast({
@@ -488,7 +516,9 @@ const Index = () => {
         variant: "destructive",
       });
     } finally {
-      setBridgingIdx(null);
+      setLiveQuantumMarkets(prev => prev.map((m, i) => 
+        i === marketIndex ? { ...m, bridgingIdx: null } : m
+      ));
     }
   };
 
@@ -686,7 +716,7 @@ const Index = () => {
             {generating ? (
               <>
                 <Sparkles className="w-4 h-4 mr-2 animate-pulse" />
-                {creatingQuantumMarket ? "Creating Market..." : "Generating AI scenarios..."}
+                {creatingQuantumMarket ? "Generating Market..." : "Generating AI scenarios..."}
               </>
             ) : (
               <>
@@ -695,83 +725,117 @@ const Index = () => {
               </>
             )}
           </Button>
-
-          {scenarios.length > 0 && (
-            <div className="grid grid-cols-2 gap-4 pt-4 animate-fade-in">
-              {scenarios.map((scenario, idx) => (
-                <div 
-                  key={idx}
-                  className="p-6 rounded-xl border-2 border-primary/30 bg-primary/5 hover:border-primary/50 transition-all"
-                >
-                  <div className="text-xs font-bold text-primary mb-2 uppercase">
-                    {idx === 0 ? "Yes" : "No"}
-                  </div>
-                  <div className="text-sm mb-4 min-h-[3rem]">{scenario}</div>
-                  
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-muted-foreground">💰</span>
-                      <Input 
-                        type="number"
-                        placeholder="0.1"
-                        value={betAmounts[idx]}
-                        onChange={(e) => {
-                          const newAmounts = [...betAmounts];
-                          newAmounts[idx] = e.target.value;
-                          setBetAmounts(newAmounts);
-                        }}
-                        className="flex-1 font-semibold"
-                        style={{
-                          background: '#171218',
-                          color: '#FFFFFF',
-                          border: '1px solid #6B4FFF',
-                        }}
-                        onFocus={(e) => e.target.style.borderColor = '#9F7BFF'}
-                        onBlur={(e) => e.target.style.borderColor = '#6B4FFF'}
-                      />
-                      <span className="text-sm font-bold" style={{ color: '#D9CCFF', opacity: 0.9 }}>USDC</span>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Button 
-                        onClick={() => placeBet(idx)}
-                        disabled={bettingIdx !== null || bridgingIdx !== null || !quantumMarketId}
-                        className="w-full font-semibold"
-                        style={{
-                          background: '#A77BFF',
-                        }}
-                        onMouseEnter={(e) => e.currentTarget.style.background = '#C6A5FF'}
-                        onMouseLeave={(e) => e.currentTarget.style.background = '#A77BFF'}
-                        size="sm"
-                      >
-                        {bettingIdx === idx ? "Placing..." : "Bet"}
-                      </Button>
-
-                      <Button 
-                        onClick={() => bridgeAndBet(idx)}
-                        disabled={bettingIdx !== null || bridgingIdx !== null || !quantumMarketId}
-                        variant="outline"
-                        className="w-full font-semibold rounded-full"
-                        style={{
-                          border: '1px solid #9F7BFF',
-                          color: '#D4C3FF',
-                          background: 'transparent',
-                          boxShadow: '0 0 8px rgba(167,123,255,0.25)',
-                        }}
-                        onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(167,123,255,0.15)'}
-                        onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-                        size="sm"
-                      >
-                        {bridgingIdx === idx ? "Bridging..." : "Bridge & Bet with Avail"}
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
         </div>
       </section>
+
+      {liveQuantumMarkets.length > 0 && (
+        <section className="max-w-4xl mx-auto px-6 pb-16">
+          <div className="text-center mb-8">
+            <h2 className="text-4xl font-bold mb-3" style={{ color: '#CDBBFF', fontSize: '1.5rem', fontWeight: 700, marginBottom: '24px' }}>
+              🧠 Live Quantum Markets
+            </h2>
+            <p className="text-muted-foreground text-lg">Active AI-generated markets you can bet on below.</p>
+          </div>
+
+          <div className="space-y-8">
+            {liveQuantumMarkets.map((market, marketIndex) => (
+              <div 
+                key={marketIndex}
+                className="glass-card p-6"
+                style={{
+                  borderRadius: '20px',
+                  border: '1px solid #4B2AFF',
+                  background: 'rgba(32, 24, 48, 0.5)',
+                  padding: '20px',
+                  boxShadow: '0 0 16px rgba(139, 109, 255, 0.15)',
+                }}
+              >
+                <h3 className="text-xl font-bold text-center mb-6">{market.question}</h3>
+                
+                <div className="grid grid-cols-2 gap-6">
+                  {market.scenarios.map((scenario, scenarioIdx) => (
+                    <div 
+                      key={scenarioIdx}
+                      className="p-6 rounded-xl border-2 border-primary/30 bg-primary/5 hover:border-primary/50 transition-all"
+                    >
+                      <div className="text-xs font-bold text-primary mb-2 uppercase">
+                        {scenarioIdx === 0 ? "Yes" : "No"}
+                      </div>
+                      <div className="text-sm mb-4 min-h-[3rem]">{scenario}</div>
+                      
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-muted-foreground">💰</span>
+                          <Input 
+                            type="number"
+                            placeholder="0.1"
+                            value={market.betAmounts[scenarioIdx]}
+                            onChange={(e) => {
+                              setLiveQuantumMarkets(prev => prev.map((m, i) => {
+                                if (i === marketIndex) {
+                                  const newAmounts = [...m.betAmounts];
+                                  newAmounts[scenarioIdx] = e.target.value;
+                                  return { ...m, betAmounts: newAmounts };
+                                }
+                                return m;
+                              }));
+                            }}
+                            className="flex-1 font-semibold"
+                            style={{
+                              background: '#171218',
+                              color: '#FFFFFF',
+                              border: '1px solid #6B4FFF',
+                              fontWeight: 600,
+                            }}
+                            onFocus={(e) => e.target.style.borderColor = '#9F7BFF'}
+                            onBlur={(e) => e.target.style.borderColor = '#6B4FFF'}
+                          />
+                          <span className="text-sm font-bold" style={{ color: '#D9CCFF' }}>USDC</span>
+                        </div>
+                        
+                        <div className="space-y-2.5">
+                          <Button 
+                            onClick={() => placeBet(marketIndex, scenarioIdx)}
+                            disabled={market.bettingIdx !== null || market.bridgingIdx !== null}
+                            className="w-full font-semibold"
+                            style={{
+                              background: '#A77BFF',
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.background = '#C6A5FF'}
+                            onMouseLeave={(e) => e.currentTarget.style.background = '#A77BFF'}
+                            size="sm"
+                          >
+                            {market.bettingIdx === scenarioIdx ? "Placing..." : "Bet"}
+                          </Button>
+
+                          <Button 
+                            onClick={() => bridgeAndBet(marketIndex, scenarioIdx)}
+                            disabled={market.bettingIdx !== null || market.bridgingIdx !== null}
+                            variant="outline"
+                            className="w-full font-semibold rounded-full"
+                            style={{
+                              border: '1px solid #A77BFF',
+                              color: '#D4C3FF',
+                              background: 'transparent',
+                              boxShadow: '0 0 8px rgba(167,123,255,0.25)',
+                              fontWeight: 600,
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(167,123,255,0.15)'}
+                            onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                            size="sm"
+                          >
+                            {market.bridgingIdx === scenarioIdx ? "Bridging..." : "Bridge & Bet with Avail"}
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       <PythPriceTicker />
       <section className="max-w-4xl mx-auto px-6 pb-24">
