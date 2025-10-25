@@ -645,25 +645,15 @@ const Index = () => {
               Cross-chain unified balance powered by Avail Nexus
             </p>
 
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <p className="text-sm text-muted-foreground mb-1">Unified Balance</p>
-                <p className="text-3xl font-bold text-purple-400">
-                  {balanceLoading || initializingNexus ? (
-                    <span className="text-lg">Loading...</span>
-                  ) : (
-                    `${unifiedBalance} ETH`
-                  )}
-                </p>
-              </div>
-              <Button
-                onClick={() => switchChain({ chainId: optimismSepolia.id })}
-                variant="outline"
-                className="border-purple-500/50 hover:bg-purple-500/10 hover:text-purple-300"
-                disabled={isOnOptimismSepolia}
-              >
-                {isOnOptimismSepolia ? "On Optimism Sepolia" : "Switch to Optimism Sepolia"}
-              </Button>
+            <div className="mb-6">
+              <p className="text-sm text-muted-foreground mb-1">Unified Balance</p>
+              <p className="text-3xl font-bold text-purple-400">
+                {balanceLoading || initializingNexus ? (
+                  <span className="text-lg">Loading...</span>
+                ) : (
+                  `${unifiedBalance} ETH`
+                )}
+              </p>
             </div>
 
             {nexusInitialized && (
@@ -738,32 +728,30 @@ const Index = () => {
                 <div className="text-sm text-muted-foreground text-center mb-3">
                   Use "Bridge & Bet" buttons in markets below to bridge from Optimism Sepolia
                 </div>
-                {isOnOptimismSepolia && (
-                  <BridgeAndExecuteButton
-                    contractAddress={URIM_QUANTUM_MARKET_ADDRESS as `0x${string}`}
-                    contractAbi={UrimQuantumMarketABI.abi as any}
-                    functionName="buyScenarioShares"
-                    buildFunctionParams={() => ({
-                      functionParams: [BigInt(0), BigInt(0), parseUnits("1", 6)]
-                    })}
-                    prefill={{
-                      toChainId: baseSepolia.id,
-                      token: 'USDC',
-                      amount: '1'
-                    }}
-                  >
-                    {({ onClick, isLoading, disabled }) => (
-                      <Button
-                        onClick={onClick}
-                        disabled={isLoading || disabled}
-                        className="w-full bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800"
-                        size="lg"
-                      >
-                        {isLoading ? "🌉 Bridging..." : "Bridge & Bet Example"}
-                      </Button>
-                    )}
-                  </BridgeAndExecuteButton>
-                )}
+                <BridgeAndExecuteButton
+                  contractAddress={URIM_QUANTUM_MARKET_ADDRESS as `0x${string}`}
+                  contractAbi={UrimQuantumMarketABI.abi as any}
+                  functionName="buyScenarioShares"
+                  buildFunctionParams={() => ({
+                    functionParams: [BigInt(0), BigInt(0), parseUnits("1", 6)]
+                  })}
+                  prefill={{
+                    toChainId: baseSepolia.id,
+                    token: 'USDC',
+                    amount: '1'
+                  }}
+                >
+                  {({ onClick, isLoading, disabled }) => (
+                    <Button
+                      onClick={onClick}
+                      disabled={isLoading || disabled}
+                      className="w-full bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800"
+                      size="lg"
+                    >
+                      {isLoading ? "🌉 Bridging..." : "Bridge"}
+                    </Button>
+                  )}
+                </BridgeAndExecuteButton>
               </div>
             </div>
           )}
