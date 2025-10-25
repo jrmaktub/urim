@@ -27,18 +27,20 @@ type MarketData = {
 };
 
 export default function LiveQuantumMarkets() {
-  const { address } = useAccount();
+  const { address, chain } = useAccount();
   const { toast } = useToast();
   const { writeContractAsync } = useWriteContract();
   const [markets, setMarkets] = useState<MarketData[]>([]);
   const [betAmounts, setBetAmounts] = useState<Record<string, string>>({});
   const [bettingMarkets, setBettingMarkets] = useState<Record<string, 'yes' | 'no' | null>>({});
+  const [bridgeMode, setBridgeMode] = useState<Record<string, boolean>>({});
 
-  // Fetch all market IDs
+  // Fetch all market IDs - always from Base Sepolia
   const { data: marketIdsData, refetch: refetchMarketIds } = useReadContract({
     address: URIM_QUANTUM_MARKET_ADDRESS as `0x${string}`,
     abi: UrimQuantumMarketABI.abi as any,
     functionName: "getAllMarketIds",
+    chainId: baseSepolia.id,
   });
 
   const marketIds = (marketIdsData as bigint[]) || [];
@@ -72,6 +74,16 @@ export default function LiveQuantumMarkets() {
   const placeBet = async (marketId: bigint, isYes: boolean) => {
     if (!address) {
       toast({ title: "Connect Wallet", description: "Please connect your wallet first.", variant: "destructive" });
+      return;
+    }
+
+    // Check if on Base Sepolia for direct betting
+    if (chain?.id !== baseSepolia.id) {
+      toast({ 
+        title: "Wrong Network", 
+        description: "Please switch to Base Sepolia to place bets directly.", 
+        variant: "destructive" 
+      });
       return;
     }
 
@@ -189,6 +201,10 @@ export default function LiveQuantumMarkets() {
               }
               onPlaceBet={placeBet}
               bettingStatus={bettingMarkets[marketId.toString()]}
+              bridgeMode={bridgeMode[marketId.toString()] || false}
+              onBridgeModeToggle={(value) =>
+                setBridgeMode(prev => ({ ...prev, [marketId.toString()]: value }))
+              }
             />
           ))
         )}
@@ -202,13 +218,17 @@ function LiveMarketCard({
   betAmount, 
   onBetAmountChange, 
   onPlaceBet,
-  bettingStatus 
+  bettingStatus,
+  bridgeMode,
+  onBridgeModeToggle
 }: { 
   marketId: bigint;
   betAmount: string;
   onBetAmountChange: (value: string) => void;
   onPlaceBet: (marketId: bigint, isYes: boolean) => void;
   bettingStatus: 'yes' | 'no' | null;
+  bridgeMode: boolean;
+  onBridgeModeToggle: (value: boolean) => void;
 }) {
   const { address, chain } = useAccount();
   const { switchChain } = useSwitchChain();
@@ -216,11 +236,14 @@ function LiveMarketCard({
   const [bridgeChoice, setBridgeChoice] = useState<'yes' | 'no' | null>(null);
 
   const isOnOptimismSepolia = chain?.id === optimismSepolia.id;
+  const isOnBaseSepolia = chain?.id === baseSepolia.id;
+  
   const { data: marketInfo, refetch } = useReadContract({
     address: URIM_QUANTUM_MARKET_ADDRESS as `0x${string}`,
     abi: UrimQuantumMarketABI.abi as any,
     functionName: "getMarketInfo",
     args: [marketId],
+    chainId: baseSepolia.id,
   });
 
   // Auto-refresh every 10 seconds
@@ -316,115 +339,150 @@ function LiveMarketCard({
 
       {isActive && !isResolved && (
         <>
-          <div className="flex gap-2">
-            <Input
-              type="number"
-              placeholder="Amount (USDC)"
-              value={betAmount}
-              onChange={(e) => onBetAmountChange(e.target.value)}
-              className="flex-1 bg-background/50"
-            />
-            <Button
-              onClick={() => onPlaceBet(marketId, true)}
-              disabled={bettingStatus === 'yes' || bettingStatus === 'no'}
-              className="bg-gradient-to-r from-primary to-primary-glow hover:opacity-90"
-            >
-              {bettingStatus === 'yes' ? "Betting..." : "Bet Yes"}
-            </Button>
-            <Button
-              onClick={() => onPlaceBet(marketId, false)}
-              disabled={bettingStatus === 'yes' || bettingStatus === 'no'}
-              className="bg-gradient-to-r from-primary to-primary-glow hover:opacity-90"
-            >
-              {bettingStatus === 'no' ? "Betting..." : "Bet No"}
-            </Button>
-          </div>
-
-          {/* Avail Bridge & Execute Section */}
-          <div className="mt-4 pt-4 border-t border-primary/20" style={{ boxShadow: '0 -1px 0 0 hsl(var(--primary) / 0.2)' }}>
-            <div className="text-xs text-muted-foreground mb-3 flex items-center gap-2">
-              <span className="text-primary">🔗</span>
-              <span>Cross-Chain Bridge (via Avail)</span>
+          {!bridgeMode ? (
+            // Mode 1: Normal Betting
+            <div className="flex gap-2">
+              <Input
+                type="number"
+                placeholder="Amount (USDC)"
+                value={betAmount}
+                onChange={(e) => onBetAmountChange(e.target.value)}
+                className="flex-1 bg-background/50"
+              />
+              {!isOnBaseSepolia ? (
+                <Button
+                  onClick={() => switchChain({ chainId: baseSepolia.id })}
+                  className="bg-gradient-to-r from-orange-500 to-orange-600 hover:opacity-90 whitespace-nowrap"
+                >
+                  Switch to Base
+                </Button>
+              ) : (
+                <>
+                  <Button
+                    onClick={() => onPlaceBet(marketId, true)}
+                    disabled={bettingStatus === 'yes' || bettingStatus === 'no'}
+                    className="bg-gradient-to-r from-primary to-primary-glow hover:opacity-90"
+                  >
+                    {bettingStatus === 'yes' ? "Betting..." : "Bet Yes"}
+                  </Button>
+                  <Button
+                    onClick={() => onPlaceBet(marketId, false)}
+                    disabled={bettingStatus === 'yes' || bettingStatus === 'no'}
+                    className="bg-gradient-to-r from-primary to-primary-glow hover:opacity-90"
+                  >
+                    {bettingStatus === 'no' ? "Betting..." : "Bet No"}
+                  </Button>
+                </>
+              )}
             </div>
-            
-            {!address ? (
-              <div className="text-sm text-muted-foreground text-center py-2">
-                🔒 Connect wallet to enable bridging
+          ) : (
+            // Mode 2: Bridge Mode
+            <div className="space-y-3">
+              <div className="flex gap-2">
+                <Input
+                  type="number"
+                  placeholder="Amount (USDC)"
+                  value={betAmount}
+                  onChange={(e) => onBetAmountChange(e.target.value)}
+                  className="flex-1 bg-background/50"
+                />
               </div>
-            ) : !isOnOptimismSepolia ? (
-              <Button
-                onClick={() => switchChain({ chainId: optimismSepolia.id })}
-                className="w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:opacity-90"
-              >
-                Switch to Optimism Sepolia
-              </Button>
-            ) : (
-              <div className="space-y-3">
-                <div className="flex gap-2">
-                  <Button
-                    onClick={() => setBridgeChoice('yes')}
-                    variant={bridgeChoice === 'yes' ? 'default' : 'outline'}
-                    className="flex-1"
-                  >
-                    🔮 Yes
-                  </Button>
-                  <Button
-                    onClick={() => setBridgeChoice('no')}
-                    variant={bridgeChoice === 'no' ? 'default' : 'outline'}
-                    className="flex-1"
-                  >
-                    🪶 No
-                  </Button>
-                </div>
+              <div className="flex gap-2">
+                <Button
+                  onClick={() => setBridgeChoice('yes')}
+                  variant={bridgeChoice === 'yes' ? 'default' : 'outline'}
+                  className="flex-1"
+                >
+                  🔮 Bridge & Bet Yes
+                </Button>
+                <Button
+                  onClick={() => setBridgeChoice('no')}
+                  variant={bridgeChoice === 'no' ? 'default' : 'outline'}
+                  className="flex-1"
+                >
+                  🪶 Bridge & Bet No
+                </Button>
+              </div>
+            </div>
+          )}
 
-                {bridgeChoice && (
-                  <BridgeAndExecuteButton
-                    contractAddress={URIM_QUANTUM_MARKET_ADDRESS as `0x${string}`}
-                    contractAbi={[{
-                      name: 'buyShares',
-                      type: 'function',
-                      stateMutability: 'nonpayable',
-                      inputs: [
-                        { name: '_marketId', type: 'uint256' },
-                        { name: '_isOptionA', type: 'bool' },
-                        { name: '_amount', type: 'uint256' }
-                      ],
-                      outputs: []
-                    }] as const}
-                    functionName="buyShares"
-                    buildFunctionParams={() => ({
-                      functionParams: [
-                        marketId,
-                        bridgeChoice === 'yes',
-                        parseUnits(betAmount || '1', 6)
-                      ]
-                    })}
-                    prefill={{
-                      toChainId: baseSepolia.id,
-                      token: 'USDC',
-                      amount: betAmount || '1'
-                    }}
-                  >
-                    {({ onClick, isLoading, disabled }) => (
-                      <Button
-                        onClick={() => {
-                          onClick();
-                          toast({ 
-                            title: "🌉 Bridging USDC to Base Sepolia...", 
-                            description: `Betting ${betAmount || '1'} USDC on ${bridgeChoice === 'yes' ? 'YES' : 'NO'}` 
-                          });
-                        }}
-                        disabled={isLoading || disabled || !betAmount}
-                        className="w-full bg-gradient-to-r from-primary to-primary-glow hover:opacity-90"
-                      >
-                        {isLoading ? '⏳ Processing...' : '🔄 Bridge & Execute'}
-                      </Button>
-                    )}
-                  </BridgeAndExecuteButton>
-                )}
-              </div>
-            )}
+          {/* Toggle Bridge Mode Button */}
+          <div className="mt-4 pt-4 border-t border-primary/20">
+            <Button
+              onClick={() => onBridgeModeToggle(!bridgeMode)}
+              variant="outline"
+              className="w-full"
+            >
+              {bridgeMode ? '← Back to Normal Betting' : '🌉 Bridge & Execute'}
+            </Button>
           </div>
+
+          {/* Avail Bridge Widget - Only shown in Bridge Mode */}
+          {bridgeMode && bridgeChoice && (
+            <div className="mt-3 p-4 rounded-lg bg-primary/5 border border-primary/20">
+              <div className="text-xs text-muted-foreground mb-3 flex items-center gap-2">
+                <span className="text-primary">🔗</span>
+                <span>Cross-Chain Bridge via Avail</span>
+              </div>
+              
+              {!address ? (
+                <div className="text-sm text-muted-foreground text-center py-2">
+                  🔒 Connect wallet to enable bridging
+                </div>
+              ) : !isOnOptimismSepolia ? (
+                <Button
+                  onClick={() => switchChain({ chainId: optimismSepolia.id })}
+                  className="w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:opacity-90"
+                >
+                  Switch to Optimism Sepolia
+                </Button>
+              ) : (
+                <BridgeAndExecuteButton
+                  contractAddress={URIM_QUANTUM_MARKET_ADDRESS as `0x${string}`}
+                  contractAbi={[{
+                    name: 'buyShares',
+                    type: 'function',
+                    stateMutability: 'nonpayable',
+                    inputs: [
+                      { name: '_marketId', type: 'uint256' },
+                      { name: '_isOptionA', type: 'bool' },
+                      { name: '_amount', type: 'uint256' }
+                    ],
+                    outputs: []
+                  }] as const}
+                  functionName="buyShares"
+                  buildFunctionParams={() => ({
+                    functionParams: [
+                      marketId,
+                      bridgeChoice === 'yes',
+                      parseUnits(betAmount || '1', 6)
+                    ]
+                  })}
+                  prefill={{
+                    toChainId: baseSepolia.id,
+                    token: 'USDC',
+                    amount: betAmount || '1'
+                  }}
+                >
+                  {({ onClick, isLoading, disabled }) => (
+                    <Button
+                      onClick={() => {
+                        onClick();
+                        toast({ 
+                          title: "🌉 Bridging USDC to Base Sepolia...", 
+                          description: `Betting ${betAmount || '1'} USDC on ${bridgeChoice === 'yes' ? 'YES' : 'NO'}` 
+                        });
+                      }}
+                      disabled={isLoading || disabled || !betAmount}
+                      className="w-full bg-gradient-to-r from-primary to-primary-glow hover:opacity-90"
+                    >
+                      {isLoading ? '⏳ Processing...' : '🔄 Bridge & Execute'}
+                    </Button>
+                  )}
+                </BridgeAndExecuteButton>
+              )}
+            </div>
+          )}
         </>
       )}
     </Card>
