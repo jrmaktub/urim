@@ -1,12 +1,12 @@
 import { BridgeButton, SUPPORTED_CHAINS } from '@avail-project/nexus-widgets';
 import { useAccount, useSwitchChain } from 'wagmi';
-import { baseSepolia } from 'wagmi/chains';
+import { optimismSepolia } from 'wagmi/chains';
 
 function Bridge() {
   const { address, isConnected, chain } = useAccount();
   const { switchChain } = useSwitchChain();
 
-  const isOnCorrectChain = chain?.id === baseSepolia.id;
+  const isOnCorrectChain = chain?.id === optimismSepolia.id;
 
   if (!isConnected) {
     return (
@@ -20,16 +20,16 @@ function Bridge() {
     return (
       <div className="p-4 bg-yellow-100 border border-yellow-300 rounded">
         <p className="text-yellow-700 mb-3">
-          ⚠️ You need to be on Base Sepolia to bridge to Optimism Sepolia
+          ⚠️ You need to be on Optimism Sepolia to bridge to Base Sepolia
         </p>
         <p className="text-sm text-yellow-600 mb-3">
           Current network: {chain?.name}
         </p>
         <button
-          onClick={() => switchChain({ chainId: baseSepolia.id })}
+          onClick={() => switchChain({ chainId: optimismSepolia.id })}
           className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
         >
-          Switch to Base Sepolia
+          Switch to Optimism Sepolia
         </button>
       </div>
     );
@@ -46,9 +46,9 @@ function Bridge() {
 
       <BridgeButton
         prefill={{
-          chainId: 11155420, // OP Sepolia (destination)
+          chainId: 84532, // BASE Sepolia (destination)
           token: 'USDC',
-          amount: '0.1',
+          amount: '1',
         }}
       >
         {({ onClick, isLoading }) => (
@@ -57,7 +57,7 @@ function Bridge() {
             disabled={isLoading}
             className="w-full bg-purple-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
           >
-            {isLoading ? '⏳ Bridging…' : '🌉 Bridge 0.1 USDC to OP Sepolia'}
+            {isLoading ? '⏳ Bridging…' : '🌉 Bridge 1 USDC to Base Sepolia'}
           </button>
         )}
       </BridgeButton>

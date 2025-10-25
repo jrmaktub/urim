@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useAccount, useReadContract, useWriteContract } from "wagmi";
+import { useAccount, useReadContract, useWriteContract, useSwitchChain } from "wagmi";
 import { Link } from "react-router-dom";
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
@@ -21,7 +21,9 @@ import PythPriceTicker from "@/components/PythPriceTicker";
 import { EvmPriceServiceConnection } from "@pythnetwork/pyth-evm-js";
 import { initializeWithProvider, isInitialized } from "@/lib/nexus";
 import { BridgeAndExecuteButton } from '@avail-project/nexus-widgets';
+import { useNexus } from '@avail-project/nexus-widgets';
 import { supabase } from "@/integrations/supabase/client";
+import { optimismSepolia } from 'wagmi/chains';
 
 const ETH_USD_PRICE_FEED = "0xff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace";
 const connection = new EvmPriceServiceConnection("https://hermes.pyth.network");
@@ -33,7 +35,10 @@ interface AIBetIdea {
 }
 
 const Index = () => {
-  const { address, connector } = useAccount();
+
+  const { switchChain } = useSwitchChain();
+  const { address, connector, isConnected, chain } = useAccount();
+  const { setProvider } = useNexus();
   const { toast } = useToast();
   const { writeContractAsync } = useWriteContract();
   const [question, setQuestion] = useState("");
@@ -46,23 +51,14 @@ const Index = () => {
   const [creatingAIBet, setCreatingAIBet] = useState<number | null>(null);
   const [pythBetAmounts, setPythBetAmounts] = useState<{ [key: number]: number }>({});
 
+  const isOnOptimismSepolia = chain?.id === optimismSepolia.id;
+
   // Auto-initialize Nexus SDK on wallet connect
   useEffect(() => {
-    const initNexus = async () => {
-      if (address && connector && !isInitialized()) {
-        try {
-          const provider = await connector.getProvider();
-          if (provider) {
-            await initializeWithProvider(provider);
-            console.log("Nexus SDK initialized");
-          }
-        } catch (error) {
-          console.error("Failed to initialize Nexus:", error);
-        }
-      }
-    };
-    initNexus();
-  }, [address, connector]);
+    if (isConnected && connector?.getProvider) {
+      connector.getProvider().then(setProvider);
+    }
+  }, [isConnected, connector, setProvider]);
 
   const { quantumMarketIds, everythingMarketIds } = useAllMarkets();
 
@@ -93,7 +89,7 @@ const Index = () => {
       const roundedPrice = Math.round(currentPrice);
       const threshold1 = roundedPrice + 50;
       const threshold2 = roundedPrice - 50;
-      
+
       setAiBetIdeas([
         {
           question: `Will ETH close above $${threshold1} tomorrow?`,
@@ -118,7 +114,7 @@ const Index = () => {
       toast({ title: "Enter a question", variant: "destructive" });
       return;
     }
-    
+
     setGenerating(true);
     setScenarios([]);
 
@@ -130,22 +126,22 @@ const Index = () => {
       if (error) throw error;
 
       const scenarioDescriptions = data?.scenarios?.map((s: any) => s.description) || [];
-      
+
       if (scenarioDescriptions.length >= 2) {
         setScenarios(scenarioDescriptions.slice(0, 2));
-        toast({ 
-          title: "✨ Scenarios generated!", 
-          description: "2 AI-powered scenarios ready. Place your bet below." 
+        toast({
+          title: "✨ Scenarios generated!",
+          description: "2 AI-powered scenarios ready. Place your bet below."
         });
       } else {
         throw new Error("Not enough scenarios generated");
       }
     } catch (error: any) {
       console.error("AI generation error:", error);
-      toast({ 
-        title: "Generation failed", 
-        description: "Using fallback scenarios: YES/NO", 
-        variant: "destructive" 
+      toast({
+        title: "Generation failed",
+        description: "Using fallback scenarios: YES/NO",
+        variant: "destructive"
       });
       setScenarios(["YES", "NO"]);
     } finally {
@@ -158,7 +154,7 @@ const Index = () => {
       toast({ title: "Connect Wallet", description: "Please connect your wallet first.", variant: "destructive" });
       return;
     }
-    
+
     const amount = betAmounts[scenarioIndex];
     if (!amount || parseFloat(amount) <= 0) {
       toast({ title: "Enter bet amount", variant: "destructive" });
@@ -185,8 +181,8 @@ const Index = () => {
         args: [question, scenarios, probs, duration, ETH_USD_PRICE_FEED as `0x${string}`, priceBoundaries],
       } as any);
 
-      toast({ 
-        title: "⚡ Market created!", 
+      toast({
+        title: "⚡ Market created!",
         description: (
           <div className="space-y-2">
             <p>Now placing your bet...</p>
@@ -212,7 +208,7 @@ const Index = () => {
 
       const latestId = quantumMarketIds.length > 0 ? quantumMarketIds[quantumMarketIds.length - 1] : BigInt(0);
       const newMarketId = latestId + BigInt(1);
-      
+
       const betTx = await writeContractAsync({
         address: URIM_QUANTUM_MARKET_ADDRESS as `0x${string}`,
         abi: UrimQuantumMarketABI.abi as any,
@@ -240,10 +236,10 @@ const Index = () => {
       setScenarios([]);
     } catch (error: any) {
       console.error(error);
-      toast({ 
-        title: "Transaction failed", 
-        description: error?.shortMessage || "Please try again", 
-        variant: "destructive" 
+      toast({
+        title: "Transaction failed",
+        description: error?.shortMessage || "Please try again",
+        variant: "destructive"
       });
     } finally {
       setBettingIdx(null);
@@ -279,7 +275,7 @@ const Index = () => {
         address: USDC_ADDRESS as `0x${string}`,
         abi: ERC20ABI.abi as any,
         functionName: "approve",
-        args: [URIM_MARKET_ADDRESS, amountWei],
+        args: [URIM_QUANTUM_MARKET_ADDRESS, amountWei],
       } as any);
 
       // Get latest market ID
@@ -310,10 +306,10 @@ const Index = () => {
       });
     } catch (error: any) {
       console.error(error);
-      toast({ 
-        title: "Transaction failed", 
-        description: error?.shortMessage || "Try again", 
-        variant: "destructive" 
+      toast({
+        title: "Transaction failed",
+        description: error?.shortMessage || "Try again",
+        variant: "destructive"
       });
     } finally {
       setCreatingAIBet(null);
@@ -324,7 +320,7 @@ const Index = () => {
     <div className="min-h-screen w-full bg-background relative overflow-hidden">
       {/* Background gradient */}
       <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-transparent pointer-events-none" />
-      
+
       <Navigation />
 
       <section className="relative max-w-6xl mx-auto px-6 pt-32 pb-16">
@@ -340,13 +336,13 @@ const Index = () => {
 
         {/* Two main cards */}
         <div className="grid md:grid-cols-2 gap-6 mb-16 animate-fade-in">
-          
+
           {/* QUANTUM BET CARD */}
           <div className="glass-card p-8 space-y-6 border-primary/50 hover:border-primary/70 transition-all shadow-lg shadow-primary/10">
             <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center shadow-lg shadow-primary/30">
               <Sparkles className="w-7 h-7 text-background" />
             </div>
-            
+
             <div>
               <h2 className="text-3xl font-bold mb-2">Quantum Bet</h2>
               <p className="text-sm text-muted-foreground">AI-powered multi-scenario predictions</p>
@@ -365,8 +361,8 @@ const Index = () => {
                 />
               </div>
 
-              <Button 
-                onClick={handleGenerate} 
+              <Button
+                onClick={handleGenerate}
                 disabled={generating || !question.trim()}
                 className="w-full bg-gradient-to-r from-primary to-primary/70 hover:shadow-lg hover:shadow-primary/20"
               >
@@ -412,7 +408,7 @@ const Index = () => {
                         </div>
                         <span className="text-xs font-mono text-primary/60">50%</span>
                       </div>
-                      
+
                       <div className="flex gap-2 mb-3">
                         <Input
                           type="number"
@@ -440,48 +436,58 @@ const Index = () => {
                       </div>
 
                       {/* Avail Bridge Button */}
-                      <div className="pt-3 border-t border-border/30">
-                        <BridgeAndExecuteButton
-                          contractAddress={URIM_QUANTUM_MARKET_ADDRESS}
-                          contractAbi={UrimQuantumMarketABI.abi as any}
-                          functionName="createQuantumMarket"
-                          buildFunctionParams={() => {
-                            const delta = 500;
-                            const lowerBound = Math.floor(currentPrice - delta);
-                            const upperBound = Math.ceil(currentPrice + delta);
-                            const priceBoundaries = [BigInt(lowerBound * 100000000), BigInt(upperBound * 100000000)];
-                            const duration = BigInt(86400);
-                            const probs = [BigInt(50), BigInt(50)];
-                            
-                            return {
-                              functionParams: [question, scenarios, probs, duration, ETH_USD_PRICE_FEED as `0x${string}`, priceBoundaries]
-                            };
-                          }}
-                          prefill={{
-                            toChainId: 84532, // Base Sepolia
-                            token: 'USDC',
-                            amount: betAmounts[i] || '0.1'
-                          }}
-                        >
-                          {({ onClick, isLoading, disabled }) => (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="w-full border-primary/30 hover:bg-primary/5 hover:border-primary/50 text-xs"
-                              onClick={() => {
-                                onClick();
-                                toast({
-                                  title: "✅ Bridging & executing via Avail",
-                                  description: "View transaction on Blockscout after confirmation"
-                                });
-                              }}
-                              disabled={isLoading || disabled}
-                            >
-                              {isLoading ? '⏳ Bridging...' : '🪐 Bridge & Execute with Avail'}
-                            </Button>
-                          )}
-                        </BridgeAndExecuteButton>
-                      </div>
+ {!isOnOptimismSepolia ? (
+  <Button
+    variant="outline"
+    size="sm"
+    className="w-full border-yellow-500/30 hover:bg-yellow-500/5 text-xs"
+    onClick={() => switchChain({ chainId: optimismSepolia.id })}
+  >
+    ⚠️ Switch to Optimism Sepolia
+  </Button>
+) : (
+  <BridgeAndExecuteButton
+    contractAddress={URIM_QUANTUM_MARKET_ADDRESS}
+    contractAbi={UrimQuantumMarketABI.abi as any}
+    functionName="buyScenarioShares"
+    buildFunctionParams={() => {
+      const marketId = BigInt(0); // Replace with actual market ID
+      const scenarioIndex = BigInt(0); // Which scenario to bet on
+      const usdcAmount = parseUnits(betAmounts[i] || '0.1', 6);
+      
+      return {
+        functionParams: [
+          marketId,
+          scenarioIndex,
+          usdcAmount
+        ]
+      };
+    }}
+    prefill={{
+      toChainId: 84532, // Base Sepolia (destination)
+      token: 'USDC',
+      amount: betAmounts[i] || '0.1'
+    }}
+  >
+    {({ onClick, isLoading, disabled }) => (
+      <Button
+        variant="outline"
+        size="sm"
+        className="w-full border-primary/30 hover:bg-primary/5 hover:border-primary/50 text-xs"
+        onClick={() => {
+          onClick();
+          toast({
+            title: "✅ Bridging from OP Sepolia → Base Sepolia",
+            description: "Placing bet after bridge completes"
+          });
+        }}
+        disabled={isLoading || disabled}
+      >
+        {isLoading ? '⏳ Bridging from OP...' : '🪐 Bridge & Bet (OP → Base)'}
+      </Button>
+    )}
+  </BridgeAndExecuteButton>
+)}
                     </Card>
                   ))}
                 </div>
@@ -490,14 +496,14 @@ const Index = () => {
           </div>
 
           {/* EVERYTHING BETS CARD */}
-          <Link 
-            to="/create-bet" 
+          <Link
+            to="/create-bet"
             className="glass-card p-8 space-y-6 border-primary/50 hover:border-primary/70 hover:shadow-lg hover:shadow-primary/20 transition-all block group"
           >
             <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center shadow-lg shadow-primary/30 group-hover:scale-110 transition-transform">
               <TrendingUp className="w-7 h-7 text-background" />
             </div>
-            
+
             <div>
               <h2 className="text-3xl font-bold mb-2">Everything Bets</h2>
               <p className="text-sm text-muted-foreground">Create custom prediction markets on any topic</p>
@@ -517,7 +523,7 @@ const Index = () => {
           <div className="mb-16 space-y-6 animate-fade-in">
             {/* Live Pyth Price Widget */}
             <PythPriceTicker />
-            
+
             <div className="text-center">
               <h2 className="text-3xl font-bold mb-2 bg-gradient-to-r from-primary via-purple-400 to-primary bg-clip-text text-transparent">
                 Quantum Pyth
@@ -534,20 +540,20 @@ const Index = () => {
                     <div className="text-sm font-semibold leading-snug group-hover:text-primary transition-colors">
                       {idea.question}
                     </div>
-                    
+
                     <div className="flex items-center gap-2">
                       <input
                         type="number"
                         step="0.1"
                         min="0.1"
                         value={pythBetAmounts[idx] || 0.1}
-                        onChange={(e) => setPythBetAmounts({...pythBetAmounts, [idx]: parseFloat(e.target.value) || 0.1})}
+                        onChange={(e) => setPythBetAmounts({ ...pythBetAmounts, [idx]: parseFloat(e.target.value) || 0.1 })}
                         className="w-20 px-2 py-1 rounded-lg bg-background/50 border border-primary/20 text-xs focus:outline-none focus:border-primary/40"
                         placeholder="0.1"
                       />
                       <span className="text-xs text-muted-foreground">USDC</span>
                     </div>
-                    
+
                     <div className="flex gap-2">
                       <Button
                         size="sm"
@@ -579,7 +585,7 @@ const Index = () => {
             <Sparkles className="w-6 h-6 text-primary" />
             Quantum Markets
           </h2>
-          
+
           <div className="grid gap-4">
             {quantumMarketIds.length === 0 ? (
               <Card className="p-8 text-center text-muted-foreground border-dashed">
@@ -599,7 +605,7 @@ const Index = () => {
             <TrendingUp className="w-6 h-6 text-primary" />
             Everything Bets Markets
           </h2>
-          
+
           <div className="grid gap-4">
             {everythingMarketIds.length === 0 ? (
               <Card className="p-8 text-center text-muted-foreground border-dashed">
@@ -620,7 +626,7 @@ const Index = () => {
               <TrendingUp className="w-6 h-6 text-primary" />
               Your Quantum Bets
             </h2>
-            
+
             <div className="grid gap-4">
               {quantumMarketIds.length === 0 ? (
                 <Card className="p-8 text-center text-muted-foreground border-dashed">
@@ -947,8 +953,8 @@ function UserBetsCard({ marketId, userAddress }: { marketId: bigint; userAddress
           const isWinner = resolved && winningIndex === idx;
 
           return (
-            <div 
-              key={idx} 
+            <div
+              key={idx}
               className={`p-3 rounded-lg border-2 ${isWinner ? 'border-primary bg-primary/10' : 'border-border/30 bg-background/50'}`}
             >
               <div className="flex justify-between items-start mb-2">

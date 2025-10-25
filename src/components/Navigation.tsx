@@ -61,6 +61,7 @@ const Navigation = () => {
         <div className="flex items-center gap-3">
           <WalletButton />
         </div>
+        <InitButton />
       </div>
     </nav>
   );
