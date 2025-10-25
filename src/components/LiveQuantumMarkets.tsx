@@ -413,7 +413,7 @@ function LiveMarketCard({
               variant="outline"
               className="w-full"
             >
-              {bridgeMode ? '← Back to Normal Betting' : '🌉 Bridge & Execute'}
+              {bridgeMode ? '← Back to Normal Betting' : '🌉 Toggle Avail Mode'}
             </Button>
           </div>
 
