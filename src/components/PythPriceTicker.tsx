@@ -36,12 +36,12 @@ export default function PythPriceTicker() {
   if (isLoading) return null;
 
   return (
-    <div className="fixed top-20 right-6 z-40 animate-slide-in">
-      <div className="glass-card px-4 py-2 flex items-center gap-2 border-primary/30 shadow-lg shadow-primary/10">
-        <TrendingUp className="w-4 h-4 text-primary animate-glow" />
-        <span className="text-xs text-muted-foreground">Live ETH:</span>
-        <span className="text-sm font-bold text-primary shimmer-text">${ethPrice}</span>
-        <span className="text-xs text-muted-foreground/60">via Pyth</span>
+    <div className="fixed top-20 right-6 z-40 animate-fade-in">
+      <div className="px-4 py-2 flex items-center gap-2 rounded-lg border border-primary/30 bg-background/95 backdrop-blur-sm shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all">
+        <TrendingUp className="w-4 h-4 text-primary" />
+        <span className="text-xs text-muted-foreground">ETH/USD:</span>
+        <span className="text-sm font-bold text-primary animate-pulse">${ethPrice}</span>
+        <span className="text-[10px] text-muted-foreground/60">Pyth</span>
       </div>
     </div>
   );
