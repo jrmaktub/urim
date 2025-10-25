@@ -55,28 +55,26 @@ export default function PythPriceTicker() {
   }
 
   return (
-    <div className="w-full max-w-2xl mx-auto mb-12 animate-fade-in">
-      <div className="relative overflow-hidden rounded-2xl border-2 border-primary/40 bg-gradient-to-br from-background via-background to-primary/5 p-8 backdrop-blur-sm shadow-2xl shadow-primary/20 hover:shadow-primary/30 transition-all duration-300">
-        {/* Animated background glow */}
-        <div className="absolute inset-0 bg-gradient-to-r from-primary/0 via-primary/10 to-primary/0 animate-pulse" />
+    <div className="w-full max-w-md mx-auto mb-8 animate-fade-in">
+      <div className="relative overflow-hidden rounded-xl border border-primary/30 bg-background/80 backdrop-blur-sm p-4">
+        {/* Subtle animated background */}
+        <div className="absolute inset-0 bg-gradient-to-r from-primary/0 via-primary/5 to-primary/0 animate-pulse" />
         
         {/* Content */}
-        <div className="relative flex flex-col items-center gap-4">
-          {/* Icon and Label */}
-          <div className="flex items-center gap-3">
-            <Sparkles className="w-5 h-5 text-primary animate-pulse" />
-            <span className="text-sm font-semibold tracking-wider text-primary/80 uppercase">
-              Live ETH/USD (Pyth Oracle)
+        <div className="relative flex flex-col items-center gap-2">
+          {/* Label */}
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-primary/70" />
+            <span className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+              ETH/USD — Pyth Oracle
             </span>
-            <Sparkles className="w-5 h-5 text-primary animate-pulse" />
           </div>
           
           {/* Price Display */}
-          <div className="flex items-center gap-3">
-            <TrendingUp className="w-8 h-8 text-primary" />
+          <div className="flex items-center gap-2">
             <span 
-              className={`text-5xl font-bold bg-gradient-to-r from-primary via-purple-400 to-primary bg-clip-text text-transparent transition-all duration-300 ${
-                priceChanged ? 'scale-110' : 'scale-100'
+              className={`text-3xl font-semibold bg-gradient-to-r from-primary via-purple-400 to-primary bg-clip-text text-transparent transition-all duration-300 ${
+                priceChanged ? 'scale-105' : 'scale-100'
               }`}
             >
               ${ethPrice}
@@ -84,10 +82,10 @@ export default function PythPriceTicker() {
           </div>
           
           {/* Update Status */}
-          <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-            <span className="text-xs text-muted-foreground font-medium">
-              Updated in real-time
+          <div className="flex items-center gap-1.5">
+            <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+            <span className="text-[10px] text-muted-foreground/80 font-light">
+              Updated in real time
             </span>
           </div>
         </div>

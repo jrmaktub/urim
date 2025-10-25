@@ -41,6 +41,7 @@ const Index = () => {
   const [currentPrice, setCurrentPrice] = useState<number>(0);
   const [aiBetIdeas, setAiBetIdeas] = useState<AIBetIdea[]>([]);
   const [creatingAIBet, setCreatingAIBet] = useState<number | null>(null);
+  const [pythBetAmounts, setPythBetAmounts] = useState<{ [key: number]: number }>({});
 
   const { quantumMarketIds, everythingMarketIds } = useAllMarkets();
 
@@ -209,11 +210,14 @@ const Index = () => {
     }
   };
 
-  const createAIBet = async (idea: AIBetIdea, outcomeIndex: number) => {
+  const createAIBet = async (idea: AIBetIdea, outcomeIndex: number, amount: number) => {
     if (!address) {
       toast({ title: "Connect Wallet", variant: "destructive" });
       return;
     }
+
+    const ideaIdx = aiBetIdeas.findIndex(i => i.question === idea.question);
+    setCreatingAIBet(ideaIdx);
 
     try {
       const duration = Math.floor(Date.now() / 1000) + 86400; // 24h from now
@@ -226,10 +230,10 @@ const Index = () => {
       } as any);
 
       toast({
-        title: "⚡ Market Created!",
+        title: "✅ Bet placed!",
         description: (
           <div className="space-y-2">
-            <p>{idea.question} — {idea.outcomes[outcomeIndex]}</p>
+            <p>{amount} USDC on "{idea.outcomes[outcomeIndex]}"</p>
             <button
               onClick={() => window.open(getExplorerTxUrl(createTx as string), '_blank')}
               className="text-xs text-primary hover:underline flex items-center gap-1"
@@ -246,6 +250,8 @@ const Index = () => {
         description: error?.shortMessage || "Try again", 
         variant: "destructive" 
       });
+    } finally {
+      setCreatingAIBet(null);
     }
   };
 
@@ -436,20 +442,36 @@ const Index = () => {
                     <div className="text-sm font-semibold leading-snug group-hover:text-primary transition-colors">
                       {idea.question}
                     </div>
+                    
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        step="0.1"
+                        min="0.1"
+                        value={pythBetAmounts[idx] || 0.1}
+                        onChange={(e) => setPythBetAmounts({...pythBetAmounts, [idx]: parseFloat(e.target.value) || 0.1})}
+                        className="w-20 px-2 py-1 rounded-lg bg-background/50 border border-primary/20 text-xs focus:outline-none focus:border-primary/40"
+                        placeholder="0.1"
+                      />
+                      <span className="text-xs text-muted-foreground">USDC</span>
+                    </div>
+                    
                     <div className="flex gap-2">
                       <Button
                         size="sm"
-                        onClick={() => createAIBet(idea, 0)}
+                        onClick={() => createAIBet(idea, 0, pythBetAmounts[idx] || 0.1)}
+                        disabled={creatingAIBet === idx}
                         className="flex-1 bg-green-600/20 hover:bg-green-600/30 border border-green-500/50 hover:border-green-500 transition-all"
                       >
-                        ✅ Yes
+                        {creatingAIBet === idx ? <Sparkles className="w-3 h-3 animate-spin" /> : "✅ Yes"}
                       </Button>
                       <Button
                         size="sm"
-                        onClick={() => createAIBet(idea, 1)}
+                        onClick={() => createAIBet(idea, 1, pythBetAmounts[idx] || 0.1)}
+                        disabled={creatingAIBet === idx}
                         className="flex-1 bg-red-600/20 hover:bg-red-600/30 border border-red-500/50 hover:border-red-500 transition-all"
                       >
-                        ❌ No
+                        {creatingAIBet === idx ? <Sparkles className="w-3 h-3 animate-spin" /> : "❌ No"}
                       </Button>
                     </div>
                   </div>
