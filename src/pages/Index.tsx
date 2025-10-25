@@ -21,6 +21,7 @@ import PythPriceTicker from "@/components/PythPriceTicker";
 import { EvmPriceServiceConnection } from "@pythnetwork/pyth-evm-js";
 import { initializeWithProvider, isInitialized } from "@/lib/nexus";
 import { BridgeAndExecuteButton } from '@avail-project/nexus-widgets';
+import { supabase } from "@/integrations/supabase/client";
 
 const ETH_USD_PRICE_FEED = "0xff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace";
 const connection = new EvmPriceServiceConnection("https://hermes.pyth.network");
@@ -121,16 +122,35 @@ const Index = () => {
     setGenerating(true);
     setScenarios([]);
 
-    // Simulate AI generation with animation
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    setScenarios(["YES", "NO"]);
-    setGenerating(false);
-    
-    toast({ 
-      title: "✨ Scenarios generated!", 
-      description: "2 quantum scenarios ready (YES/NO). Place your bet below." 
-    });
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-scenarios', {
+        body: { question: question.trim() }
+      });
+
+      if (error) throw error;
+
+      const scenarioDescriptions = data?.scenarios?.map((s: any) => s.description) || [];
+      
+      if (scenarioDescriptions.length >= 2) {
+        setScenarios(scenarioDescriptions.slice(0, 2));
+        toast({ 
+          title: "✨ Scenarios generated!", 
+          description: "2 AI-powered scenarios ready. Place your bet below." 
+        });
+      } else {
+        throw new Error("Not enough scenarios generated");
+      }
+    } catch (error: any) {
+      console.error("AI generation error:", error);
+      toast({ 
+        title: "Generation failed", 
+        description: "Using fallback scenarios: YES/NO", 
+        variant: "destructive" 
+      });
+      setScenarios(["YES", "NO"]);
+    } finally {
+      setGenerating(false);
+    }
   };
 
   const createMarketAndBet = async (scenarioIndex: number) => {
