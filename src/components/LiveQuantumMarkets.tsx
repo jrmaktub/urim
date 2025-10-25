@@ -12,6 +12,7 @@ import ERC20ABI from "@/contracts/ERC20.json";
 import { parseUnits, formatUnits } from "viem";
 import { BridgeAndExecuteButton } from '@avail-project/nexus-widgets';
 import { optimismSepolia, baseSepolia } from 'wagmi/chains';
+import { useNotification } from "@blockscout/app-sdk";
 
 type MarketData = {
   marketId: bigint;
@@ -30,6 +31,7 @@ export default function LiveQuantumMarkets() {
   const { address, chain } = useAccount();
   const { toast } = useToast();
   const { writeContractAsync } = useWriteContract();
+  const { openTxToast } = useNotification();
   const [markets, setMarkets] = useState<MarketData[]>([]);
   const [betAmounts, setBetAmounts] = useState<Record<string, string>>({});
   const [bettingMarkets, setBettingMarkets] = useState<Record<string, 'yes' | 'no' | null>>({});
@@ -118,7 +120,7 @@ export default function LiveQuantumMarkets() {
 
       // Buy shares - isYes is passed as _isOptionA parameter
       // true = OptionA (Yes), false = OptionB (No)
-      const txHash = await writeContractAsync({
+      const hash = await writeContractAsync({
         address: URIM_QUANTUM_MARKET_ADDRESS as `0x${string}`,
         abi: UrimQuantumMarketABI.abi as any,
         functionName: "buyShares",
@@ -126,10 +128,8 @@ export default function LiveQuantumMarkets() {
         gas: BigInt(500_000),
       } as any);
 
-      toast({ 
-        title: "✅ Bet placed successfully!", 
-        description: `You bet ${betAmount} USDC on ${isYes ? 'YES (Option A)' : 'NO (Option B)'}`
-      });
+      // Show Blockscout toast
+      openTxToast("84532", hash);
 
       // Clear input and refetch
       setBetAmounts(prev => ({ ...prev, [marketId.toString()]: '' }));
@@ -494,7 +494,7 @@ function LiveMarketCard({
                   ) : !isApproved ? (
                     <div className="space-y-2">
                       <div className="text-xs text-muted-foreground">
-                        Approve USDC for bridge transactions
+                        Approve 1000 USDC for bridge transactions
                       </div>
                       <Button
                         onClick={handleApprove}

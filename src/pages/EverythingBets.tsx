@@ -28,10 +28,6 @@ import ERC20ABI from "@/contracts/ERC20.json";
 import { parseUnits, formatUnits } from "viem";
 import { useAllMarkets, useMarketInfo, useOutcomePool } from "@/hooks/useMarkets";
 
-import Bridge from '@/components/BridgeButton';
-import BridgeAndExecute from '@/components/BridgeAndExecute';
-
-
 
 const EverythingBets = () => {
   const { toast } = useToast();
@@ -241,8 +237,6 @@ const EverythingBets = () => {
                   {balances && (
           <pre className="whitespace-pre-wrap">{JSON.stringify(balances, null, 2)}</pre>
         )}
-          {/* <Bridge /> */}
-          <BridgeAndExecute />
           {/* Form Card */}
           <div className="card-glow p-10 animate-fade-up" style={{ animationDelay: "0.15s" }}>
             <div className="space-y-7">

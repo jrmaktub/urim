@@ -11,7 +11,6 @@ import { TrendingUp, Plus, X } from "lucide-react";
 import { URIM_MARKET_ADDRESS } from "@/constants/contracts";
 import UrimMarketABI from "@/contracts/UrimMarket.json";
 import { Card } from "@/components/ui/card";
-import { getExplorerTxUrl } from "@/constants/blockscout";
 import { useNotification } from "@blockscout/app-sdk";
 
 const CreateBet = () => {
@@ -44,7 +43,7 @@ const CreateBet = () => {
     }
   };
 
-  const handleCreateMarket = async () => {  // ✅ Removed txHash parameter
+  const handleCreateMarket = async () => {
     if (!address) {
       toast({
         title: "Connect Wallet",
@@ -69,34 +68,15 @@ const CreateBet = () => {
       const durationInSeconds = parseInt(duration) * 3600;
       const endTimestamp = Math.floor(Date.now() / 1000) + durationInSeconds;
       
-      // Execute the transaction
-      const hash = await writeContractAsync({  // ✅ Use 'hash' instead of 'txHash'
+      const hash = await writeContractAsync({
         address: URIM_MARKET_ADDRESS as `0x${string}`,
         abi: UrimMarketABI.abi as any,
         functionName: "createMarket",
         args: [question, validOutcomes, BigInt(endTimestamp)],
       } as any);
 
-      // ✅ Now show the Blockscout toast notification
       openTxToast("84532", hash);
       
-      // Show success toast
-      toast({
-        title: "⚡ Market Created!",
-        description: (
-          <div className="space-y-2">
-            <p>{question}</p>
-            <button
-              onClick={() => window.open(getExplorerTxUrl(hash), '_blank')}
-              className="text-xs text-primary hover:underline flex items-center gap-1"
-            >
-              View on BlockScout →
-            </button>
-          </div>
-        )
-      });
-      
-      // Navigate after delay
       setTimeout(() => navigate("/"), 2000);
     } catch (error: any) {
       console.error(error);
