@@ -86,6 +86,11 @@ export default function LiveQuantumMarkets() {
     try {
       const amountWei = parseUnits(betAmount, 6);
 
+      toast({ 
+        title: "Step 1: Approving USDC...", 
+        description: "Please confirm the approval transaction in your wallet" 
+      });
+
       // Approve USDC
       await writeContractAsync({
         address: USDC_ADDRESS as `0x${string}`,
@@ -94,20 +99,24 @@ export default function LiveQuantumMarkets() {
         args: [URIM_QUANTUM_MARKET_ADDRESS, amountWei],
       } as any);
 
-      toast({ title: "Placing bet...", description: "Confirm the transaction in your wallet" });
+      toast({ 
+        title: "Step 2: Placing bet...", 
+        description: `Betting ${betAmount} USDC on ${isYes ? 'YES' : 'NO'}. Confirm the transaction.` 
+      });
 
-      // Buy shares
+      // Buy shares - isYes is passed as _isOptionA parameter
+      // true = OptionA (Yes), false = OptionB (No)
       const txHash = await writeContractAsync({
         address: URIM_QUANTUM_MARKET_ADDRESS as `0x${string}`,
         abi: UrimQuantumMarketABI.abi as any,
         functionName: "buyShares",
-        args: [marketId, isYes, amountWei],
+        args: [marketId, isYes, amountWei], // marketId, _isOptionA (boolean), _amount
         gas: BigInt(500_000),
       } as any);
 
       toast({ 
-        title: "✅ Bet placed successfully", 
-        description: `You bet ${betAmount} USDC on ${isYes ? 'YES' : 'NO'}`
+        title: "✅ Bet placed successfully!", 
+        description: `You bet ${betAmount} USDC on ${isYes ? 'YES (Option A)' : 'NO (Option B)'}`
       });
 
       // Clear input and refetch
@@ -115,7 +124,26 @@ export default function LiveQuantumMarkets() {
       await refetchMarketIds();
     } catch (error: any) {
       console.error("Bet error:", error);
-      const errorMsg = error?.shortMessage || error?.message || "Transaction failed";
+      
+      // Better error parsing
+      let errorMsg = "Transaction failed";
+      if (error?.shortMessage) {
+        errorMsg = error.shortMessage;
+      } else if (error?.message) {
+        // Extract readable error from message
+        if (error.message.includes("user rejected")) {
+          errorMsg = "Transaction rejected by user";
+        } else if (error.message.includes("insufficient funds")) {
+          errorMsg = "Insufficient funds for transaction";
+        } else if (error.message.includes("Market trading period has ended")) {
+          errorMsg = "Market trading period has ended";
+        } else if (error.message.includes("Amount too small")) {
+          errorMsg = "Bet amount is too small";
+        } else {
+          errorMsg = error.message;
+        }
+      }
+      
       const fullError = JSON.stringify(error, null, 2);
 
       toast({
@@ -298,14 +326,14 @@ function LiveMarketCard({
             />
             <Button
               onClick={() => onPlaceBet(marketId, true)}
-              disabled={bettingStatus !== null}
+              disabled={bettingStatus === 'yes' || bettingStatus === 'no'}
               className="bg-gradient-to-r from-primary to-primary-glow hover:opacity-90"
             >
               {bettingStatus === 'yes' ? "Betting..." : "Bet Yes"}
             </Button>
             <Button
               onClick={() => onPlaceBet(marketId, false)}
-              disabled={bettingStatus !== null}
+              disabled={bettingStatus === 'yes' || bettingStatus === 'no'}
               className="bg-gradient-to-r from-primary to-primary-glow hover:opacity-90"
             >
               {bettingStatus === 'no' ? "Betting..." : "Bet No"}
