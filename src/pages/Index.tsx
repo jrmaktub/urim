@@ -308,15 +308,15 @@ const Index = () => {
       toast({ title: "Creating Pyth Market...", description: "Confirm transaction in wallet" });
 
       const duration = BigInt(24 * 60 * 60); // 24 hours
-      const outcomes = ["YES", "NO"];
-      const now = Math.floor(Date.now() / 1000);
-      const endTimestamp = BigInt(now) + duration;
+      const priceFeedId = ETH_USD_PRICE_FEED as `0x${string}`;
+      // Convert threshold to Pyth price format (price * 10^8)
+      const targetPrice = BigInt(Math.round(market.threshold * 1e8));
 
       await writeContractAsync({
-        address: URIM_MARKET_ADDRESS as `0x${string}`,
-        abi: UrimMarketABI.abi as any,
+        address: URIM_QUANTUM_MARKET_ADDRESS as `0x${string}`,
+        abi: UrimQuantumMarketABI.abi as any,
         functionName: "createMarket",
-        args: [market.question, outcomes, endTimestamp],
+        args: [market.question, "Yes", "No", duration, priceFeedId, targetPrice],
         gas: BigInt(3_000_000),
       } as any);
 
@@ -324,8 +324,8 @@ const Index = () => {
 
       // Wait a bit for the blockchain to update, then fetch new market ID
       setTimeout(() => {
-        if (everythingMarketIds && everythingMarketIds.length > 0) {
-          const newMarketId = everythingMarketIds[everythingMarketIds.length - 1];
+        if (quantumMarketIds && quantumMarketIds.length > 0) {
+          const newMarketId = quantumMarketIds[quantumMarketIds.length - 1];
           setPythMarkets(prev => prev.map((m, i) => 
             i === marketIndex ? { ...m, marketId: newMarketId, creating: false } : m
           ));
