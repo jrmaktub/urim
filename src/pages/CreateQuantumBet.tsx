@@ -87,11 +87,16 @@ const CreateQuantumBet = () => {
         description: "Please confirm the transaction in your wallet.",
       });
 
+      // Use the new createMarket function with optionA/optionB
+      const optionA = "Yes";
+      const optionB = "No";
+      const targetPrice = BigInt(0); // Default target price (not using Pyth price for manual creation)
+
       await writeContractAsync({
         address: URIM_QUANTUM_MARKET_ADDRESS as `0x${string}`,
         abi: UrimQuantumMarketABI.abi as any,
-        functionName: 'createQuantumMarket',
-        args: [question, scenarioTexts, probabilitiesArray, durationSeconds, priceFeedId, priceBoundaries],
+        functionName: 'createMarket',
+        args: [question, optionA, optionB, durationSeconds, priceFeedId, targetPrice],
         gas: BigInt(3000000),
       } as any);
 
@@ -106,10 +111,24 @@ const CreateQuantumBet = () => {
       }, 2000);
     } catch (error: any) {
       console.error("Failed to create quantum market:", error);
+      const errorMsg = error?.shortMessage || error?.message || "Could not create market. Please try again.";
+      const fullError = JSON.stringify(error, null, 2);
+      
       toast({
         title: "Transaction Failed",
-        description: error?.shortMessage || error?.message || "Could not create market. Please try again.",
+        description: errorMsg,
         variant: "destructive",
+        action: (
+          <button
+            onClick={() => {
+              navigator.clipboard.writeText(fullError);
+              toast({ title: "Error copied to clipboard" });
+            }}
+            className="ml-2 px-3 py-1 text-xs bg-destructive/20 hover:bg-destructive/30 rounded"
+          >
+            📋 Copy
+          </button>
+        ),
       });
     } finally {
       setIsProcessing(false);
