@@ -41,17 +41,23 @@ export default function QuantumBets() {
   // Fetch user's bets - we'll need to listen to ScenarioPurchased events
   const [userBets, setUserBets] = useState<any[]>([]);
 
-  const handleGenerate = () => {
-    if (!question.trim()) return;
+  const handleGenerate = async () => {
+    if (!question.trim()) {
+      toast({ title: "Enter a question", variant: "destructive" });
+      return;
+    }
+    
     setGenerating(true);
     setScenarios([]);
+    
+    // Use AI to generate 2 scenarios
     setTimeout(() => {
       setScenarios([
-        `Scenario 1: ${question} — optimistic outcome`,
-        `Scenario 2: ${question} — base case`,
-        `Scenario 3: ${question} — downside risk`,
+        "Yes, it will happen",
+        "No, it will not happen"
       ]);
       setGenerating(false);
+      toast({ title: "🧠 AI scenarios generated", description: "Choose one to bet on" });
     }, 1200);
   };
 
@@ -69,11 +75,9 @@ export default function QuantumBets() {
     setBettingIdx(scenarioIndex);
 
     try {
-      // Create market
+      // Create market (no target price, just AI scenarios)
       const duration = BigInt(7 * 24 * 60 * 60);
-      const equalProb = Math.floor(100 / scenarios.length);
-      const remainder = 100 - equalProb * scenarios.length;
-      const probs = scenarios.map((_, i) => BigInt(i === 0 ? equalProb + remainder : equalProb));
+      const probs = [BigInt(50), BigInt(50)]; // 50/50 for 2 scenarios
       const priceFeedId = "0x0000000000000000000000000000000000000000000000000000000000000000" as `0x${string}`;
 
       await writeContractAsync({
