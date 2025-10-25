@@ -19,6 +19,8 @@ import { initializeWithProvider, isInitialized, getUnifiedBalances } from "@/lib
 import { BridgeAndExecuteButton } from '@avail-project/nexus-widgets';
 import { supabase } from "@/integrations/supabase/client";
 import { optimismSepolia, baseSepolia } from 'wagmi/chains';
+import Bridge from '@/components/BridgeButton';
+
 
 const ETH_USD_PRICE_FEED = "0xff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace";
 const connection = new EvmPriceServiceConnection("https://hermes.pyth.network");
@@ -778,30 +780,7 @@ const Index = () => {
                       <div className="text-xs text-muted-foreground text-center mb-2">
                         Bridge from Optimism Sepolia
                       </div>
-                      <BridgeAndExecuteButton
-                        contractAddress={URIM_QUANTUM_MARKET_ADDRESS as `0x${string}`}
-                        contractAbi={UrimQuantumMarketABI.abi as any}
-                        functionName="buyScenarioShares"
-                        buildFunctionParams={() => ({
-                          functionParams: [BigInt(0), BigInt(0), parseUnits("1", 6)]
-                        })}
-                        prefill={{
-                          toChainId: baseSepolia.id,
-                          token: 'USDC',
-                          amount: '1'
-                        }}
-                      >
-                        {({ onClick, isLoading, disabled }) => (
-                          <Button
-                            onClick={onClick}
-                            disabled={isLoading || disabled}
-                            className="w-full bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800"
-                            size="sm"
-                          >
-                            {isLoading ? "🌉 Bridging..." : "Bridge"}
-                          </Button>
-                        )}
-                      </BridgeAndExecuteButton>
+                    <Bridge/>
                     </div>
                   </div>
                 )}

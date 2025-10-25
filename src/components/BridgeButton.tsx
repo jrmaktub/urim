@@ -1,72 +1,103 @@
-import { BridgeButton, SUPPORTED_CHAINS } from '@avail-project/nexus-widgets';
+import { BridgeButton } from '@avail-project/nexus-widgets';
 import { useAccount, useSwitchChain } from 'wagmi';
 import { optimismSepolia } from 'wagmi/chains';
+import { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { AlertCircle } from 'lucide-react';
 
 function Bridge() {
   const { address, isConnected, chain } = useAccount();
   const { switchChain } = useSwitchChain();
-
+  const [bridgeAmount, setBridgeAmount] = useState("1");
+  
   const isOnCorrectChain = chain?.id === optimismSepolia.id;
 
   if (!isConnected) {
     return (
-      <div className="p-4 bg-red-100 border border-red-300 rounded text-red-700">
-        ⚠️ Please connect your wallet first using the Connect Wallet button
+      <div className="glass-card p-6 border-2 border-red-500/30 bg-gradient-to-r from-red-500/10 to-red-600/10">
+        <div className="flex items-center gap-3">
+          <AlertCircle className="w-5 h-5 text-red-400" />
+          <p className="text-red-400 font-medium">
+            Please connect your wallet first
+          </p>
+        </div>
       </div>
     );
   }
 
   if (!isOnCorrectChain) {
     return (
-      <div className="p-4 bg-yellow-100 border border-yellow-300 rounded">
-        <p className="text-yellow-700 mb-3">
-          ⚠️ You need to be on Optimism Sepolia to bridge to Base Sepolia
-        </p>
-        <p className="text-sm text-yellow-600 mb-3">
-          Current network: {chain?.name}
-        </p>
-        <button
+      <div className="glass-card p-6 space-y-4">
+        <div className="p-4 rounded-lg bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border border-yellow-500/30">
+          <div className="flex items-start gap-3 mb-3">
+            <AlertCircle className="w-5 h-5 text-yellow-400 mt-0.5" />
+            <div>
+              <p className="text-yellow-400 font-medium mb-1">
+                You need to be on Optimism Sepolia to bridge to Base Sepolia
+              </p>
+              <p className="text-sm text-yellow-400/80">
+                Current network: {chain?.name}
+              </p>
+            </div>
+          </div>
+        </div>
+        
+        <Button
           onClick={() => switchChain({ chainId: optimismSepolia.id })}
-          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+          className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800"
+          size="lg"
         >
           Switch to Optimism Sepolia
-        </button>
+        </Button>
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
-      <div className="p-3 bg-green-100 border border-green-300 rounded">
-        <p className="text-green-700">✅ Ready to bridge!</p>
-        <p className="text-sm text-green-600 mt-1">
-          Wallet: {address?.slice(0, 8)}...{address?.slice(-6)} on {chain?.name}
+    <div className="glass-card p-6 space-y-4">
+      <div className="space-y-2">
+        <label className="text-sm font-medium text-muted-foreground">
+          Amount to Bridge
+        </label>
+        <div className="flex items-center gap-2">
+          <Input
+            type="number"
+            value={bridgeAmount}
+            onChange={(e) => setBridgeAmount(e.target.value)}
+            placeholder="1.0"
+            className="flex-1 h-12 text-lg bg-background/50"
+            min="0"
+            step="0.1"
+          />
+          <span className="text-sm font-bold text-muted-foreground px-3">USDC</span>
+        </div>
+      </div>
+
+      <div className="p-3 rounded-lg bg-purple-500/10 border border-purple-500/20">
+        <p className="text-xs text-muted-foreground">
+          <span className="font-medium text-purple-400">From:</span> Optimism Sepolia → <span className="font-medium text-purple-400">To:</span> Base Sepolia
         </p>
       </div>
 
       <BridgeButton
         prefill={{
-          chainId: 84532, // BASE Sepolia (destination)
+          chainId: 84532,
           token: 'USDC',
-          amount: '1',
+          amount: bridgeAmount || '1',
         }}
       >
         {({ onClick, isLoading }) => (
-          <button
+          <Button
             onClick={onClick}
-            disabled={isLoading}
-            className="w-full bg-purple-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+            disabled={isLoading || !bridgeAmount || parseFloat(bridgeAmount) <= 0}
+            className="w-full bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800"
+            size="lg"
           >
-            {isLoading ? '⏳ Bridging…' : '🌉 Bridge 1 USDC to Base Sepolia'}
-          </button>
+            {isLoading ? '⏳ Bridging…' : `🌉 Bridge ${bridgeAmount || '0'} USDC to Base Sepolia`}
+          </Button>
         )}
       </BridgeButton>
-
-      <div className="text-xs text-gray-500 space-y-1">
-        <p>✅ Wallet Connected</p>
-        <p>✅ On Base Sepolia</p>
-        <p className="text-green-600 font-semibold">Ready to bridge!</p>
-      </div>
     </div>
   );
 }
