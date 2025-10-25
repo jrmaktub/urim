@@ -63,6 +63,7 @@ const Index = () => {
   const [balanceLoading, setBalanceLoading] = useState(false);
   const [balanceError, setBalanceError] = useState<string | null>(null);
   const [expandedTokens, setExpandedTokens] = useState<Set<string>>(new Set());
+  const [unifiedBalance, setUnifiedBalance] = useState<string>("0.0000");
   
   const [currentPrice, setCurrentPrice] = useState<number>(0);
   const [pythMarkets, setPythMarkets] = useState<Array<{
@@ -113,26 +114,50 @@ const Index = () => {
 
       console.log('Processed Data for UI:', processed);
       setProcessedBalances(processed);
+      
+      // Calculate unified balance total
+      const total = rawBalances.reduce((sum: number, token: any) => 
+        sum + parseFloat(token.balance || "0"), 0
+      );
+      setUnifiedBalance(total.toFixed(4));
     } catch (e: any) {
       console.error("Failed to fetch balances:", e);
       setBalanceError(e.message || "Failed to fetch balance");
       setProcessedBalances([]);
+      setUnifiedBalance("0.0000");
     } finally {
       setBalanceLoading(false);
     }
   };
 
+  // Auto-initialize Nexus on wallet connection
   useEffect(() => {
-    const checkInit = async () => {
-      const initialized = isInitialized();
-      setNexusInitialized(initialized);
+    const autoInitNexus = async () => {
+      if (!isConnected || !walletClient) return;
       
-      if (initialized) {
+      // Check if already initialized
+      if (isInitialized()) {
+        setNexusInitialized(true);
         await fetchBalances();
+        return;
+      }
+      
+      // Auto-initialize
+      try {
+        setInitializingNexus(true);
+        await initializeWithProvider(walletClient);
+        setNexusInitialized(true);
+        await fetchBalances();
+        console.log("✅ Nexus auto-initialized");
+      } catch (error) {
+        console.error("Auto-init failed:", error);
+      } finally {
+        setInitializingNexus(false);
       }
     };
-    checkInit();
-  }, []);
+    
+    autoInitNexus();
+  }, [isConnected, walletClient]);
 
   useEffect(() => {
     const fetchPrice = async () => {
@@ -592,30 +617,57 @@ const Index = () => {
         </p>
       </section>
 
-      <section className="max-w-2xl mx-auto px-6 pb-16">
-        <div className="glass-card p-8">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-3">
-              <div className="p-3 rounded-xl bg-gradient-to-br from-purple-600/20 to-purple-700/20 border border-purple-500/30">
-                <Zap className="w-6 h-6 text-purple-400" />
+      {/* Avail Nexus Integration Section */}
+      {isConnected && (
+        <section className="max-w-2xl mx-auto px-6 pb-12">
+          <div className="bg-black border border-purple-500/50 rounded-lg p-6 shadow-lg">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <div className="p-3 rounded-xl bg-gradient-to-br from-purple-600/20 to-purple-700/20 border border-purple-500/30">
+                  <Zap className="w-6 h-6 text-purple-400" />
+                </div>
+                <h3 className="text-2xl font-bold">⚡ Avail Nexus Integration</h3>
               </div>
-              <h3 className="text-2xl font-bold">⚡ Avail Nexus Integration</h3>
+              {nexusInitialized && (
+                <Button
+                  onClick={fetchBalances}
+                  disabled={balanceLoading}
+                  variant="ghost"
+                  size="sm"
+                  className="text-purple-400 hover:text-purple-300"
+                >
+                  <RefreshCw className={`w-4 h-4 ${balanceLoading ? 'animate-spin' : ''}`} />
+                </Button>
+              )}
             </div>
-          {nexusInitialized && (
-              <Button
-                onClick={fetchBalances}
-                disabled={balanceLoading}
-                variant="ghost"
-                size="sm"
-                className="text-purple-400 hover:text-purple-300"
-              >
-                <RefreshCw className={`w-4 h-4 ${balanceLoading ? 'animate-spin' : ''}`} />
-              </Button>
-            )}
-          </div>
 
-          {nexusInitialized && (
-            <div className="space-y-4">
+            <p className="text-sm text-muted-foreground mb-6">
+              Cross-chain unified balance powered by Avail Nexus
+            </p>
+
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <p className="text-sm text-muted-foreground mb-1">Unified Balance</p>
+                <p className="text-3xl font-bold text-purple-400">
+                  {balanceLoading || initializingNexus ? (
+                    <span className="text-lg">Loading...</span>
+                  ) : (
+                    `${unifiedBalance} ETH`
+                  )}
+                </p>
+              </div>
+              <Button
+                onClick={() => switchChain({ chainId: optimismSepolia.id })}
+                variant="outline"
+                className="border-purple-500/50 hover:bg-purple-500/10 hover:text-purple-300"
+                disabled={isOnOptimismSepolia}
+              >
+                {isOnOptimismSepolia ? "On Optimism Sepolia" : "Switch to Optimism Sepolia"}
+              </Button>
+            </div>
+
+            {nexusInitialized && (
+              <div className="space-y-4">
               {balanceLoading ? (
                 <div className="flex items-center justify-center gap-3 py-8">
                   <div className="w-6 h-6 border-3 border-purple-500 border-t-transparent rounded-full animate-spin" />
@@ -715,8 +767,9 @@ const Index = () => {
               </div>
             </div>
           )}
-        </div>
-      </section>
+          </div>
+        </section>
+      )}
 
       <section className="max-w-2xl mx-auto px-6 py-16">
         <div className="text-center mb-8">
