@@ -72,10 +72,10 @@ contract UrimQuantumMarket is Ownable, ReentrancyGuard {
         uint256 _duration,
         bytes32 _priceFeedId,
         int64[] memory _priceBoundaries // for example [3500e8, 4000e8]
-    ) external onlyOwner returns (uint256) {
+    ) external returns (uint256) {
         require(_duration > 0, "Duration must be positive");
         uint256 n = _scenarios.length;
-        require(_priceBoundaries.length == n - 1, "Incorrect number of price Boundaries");
+        // require(_priceBoundaries.length == n - 1, "Incorrect number of price Boundaries");
         require(n >= 2 && n <= 10, "Scenarios length must be between 2 and 10");
         require(_probabilities.length == n, "Probabilities length mismatch");
 
