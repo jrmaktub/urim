@@ -275,12 +275,12 @@ const Index = () => {
         address: USDC_ADDRESS as `0x${string}`,
         abi: ERC20ABI.abi as any,
         functionName: "approve",
-        args: [URIM_QUANTUM_MARKET_ADDRESS, amountWei],
+        args: [URIM_MARKET_ADDRESS, amountWei],
       } as any);
 
       // Get latest market ID
       const latestId = everythingMarketIds.length > 0 ? everythingMarketIds[everythingMarketIds.length - 1] : BigInt(0);
-      const newMarketId = latestId + BigInt(1);
+      const newMarketId = latestId;
 
       // Buy shares
       const betTx = await writeContractAsync({

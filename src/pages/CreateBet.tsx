@@ -19,13 +19,12 @@ const CreateBet = () => {
   const navigate = useNavigate();
   const { address } = useAccount();
   const { writeContractAsync } = useWriteContract();
+  const { openTxToast } = useNotification();
   
   const [question, setQuestion] = useState("");
   const [outcomes, setOutcomes] = useState(["YES", "NO"]);
   const [duration, setDuration] = useState("24");
   const [isCreating, setIsCreating] = useState(false);
-  const { openTxToast } = useNotification();
-
 
   const handleOutcomeChange = (index: number, value: string) => {
     const newOutcomes = [...outcomes];
@@ -45,7 +44,7 @@ const CreateBet = () => {
     }
   };
 
-  const handleCreateMarket = async (txHash) => {
+  const handleCreateMarket = async () => {  // ✅ Removed txHash parameter
     if (!address) {
       toast({
         title: "Connect Wallet",
@@ -70,22 +69,25 @@ const CreateBet = () => {
       const durationInSeconds = parseInt(duration) * 3600;
       const endTimestamp = Math.floor(Date.now() / 1000) + durationInSeconds;
       
-      const txHash = await writeContractAsync({
+      // Execute the transaction
+      const hash = await writeContractAsync({  // ✅ Use 'hash' instead of 'txHash'
         address: URIM_MARKET_ADDRESS as `0x${string}`,
         abi: UrimMarketABI.abi as any,
         functionName: "createMarket",
         args: [question, validOutcomes, BigInt(endTimestamp)],
       } as any);
 
-      openTxToast("84532", txHash)
+      // ✅ Now show the Blockscout toast notification
+      openTxToast("84532", hash);
       
+      // Show success toast
       toast({
         title: "⚡ Market Created!",
         description: (
           <div className="space-y-2">
             <p>{question}</p>
             <button
-              onClick={() => window.open(getExplorerTxUrl(txHash as string), '_blank')}
+              onClick={() => window.open(getExplorerTxUrl(hash), '_blank')}
               className="text-xs text-primary hover:underline flex items-center gap-1"
             >
               View on BlockScout →
@@ -94,6 +96,7 @@ const CreateBet = () => {
         )
       });
       
+      // Navigate after delay
       setTimeout(() => navigate("/"), 2000);
     } catch (error: any) {
       console.error(error);
