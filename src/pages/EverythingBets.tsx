@@ -241,7 +241,7 @@ const EverythingBets = () => {
                   {balances && (
           <pre className="whitespace-pre-wrap">{JSON.stringify(balances, null, 2)}</pre>
         )}
-          <Bridge />
+          {/* <Bridge /> */}
           <BridgeAndExecute />
           {/* Form Card */}
           <div className="card-glow p-10 animate-fade-up" style={{ animationDelay: "0.15s" }}>
