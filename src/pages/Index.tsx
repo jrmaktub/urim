@@ -45,6 +45,16 @@ const Index = () => {
   const [scenarios, setScenarios] = useState<string[]>([]);
   const [betAmounts, setBetAmounts] = useState<string[]>(["", ""]);
   const [bettingIdx, setBettingIdx] = useState<number | null>(null);
+  const [bridgingIdx, setBridgingIdx] = useState<number | null>(null);
+  const [creatingQuantumMarket, setCreatingQuantumMarket] = useState(false);
+  const [liveQuantumMarkets, setLiveQuantumMarkets] = useState<Array<{
+    marketId: bigint;
+    question: string;
+    scenarios: string[];
+    betAmounts: string[];
+    bettingIdx: number | null;
+    bridgingIdx: number | null;
+  }>>([]);
   
   const [nexusInitialized, setNexusInitialized] = useState(false);
   const [processedBalances, setProcessedBalances] = useState<ProcessedBalance[]>([]);
@@ -132,6 +142,38 @@ const Index = () => {
           const price = priceFeed.getPriceUnchecked();
           const formattedPrice = Number(price.price) * Math.pow(10, price.expo);
           setCurrentPrice(formattedPrice);
+
+          // Initialize at least 2 Pyth markets on first price fetch
+          if (pythMarkets.length === 0 && formattedPrice > 0) {
+            const roundedPrice = Math.round(formattedPrice);
+            const aboveThreshold = roundedPrice + Math.round(formattedPrice * 0.02);
+            const belowThreshold = roundedPrice - Math.round(formattedPrice * 0.02);
+
+            setPythMarkets([
+              {
+                id: 'pyth-above',
+                question: `Will ETH close above $${aboveThreshold} tomorrow?`,
+                threshold: aboveThreshold,
+                marketId: null,
+                selectedOutcome: null,
+                betAmount: '',
+                creating: false,
+                betting: false,
+                bridging: false,
+              },
+              {
+                id: 'pyth-below',
+                question: `Will ETH close below $${belowThreshold} tomorrow?`,
+                threshold: belowThreshold,
+                marketId: null,
+                selectedOutcome: null,
+                betAmount: '',
+                creating: false,
+                betting: false,
+                bridging: false,
+              }
+            ]);
+          }
         }
       } catch (error) {
         console.error("Error fetching price:", error);
@@ -141,7 +183,7 @@ const Index = () => {
     fetchPrice();
     const interval = setInterval(fetchPrice, 10000);
     return () => clearInterval(interval);
-  }, []);
+  }, [pythMarkets.length]);
 
   const handleInitNexus = async () => {
     if (!walletClient) {
@@ -181,37 +223,72 @@ const Index = () => {
       return;
     }
 
+    if (!address) {
+      toast({ title: "Connect Wallet", description: "Please connect your wallet first.", variant: "destructive" });
+      return;
+    }
+
     setGenerating(true);
     setScenarios([]);
+    setCreatingQuantumMarket(true);
 
     try {
+      // First, generate AI scenarios
       const { data, error } = await supabase.functions.invoke('generate-scenarios', {
         body: { question: question.trim() }
       });
 
       if (error) throw error;
 
-      const scenarioDescriptions = data?.scenarios?.map((s: any) => s.description) || [];
+      const scenarioDescriptions = data?.scenarios?.map((s: any) => s.description) || ["Yes, it will happen", "No, it will not happen"];
+      const finalScenarios = scenarioDescriptions.length >= 2 ? scenarioDescriptions.slice(0, 2) : ["Yes, it will happen", "No, it will not happen"];
+      
+      setScenarios(finalScenarios);
 
-      if (scenarioDescriptions.length >= 2) {
-        setScenarios(scenarioDescriptions.slice(0, 2));
-        toast({
-          title: "✨ Scenarios generated!",
-          description: "2 AI-powered scenarios ready. Place your bet below."
-        });
-      } else {
-        throw new Error("Not enough scenarios generated");
-      }
+      // Now create the quantum market on-chain
+      toast({ title: "Creating Quantum Market...", description: "Confirm transaction in wallet" });
+
+      const duration = BigInt(24 * 60 * 60); // 24 hours
+      const probs = [BigInt(50), BigInt(50)];
+      const priceFeedId = ETH_USD_PRICE_FEED as `0x${string}`;
+      const targetPrice = Math.round(currentPrice);
+
+      const tx = await writeContractAsync({
+        address: URIM_QUANTUM_MARKET_ADDRESS as `0x${string}`,
+        abi: UrimQuantumMarketABI.abi as any,
+        functionName: "createQuantumMarket",
+        args: [question.trim(), finalScenarios, probs, duration, priceFeedId, [BigInt(targetPrice)]],
+        gas: BigInt(3_000_000),
+      } as any);
+
+      toast({ title: "✅ New Quantum Market Created!", description: "You can now place bets on the outcomes" });
+
+      // Wait for the market to be created and get the ID
+      setTimeout(() => {
+        if (quantumMarketIds && quantumMarketIds.length > 0) {
+          const newMarketId = quantumMarketIds[quantumMarketIds.length - 1];
+          setLiveQuantumMarkets(prev => [...prev, {
+            marketId: newMarketId,
+            question: question.trim(),
+            scenarios: finalScenarios,
+            betAmounts: ["", ""],
+            bettingIdx: null,
+            bridgingIdx: null,
+          }]);
+        }
+      }, 2000);
+
     } catch (error: any) {
-      console.error("AI generation error:", error);
+      console.error("Market creation error:", error);
       toast({
-        title: "Generation failed",
-        description: "Using fallback scenarios: YES/NO",
+        title: "❌ Market creation failed",
+        description: error.message || "Please try again",
         variant: "destructive"
       });
-      setScenarios(["Yes, it will happen", "No, it will not happen"]);
+      setScenarios([]);
     } finally {
       setGenerating(false);
+      setCreatingQuantumMarket(false);
     }
   };
 
@@ -339,39 +416,31 @@ const Index = () => {
     }
   };
 
-  const createMarketAndBet = async (scenarioIndex: number) => {
+  const placeBet = async (marketIndex: number, scenarioIndex: number) => {
     if (!address) {
-      toast({ title: "Connect Wallet", description: "Please connect your wallet first.", variant: "destructive" });
+      toast({ title: "Connect wallet", variant: "destructive" });
       return;
     }
 
-    const amount = betAmounts[scenarioIndex];
+    const market = liveQuantumMarkets[marketIndex];
+    if (!market) return;
+
+    const amount = market.betAmounts[scenarioIndex];
     if (!amount || parseFloat(amount) <= 0) {
       toast({ title: "Enter bet amount", variant: "destructive" });
       return;
     }
 
-    setBettingIdx(scenarioIndex);
+    setLiveQuantumMarkets(prev => prev.map((m, i) => 
+      i === marketIndex ? { ...m, bettingIdx: scenarioIndex } : m
+    ));
 
     try {
-      toast({ title: "Creating market...", description: "Confirm transaction in wallet" });
-
-      const duration = BigInt(7 * 24 * 60 * 60);
-      const probs = [BigInt(50), BigInt(50)];
-      const priceFeedId = "0x0000000000000000000000000000000000000000000000000000000000000000" as `0x${string}`;
-
-      await writeContractAsync({
-        address: URIM_QUANTUM_MARKET_ADDRESS as `0x${string}`,
-        abi: UrimQuantumMarketABI.abi as any,
-        functionName: "createQuantumMarket",
-        args: [question, scenarios, probs, duration, priceFeedId, []],
-        gas: BigInt(3_000_000),
-      } as any);
-
-      toast({ title: "🧠 AI-generated market created!", description: "Now placing your bet..." });
+      toast({ title: "Placing bet...", description: "Confirm transactions in wallet" });
 
       const amountWei = parseUnits(amount, 6);
       
+      // Approve USDC
       await writeContractAsync({
         address: USDC_ADDRESS as `0x${string}`,
         abi: ERC20ABI.abi as any,
@@ -379,20 +448,28 @@ const Index = () => {
         args: [URIM_QUANTUM_MARKET_ADDRESS, amountWei],
       } as any);
 
-      const lastMarketId = quantumMarketIds.length > 0 ? quantumMarketIds[quantumMarketIds.length - 1] : BigInt(0);
-
+      // Place bet
       await writeContractAsync({
         address: URIM_QUANTUM_MARKET_ADDRESS as `0x${string}`,
         abi: UrimQuantumMarketABI.abi as any,
         functionName: "buyScenarioShares",
-        args: [lastMarketId, BigInt(scenarioIndex), amountWei],
+        args: [market.marketId, BigInt(scenarioIndex), amountWei],
         gas: BigInt(3_000_000),
       } as any);
 
       toast({
         title: "✅ Bet placed!",
-        description: `You bet ${amount} USDC on outcome #${scenarioIndex + 1}`,
+        description: `You bet ${amount} USDC on ${scenarioIndex === 0 ? 'YES' : 'NO'}`,
       });
+
+      setLiveQuantumMarkets(prev => prev.map((m, i) => {
+        if (i === marketIndex) {
+          const newAmounts = [...m.betAmounts];
+          newAmounts[scenarioIndex] = '';
+          return { ...m, betAmounts: newAmounts };
+        }
+        return m;
+      }));
     } catch (error: any) {
       console.error("Error placing bet:", error);
       toast({
@@ -401,7 +478,47 @@ const Index = () => {
         variant: "destructive",
       });
     } finally {
-      setBettingIdx(null);
+      setLiveQuantumMarkets(prev => prev.map((m, i) => 
+        i === marketIndex ? { ...m, bettingIdx: null } : m
+      ));
+    }
+  };
+
+  const bridgeAndBet = async (marketIndex: number, scenarioIndex: number) => {
+    if (!address) {
+      toast({ title: "Connect wallet", variant: "destructive" });
+      return;
+    }
+
+    const market = liveQuantumMarkets[marketIndex];
+    if (!market) return;
+
+    const amount = market.betAmounts[scenarioIndex];
+    if (!amount || parseFloat(amount) <= 0) {
+      toast({ title: "Enter bet amount", variant: "destructive" });
+      return;
+    }
+
+    setLiveQuantumMarkets(prev => prev.map((m, i) => 
+      i === marketIndex ? { ...m, bridgingIdx: scenarioIndex } : m
+    ));
+
+    try {
+      toast({ title: "🌉 Bridging with Avail...", description: "This may take a moment" });
+      
+      // For now, fall back to direct bet (full bridge+execute integration to be added)
+      await placeBet(marketIndex, scenarioIndex);
+    } catch (error: any) {
+      console.error("Bridge failed:", error);
+      toast({
+        title: "Bridge failed",
+        description: "You can still place a bet directly.",
+        variant: "destructive",
+      });
+    } finally {
+      setLiveQuantumMarkets(prev => prev.map((m, i) => 
+        i === marketIndex ? { ...m, bridgingIdx: null } : m
+      ));
     }
   };
 
@@ -599,7 +716,7 @@ const Index = () => {
             {generating ? (
               <>
                 <Sparkles className="w-4 h-4 mr-2 animate-pulse" />
-                Generating AI scenarios...
+                {creatingQuantumMarket ? "Generating Market..." : "Generating AI scenarios..."}
               </>
             ) : (
               <>
@@ -608,50 +725,117 @@ const Index = () => {
               </>
             )}
           </Button>
-
-          {scenarios.length > 0 && (
-            <div className="grid grid-cols-2 gap-4 pt-4 animate-fade-in">
-              {scenarios.map((scenario, idx) => (
-                <div 
-                  key={idx}
-                  className="p-6 rounded-xl border-2 border-primary/30 bg-primary/5 hover:border-primary/50 transition-all"
-                >
-                  <div className="text-xs font-bold text-primary mb-2 uppercase">
-                    {idx === 0 ? "Yes" : "No"}
-                  </div>
-                  <div className="text-sm mb-4 min-h-[3rem]">{scenario}</div>
-                  
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-muted-foreground">💰</span>
-                      <Input 
-                        type="number"
-                        placeholder="0.1"
-                        value={betAmounts[idx]}
-                        onChange={(e) => {
-                          const newAmounts = [...betAmounts];
-                          newAmounts[idx] = e.target.value;
-                          setBetAmounts(newAmounts);
-                        }}
-                        className="flex-1 bg-background/50"
-                      />
-                      <span className="text-xs font-bold text-muted-foreground">USDC</span>
-                    </div>
-                    <Button 
-                      onClick={() => createMarketAndBet(idx)}
-                      disabled={bettingIdx !== null}
-                      className="w-full bg-gradient-to-r from-primary to-primary-glow"
-                      size="sm"
-                    >
-                      {bettingIdx === idx ? "Placing..." : "Bridge & Bet with Avail"}
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
         </div>
       </section>
+
+      {liveQuantumMarkets.length > 0 && (
+        <section className="max-w-4xl mx-auto px-6 pb-16">
+          <div className="text-center mb-8">
+            <h2 className="text-4xl font-bold mb-3" style={{ color: '#CDBBFF', fontSize: '1.5rem', fontWeight: 700, marginBottom: '24px' }}>
+              🧠 Live Quantum Markets
+            </h2>
+            <p className="text-muted-foreground text-lg">Active AI-generated markets you can bet on below.</p>
+          </div>
+
+          <div className="space-y-8">
+            {liveQuantumMarkets.map((market, marketIndex) => (
+              <div 
+                key={marketIndex}
+                className="glass-card p-6"
+                style={{
+                  borderRadius: '20px',
+                  border: '1px solid #4B2AFF',
+                  background: 'rgba(32, 24, 48, 0.5)',
+                  padding: '20px',
+                  boxShadow: '0 0 16px rgba(139, 109, 255, 0.15)',
+                }}
+              >
+                <h3 className="text-xl font-bold text-center mb-6">{market.question}</h3>
+                
+                <div className="grid grid-cols-2 gap-6">
+                  {market.scenarios.map((scenario, scenarioIdx) => (
+                    <div 
+                      key={scenarioIdx}
+                      className="p-6 rounded-xl border-2 border-primary/30 bg-primary/5 hover:border-primary/50 transition-all"
+                    >
+                      <div className="text-xs font-bold text-primary mb-2 uppercase">
+                        {scenarioIdx === 0 ? "Yes" : "No"}
+                      </div>
+                      <div className="text-sm mb-4 min-h-[3rem]">{scenario}</div>
+                      
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-muted-foreground">💰</span>
+                          <Input 
+                            type="number"
+                            placeholder="0.1"
+                            value={market.betAmounts[scenarioIdx]}
+                            onChange={(e) => {
+                              setLiveQuantumMarkets(prev => prev.map((m, i) => {
+                                if (i === marketIndex) {
+                                  const newAmounts = [...m.betAmounts];
+                                  newAmounts[scenarioIdx] = e.target.value;
+                                  return { ...m, betAmounts: newAmounts };
+                                }
+                                return m;
+                              }));
+                            }}
+                            className="flex-1 font-semibold"
+                            style={{
+                              background: '#171218',
+                              color: '#FFFFFF',
+                              border: '1px solid #6B4FFF',
+                              fontWeight: 600,
+                            }}
+                            onFocus={(e) => e.target.style.borderColor = '#9F7BFF'}
+                            onBlur={(e) => e.target.style.borderColor = '#6B4FFF'}
+                          />
+                          <span className="text-sm font-bold" style={{ color: '#D9CCFF' }}>USDC</span>
+                        </div>
+                        
+                        <div className="space-y-2.5">
+                          <Button 
+                            onClick={() => placeBet(marketIndex, scenarioIdx)}
+                            disabled={market.bettingIdx !== null || market.bridgingIdx !== null}
+                            className="w-full font-semibold"
+                            style={{
+                              background: '#A77BFF',
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.background = '#C6A5FF'}
+                            onMouseLeave={(e) => e.currentTarget.style.background = '#A77BFF'}
+                            size="sm"
+                          >
+                            {market.bettingIdx === scenarioIdx ? "Placing..." : "Bet"}
+                          </Button>
+
+                          <Button 
+                            onClick={() => bridgeAndBet(marketIndex, scenarioIdx)}
+                            disabled={market.bettingIdx !== null || market.bridgingIdx !== null}
+                            variant="outline"
+                            className="w-full font-semibold rounded-full"
+                            style={{
+                              border: '1px solid #A77BFF',
+                              color: '#D4C3FF',
+                              background: 'transparent',
+                              boxShadow: '0 0 8px rgba(167,123,255,0.25)',
+                              fontWeight: 600,
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(167,123,255,0.15)'}
+                            onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                            size="sm"
+                          >
+                            {market.bridgingIdx === scenarioIdx ? "Bridging..." : "Bridge & Bet with Avail"}
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       <PythPriceTicker />
       <section className="max-w-4xl mx-auto px-6 pb-24">
