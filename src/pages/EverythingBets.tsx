@@ -343,7 +343,7 @@ const EverythingBets = () => {
                     Creating Market...
                   </>
                 ) : (
-                  "Generate AI Quantum Market"
+                  "Generate Urim Market"
                 )}
               </Button>
             </div>
