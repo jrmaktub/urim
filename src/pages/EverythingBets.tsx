@@ -28,7 +28,6 @@ import ERC20ABI from "@/contracts/ERC20.json";
 import { parseUnits, formatUnits } from "viem";
 import { useAllMarkets, useMarketInfo, useOutcomePool } from "@/hooks/useMarkets";
 
-import FetchUnifiedBalanceButton from '@/components/fetch-unified-balance-button';
 import Bridge from '@/components/BridgeButton';
 import BridgeAndExecute from '@/components/BridgeAndExecute';
 
@@ -242,7 +241,6 @@ const EverythingBets = () => {
                   {balances && (
           <pre className="whitespace-pre-wrap">{JSON.stringify(balances, null, 2)}</pre>
         )}
-        <FetchUnifiedBalanceButton className={btn} onResult={(r) => setBalances(r)} />
           <Bridge />
           <BridgeAndExecute />
           {/* Form Card */}
