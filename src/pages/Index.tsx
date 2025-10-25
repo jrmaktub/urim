@@ -1,22 +1,16 @@
 import { useState, useEffect } from "react";
-import { useAccount, useReadContract, useWriteContract, useSwitchChain, useWalletClient } from "wagmi";
-import { Link } from "react-router-dom";
+import { useAccount, useWriteContract, useSwitchChain, useWalletClient } from "wagmi";
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Sparkles, TrendingUp, Clock, ExternalLink, Zap } from "lucide-react";
+import { Sparkles, Zap, RefreshCw, ChevronUp } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useAllMarkets, useMarketInfo } from "@/hooks/useMarkets";
-import { URIM_QUANTUM_MARKET_ADDRESS, URIM_MARKET_ADDRESS, USDC_ADDRESS } from "@/constants/contracts";
+import { useAllMarkets } from "@/hooks/useMarkets";
+import { URIM_QUANTUM_MARKET_ADDRESS, USDC_ADDRESS } from "@/constants/contracts";
 import UrimQuantumMarketABI from "@/contracts/UrimQuantumMarket.json";
-import UrimMarketABI from "@/contracts/UrimMarket.json";
 import ERC20ABI from "@/contracts/ERC20.json";
-import { parseUnits, formatUnits } from "viem";
-import { getExplorerTxUrl } from "@/constants/blockscout";
+import { parseUnits } from "viem";
 import PythPriceTicker from "@/components/PythPriceTicker";
 import { EvmPriceServiceConnection } from "@pythnetwork/pyth-evm-js";
 import { initializeWithProvider, isInitialized, getUnifiedBalances } from "@/lib/nexus";
@@ -27,6 +21,17 @@ import { optimismSepolia, baseSepolia } from 'wagmi/chains';
 const ETH_USD_PRICE_FEED = "0xff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace";
 const connection = new EvmPriceServiceConnection("https://hermes.pyth.network");
 
+type ProcessedBalance = {
+  symbol: string;
+  icon: string;
+  totalBalance: string;
+  chains: {
+    chainName: string;
+    balance: string;
+    icon: string;
+  }[];
+};
+
 const Index = () => {
   const { switchChain } = useSwitchChain();
   const { address, isConnected, chain } = useAccount();
@@ -34,66 +39,80 @@ const Index = () => {
   const { toast } = useToast();
   const { writeContractAsync } = useWriteContract();
   
-  // Quantum Bets state
   const [question, setQuestion] = useState("");
   const [generating, setGenerating] = useState(false);
   const [scenarios, setScenarios] = useState<string[]>([]);
   const [betAmounts, setBetAmounts] = useState<string[]>(["", ""]);
   const [bettingIdx, setBettingIdx] = useState<number | null>(null);
   
-  // Avail Nexus state - FIXED
   const [nexusInitialized, setNexusInitialized] = useState(false);
-  const [unifiedBalance, setUnifiedBalance] = useState<string | null>(null);
+  const [processedBalances, setProcessedBalances] = useState<ProcessedBalance[]>([]);
   const [initializingNexus, setInitializingNexus] = useState(false);
   const [balanceLoading, setBalanceLoading] = useState(false);
   const [balanceError, setBalanceError] = useState<string | null>(null);
+  const [expandedTokens, setExpandedTokens] = useState<Set<string>>(new Set());
   
-  // Pyth state
   const [currentPrice, setCurrentPrice] = useState<number>(0);
   const [pythBetAmount, setPythBetAmount] = useState("");
   const [selectedPythOutcome, setSelectedPythOutcome] = useState<number | null>(null);
 
   const isOnOptimismSepolia = chain?.id === optimismSepolia.id;
+  const { quantumMarketIds } = useAllMarkets();
 
-  const { quantumMarketIds, everythingMarketIds } = useAllMarkets();
+  const fetchBalances = async () => {
+    if (!isInitialized()) {
+      return;
+    }
+    
+    setBalanceLoading(true);
+    setBalanceError(null);
+    
+    try {
+      const rawBalances = await getUnifiedBalances();
+      console.log('Raw Data from Nexus:', rawBalances);
+      
+      const processed: ProcessedBalance[] = rawBalances
+        .filter((token: any) => parseFloat(token.balance) > 0)
+        .map((token: any) => {
+          const chainsWithBalance = token.breakdown
+            .filter((chain: any) => parseFloat(chain.balance) > 0)
+            .map((chain: any) => ({
+              chainName: chain.chain.name || 'Unknown Chain',
+              balance: chain.balance,
+              icon: chain.chain.logo,
+            }));
 
-  // Check Nexus initialization on mount - FIXED
+          return {
+            symbol: token.symbol,
+            icon: token.icon,
+            totalBalance: token.balance,
+            chains: chainsWithBalance,
+          };
+        });
+
+      console.log('Processed Data for UI:', processed);
+      setProcessedBalances(processed);
+    } catch (e: any) {
+      console.error("Failed to fetch balances:", e);
+      setBalanceError(e.message || "Failed to fetch balance");
+      setProcessedBalances([]);
+    } finally {
+      setBalanceLoading(false);
+    }
+  };
+
   useEffect(() => {
     const checkInit = async () => {
       const initialized = isInitialized();
       setNexusInitialized(initialized);
       
       if (initialized) {
-        setBalanceLoading(true);
-        setBalanceError(null);
-        try {
-          const balances = await getUnifiedBalances();
-          console.log("Unified balances:", balances);
-          
-          if (Array.isArray(balances) && balances.length > 0) {
-            const usdcBalance = balances.find((b: any) => b.asset === 'USDC' || b.symbol === 'USDC');
-            if (usdcBalance) {
-              setUnifiedBalance(usdcBalance.balance || usdcBalance.balance || "0");
-            } else {
-              // No USDC found, set to "0" instead of null
-              setUnifiedBalance("0");
-            }
-          } else {
-            setUnifiedBalance("0");
-          }
-        } catch (e: any) {
-          console.error("Failed to fetch balances:", e);
-          setBalanceError(e.message || "Failed to fetch balance");
-          setUnifiedBalance("0");
-        } finally {
-          setBalanceLoading(false);
-        }
+        await fetchBalances();
       }
     };
     checkInit();
   }, []);
 
-  // Fetch Pyth price
   useEffect(() => {
     const fetchPrice = async () => {
       try {
@@ -110,7 +129,7 @@ const Index = () => {
     };
 
     fetchPrice();
-    const interval = setInterval(fetchPrice, 10000); // Update every 10 seconds
+    const interval = setInterval(fetchPrice, 10000);
     return () => clearInterval(interval);
   }, []);
 
@@ -125,22 +144,7 @@ const Index = () => {
     try {
       await initializeWithProvider(walletClient);
       setNexusInitialized(true);
-      
-      setBalanceLoading(true);
-      const balances = await getUnifiedBalances();
-      console.log("Unified balances after init:", balances);
-      
-      if (Array.isArray(balances) && balances.length > 0) {
-        const usdcBalance = balances.find((b: any) => b.asset === 'USDC' || b.symbol === 'USDC');
-        if (usdcBalance) {
-          setUnifiedBalance(usdcBalance.balance || usdcBalance.balance || "0");
-        } else {
-          setUnifiedBalance("0");
-        }
-      } else {
-        setUnifiedBalance("0");
-      }
-      
+      await fetchBalances();
       toast({ title: "🌉 Nexus Initialized", description: "Avail bridge ready!" });
     } catch (error: any) {
       console.error("Nexus init failed:", error);
@@ -148,8 +152,17 @@ const Index = () => {
       toast({ title: "Initialization failed", description: error.message, variant: "destructive" });
     } finally {
       setInitializingNexus(false);
-      setBalanceLoading(false);
     }
+  };
+
+  const toggleTokenExpansion = (token: string) => {
+    const newExpanded = new Set(expandedTokens);
+    if (newExpanded.has(token)) {
+      newExpanded.delete(token);
+    } else {
+      newExpanded.add(token);
+    }
+    setExpandedTokens(newExpanded);
   };
 
   const handleGenerate = async () => {
@@ -209,8 +222,7 @@ const Index = () => {
     try {
       toast({ title: "Creating market...", description: "Confirm transaction in wallet" });
 
-      // Create Quantum Market (no target price)
-      const duration = BigInt(7 * 24 * 60 * 60); // 7 days
+      const duration = BigInt(7 * 24 * 60 * 60);
       const probs = [BigInt(50), BigInt(50)];
       const priceFeedId = "0x0000000000000000000000000000000000000000000000000000000000000000" as `0x${string}`;
 
@@ -224,7 +236,6 @@ const Index = () => {
 
       toast({ title: "🧠 AI-generated market created!", description: "Now placing your bet..." });
 
-      // Approve and buy shares
       const amountWei = parseUnits(amount, 6);
       
       await writeContractAsync({
@@ -266,11 +277,7 @@ const Index = () => {
     <div className="min-h-screen bg-gradient-to-b from-background via-background to-purple-950/10">
       <Navigation />
       
-      {/* Hero */}
       <section className="max-w-4xl mx-auto px-6 pt-24 pb-12 text-center">
-        <Badge variant="outline" className="mb-4 text-xs uppercase tracking-wider border-primary">
-          Quantum prediction markets
-        </Badge>
         <h1 className="text-6xl font-bold mb-4 bg-gradient-to-r from-white via-purple-200 to-purple-400 bg-clip-text text-transparent">
           URIM
         </h1>
@@ -279,14 +286,26 @@ const Index = () => {
         </p>
       </section>
 
-      {/* Avail Nexus Integration - FIXED */}
       <section className="max-w-2xl mx-auto px-6 pb-16">
         <div className="glass-card p-8">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="p-3 rounded-xl bg-gradient-to-br from-purple-600/20 to-purple-700/20 border border-purple-500/30">
-              <Zap className="w-6 h-6 text-purple-400" />
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-3">
+              <div className="p-3 rounded-xl bg-gradient-to-br from-purple-600/20 to-purple-700/20 border border-purple-500/30">
+                <Zap className="w-6 h-6 text-purple-400" />
+              </div>
+              <h3 className="text-2xl font-bold">⚡ Avail Nexus Integration</h3>
             </div>
-            <h3 className="text-2xl font-bold">⚡ Avail Nexus Integration</h3>
+            {nexusInitialized && (
+              <Button
+                onClick={fetchBalances}
+                disabled={balanceLoading}
+                variant="ghost"
+                size="sm"
+                className="text-purple-400 hover:text-purple-300"
+              >
+                <RefreshCw className={`w-4 h-4 ${balanceLoading ? 'animate-spin' : ''}`} />
+              </Button>
+            )}
           </div>
 
           {!nexusInitialized ? (
@@ -305,63 +324,114 @@ const Index = () => {
             </div>
           ) : (
             <div className="space-y-4">
-              <div className="p-4 rounded-lg bg-gradient-to-r from-purple-600/10 to-purple-700/10 border border-purple-500/20">
-                <div className="text-sm text-muted-foreground mb-1">Unified Balance</div>
-                {balanceLoading ? (
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
-                    <span className="text-lg font-bold">Loading...</span>
-                  </div>
-                ) : balanceError ? (
-                  <div className="text-red-400 text-sm">{balanceError}</div>
+              {balanceLoading ? (
+                <div className="flex items-center justify-center gap-3 py-8">
+                  <div className="w-6 h-6 border-3 border-purple-500 border-t-transparent rounded-full animate-spin" />
+                  <span className="text-lg font-medium text-muted-foreground">Loading balances...</span>
+                </div>
+              ) : balanceError ? (
+                <div className="p-4 rounded-lg bg-red-500/10 border border-red-500/30">
+                  <p className="text-red-400 text-sm">{balanceError}</p>
+                </div>
+              ) : processedBalances.length === 0 ? (
+                <div className="p-6 rounded-lg bg-gradient-to-r from-purple-600/10 to-purple-700/10 border border-purple-500/20 text-center">
+                  <p className="text-muted-foreground">No balances found</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {processedBalances.map((token) => {
+                    const isExpanded = expandedTokens.has(token.symbol);
+                    
+                    return (
+                      <div key={token.symbol} className="rounded-lg border border-purple-500/20 overflow-hidden">
+                        <button
+                          onClick={() => toggleTokenExpansion(token.symbol)}
+                          className="w-full p-4 bg-gradient-to-r from-purple-600/10 to-purple-700/10 hover:from-purple-600/15 hover:to-purple-700/15 transition-all flex items-center justify-between"
+                        >
+                          <div className="flex items-center gap-3">
+                            {token.icon && (
+                              <img src={token.icon} alt={token.symbol} className="w-8 h-8 rounded-full" />
+                            )}
+                            <div className="text-left">
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-lg">{token.symbol}</span>
+                              </div>
+                              <div className="text-2xl font-bold text-purple-400">
+                                {parseFloat(token.totalBalance).toFixed(6)}
+                              </div>
+                            </div>
+                          </div>
+                          <ChevronUp className={`w-5 h-5 text-muted-foreground transition-transform ${isExpanded ? '' : 'rotate-180'}`} />
+                        </button>
+                        
+                        {isExpanded && (
+                          <div className="p-4 bg-background/50 space-y-2">
+                            {token.chains.map((chainBal, idx) => (
+                              <div
+                                key={idx}
+                                className="flex items-center justify-between p-3 rounded-lg bg-gradient-to-r from-gray-500/20 to-gray-600/20 border border-gray-500/30"
+                              >
+                                <div className="flex items-center gap-2">
+                                  {chainBal.icon && (
+                                    <img src={chainBal.icon} alt={chainBal.chainName} className="w-5 h-5 rounded-full" />
+                                  )}
+                                  <span className="text-sm font-medium">{chainBal.chainName}</span>
+                                </div>
+                                <span className="text-sm font-bold">
+                                  {parseFloat(chainBal.balance).toFixed(6)}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              <div className="pt-4">
+                {!isOnOptimismSepolia ? (
+                  <Button 
+                    onClick={() => switchChain({ chainId: optimismSepolia.id })}
+                    className="w-full"
+                    size="lg"
+                    variant="outline"
+                  >
+                    Switch to Optimism Sepolia
+                  </Button>
                 ) : (
-                  <div className="text-2xl font-bold">
-                    {parseFloat(unifiedBalance || "0").toFixed(2)} USDC
-                  </div>
+                  <BridgeAndExecuteButton
+                    contractAddress={URIM_QUANTUM_MARKET_ADDRESS as `0x${string}`}
+                    contractAbi={UrimQuantumMarketABI.abi as any}
+                    functionName="buyScenarioShares"
+                    buildFunctionParams={() => ({
+                      functionParams: [BigInt(0), BigInt(0), parseUnits("1", 6)]
+                    })}
+                    prefill={{
+                      toChainId: baseSepolia.id,
+                      token: 'USDC',
+                      amount: '1'
+                    }}
+                  >
+                    {({ onClick, isLoading, disabled }) => (
+                      <Button
+                        onClick={onClick}
+                        disabled={isLoading || disabled}
+                        className="w-full bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800"
+                        size="lg"
+                      >
+                        {isLoading ? "🌉 Bridging..." : "Bridge & Bet with Avail"}
+                      </Button>
+                    )}
+                  </BridgeAndExecuteButton>
                 )}
               </div>
-
-              {!isOnOptimismSepolia ? (
-                <Button 
-                  onClick={() => switchChain({ chainId: optimismSepolia.id })}
-                  className="w-full"
-                  size="lg"
-                  variant="outline"
-                >
-                  Switch to Optimism Sepolia
-                </Button>
-              ) : (
-                <BridgeAndExecuteButton
-                  contractAddress={URIM_QUANTUM_MARKET_ADDRESS as `0x${string}`}
-                  contractAbi={UrimQuantumMarketABI.abi as any}
-                  functionName="buyScenarioShares"
-                  buildFunctionParams={() => ({
-                    functionParams: [BigInt(0), BigInt(0), parseUnits("1", 6)]
-                  })}
-                  prefill={{
-                    toChainId: baseSepolia.id,
-                    token: 'USDC',
-                    amount: '1'
-                  }}
-                >
-                  {({ onClick, isLoading, disabled }) => (
-                    <Button
-                      onClick={onClick}
-                      disabled={isLoading || disabled}
-                      className="w-full bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800"
-                      size="lg"
-                    >
-                      {isLoading ? "🌉 Bridging..." : "Bridge & Bet with Avail"}
-                    </Button>
-                  )}
-                </BridgeAndExecuteButton>
-              )}
             </div>
           )}
         </div>
       </section>
 
-      {/* Quantum Bets Section */}
       <section className="max-w-2xl mx-auto px-6 py-16">
         <div className="text-center mb-8">
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/20 border border-primary/30 mb-4">
@@ -449,7 +519,6 @@ const Index = () => {
         </div>
       </section>
 
-      {/* Quantum Pyth Section */}
       <PythPriceTicker />
       <section className="max-w-2xl mx-auto px-6 pb-24">
         <div className="text-center mb-8">
@@ -463,7 +532,6 @@ const Index = () => {
 
         <div className="glass-card p-8">
           <div className="space-y-6">
-            {/* Live Pyth Market */}
             <div className="p-6 rounded-xl border-2 border-primary/30 bg-gradient-to-br from-primary/10 to-transparent">
               <div className="text-lg font-semibold mb-4">
                 Will ETH close above ${threshold} tomorrow?
