@@ -11,6 +11,7 @@ import { Sparkles } from "lucide-react";
 import { URIM_QUANTUM_MARKET_ADDRESS, BASE_SEPOLIA_CHAIN_ID } from "@/constants/contracts";
 import UrimQuantumMarketABI from "@/contracts/UrimQuantumMarket.json";
 import { Card } from "@/components/ui/card";
+import { useNotification } from "@blockscout/app-sdk";
 
 const CreateBet = () => {
   const { toast } = useToast();
@@ -23,6 +24,8 @@ const CreateBet = () => {
   const [probabilities, setProbabilities] = useState(["33", "33", "34"]);
   const [duration, setDuration] = useState("7");
   const [isCreating, setIsCreating] = useState(false);
+  const { openTxToast } = useNotification();
+
 
   const handleScenarioChange = (index: number, value: string) => {
     const newScenarios = [...scenarios];
@@ -36,7 +39,7 @@ const CreateBet = () => {
     setProbabilities(newProbs);
   };
 
-  const handleCreateMarket = async () => {
+  const handleCreateMarket = async (txHash) => {
     if (!address) {
       toast({
         title: "Connect Wallet",
@@ -98,6 +101,8 @@ const CreateBet = () => {
         functionName: "createQuantumMarket",
         args: [question, scenarios, probabilitiesArray, durationSeconds, priceFeedId, priceBoundaries],
       } as any);
+
+      openTxToast("84532", txHash)
       
       toast({
         title: "Quantum Market Created ⚡",

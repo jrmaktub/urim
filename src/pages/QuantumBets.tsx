@@ -13,6 +13,8 @@ import { URIM_QUANTUM_MARKET_ADDRESS, USDC_ADDRESS } from "@/constants/contracts
 import UrimQuantumMarketABI from "@/contracts/UrimQuantumMarket.json";
 import ERC20ABI from "@/contracts/ERC20.json";
 import { parseUnits } from "viem";
+import { useNotification } from "@blockscout/app-sdk";
+
 
 export default function QuantumBets() {
   const { address } = useAccount();
@@ -25,6 +27,7 @@ export default function QuantumBets() {
   const [betAmounts, setBetAmounts] = useState<string[]>(["", "", ""]);
   const [bettingIdx, setBettingIdx] = useState<number | null>(null);
   const [selectedScenario, setSelectedScenario] = useState<number | null>(null);
+    const { openTxToast } = useNotification();
 
   // Fetch all market IDs
   const { data: marketIdsData, refetch: refetchMarkets } = useReadContract({
@@ -97,17 +100,29 @@ export default function QuantumBets() {
       } as any);
 
       // Buy shares
-      await writeContractAsync({
-        address: URIM_QUANTUM_MARKET_ADDRESS as `0x${string}`,
-        abi: UrimQuantumMarketABI.abi as any,
-        functionName: "buyScenarioShares",
-        args: [latestId, scenarioIndex, amountWei],
-        gas: BigInt(500_000),
-      } as any);
-
-      toast({ title: "Bet placed!", description: `${amount} USDC on ${scenarios[scenarioIndex]}` });
-      setBetAmounts(["", "", ""]);
-      await refetchMarkets();
+            const handleBuyScenarioShares = async () => {
+              try{
+            const tx = await writeContractAsync({
+              address: URIM_QUANTUM_MARKET_ADDRESS as `0x${string}`,
+              abi: UrimQuantumMarketABI.abi as any,
+              functionName: "buyScenarioShares",
+              args: [latestId, scenarioIndex, amountWei],
+              gas: BigInt(500_000),
+            } as any);
+      
+              openTxToast("84532", tx)
+            console.log("Transaction sent:", tx);
+              }
+              catch (error) {
+                console.error("Transaction failed: ", error)
+              }
+            }
+      
+            await handleBuyScenarioShares();
+      
+            toast({ title: "Bet placed!", description: `${amount} USDC on ${scenarios[scenarioIndex]}` });
+            setBetAmounts(["", "", ""]);
+            await refetchMarkets();
     } catch (error: any) {
       console.error(error);
       toast({ title: "Transaction failed", description: error?.shortMessage || "Try again", variant: "destructive" });

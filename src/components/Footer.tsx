@@ -29,10 +29,6 @@ const Footer = () => {
               <Shield className="w-4 h-4 text-primary group-hover:scale-110 transition-transform animate-glow" />
               <span className="text-muted-foreground">Secured by <span className="text-primary font-semibold">Avail DA</span></span>
             </div>
-            <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary/5 border border-primary/20 hover:border-primary/40 transition-all group">
-              <ExternalLink className="w-4 h-4 text-primary group-hover:scale-110 transition-transform" />
-              <span className="text-muted-foreground">Verified by <span className="text-primary font-semibold">Blockscout</span></span>
-            </div>
           </div>
 
           {/* Smart Contracts Section - NEW */}

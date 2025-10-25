@@ -27,7 +27,9 @@ import {
   optimismSepolia
 } from 'wagmi/chains';
 import { createContext, useContext, useMemo, useState } from 'react';
-import WalletBridge from './components/WalletBridge'  // CRITICAL IMPORT
+import WalletBridge from './components/WalletBridge';
+import { NotificationProvider } from "@blockscout/app-sdk";
+
 
 const config = getDefaultConfig({
   appName: 'Nexus SDK with RainbowKit',
@@ -58,6 +60,7 @@ const App = () => {
   const value = useMemo(() => ({ network, setNetwork }), [network]);
 
   return (
+   <NotificationProvider>
     <Web3Context.Provider value={value}>
       <WagmiProvider config={config}>
         <QueryClientProvider client={queryClient}>
@@ -93,6 +96,7 @@ const App = () => {
         </QueryClientProvider>
       </WagmiProvider>
     </Web3Context.Provider>
+    </NotificationProvider> 
   );
 };
 
