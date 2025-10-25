@@ -55,39 +55,31 @@ export default function PythPriceTicker() {
   }
 
   return (
-    <div className="w-full max-w-md mx-auto mb-8 animate-fade-in">
-      <div className="relative overflow-hidden rounded-xl border border-primary/30 bg-background/80 backdrop-blur-sm p-4">
-        {/* Subtle animated background */}
-        <div className="absolute inset-0 bg-gradient-to-r from-primary/0 via-primary/5 to-primary/0 animate-pulse" />
+    <div className="w-full max-w-2xl mx-auto mb-8 animate-fade-in">
+      <div className="flex flex-col items-center gap-1.5">
+        {/* Label */}
+        <div className="flex items-center gap-2">
+          <Sparkles className="w-3.5 h-3.5 text-primary/50" />
+          <span className="text-xs font-light tracking-wider text-muted-foreground/70 uppercase">
+            ETH/USD — Pyth Oracle
+          </span>
+        </div>
         
-        {/* Content */}
-        <div className="relative flex flex-col items-center gap-2">
-          {/* Label */}
-          <div className="flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-primary/70" />
-            <span className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-              ETH/USD — Pyth Oracle
-            </span>
-          </div>
-          
-          {/* Price Display */}
-          <div className="flex items-center gap-2">
-            <span 
-              className={`text-3xl font-semibold bg-gradient-to-r from-primary via-purple-400 to-primary bg-clip-text text-transparent transition-all duration-300 ${
-                priceChanged ? 'scale-105' : 'scale-100'
-              }`}
-            >
-              ${ethPrice}
-            </span>
-          </div>
-          
-          {/* Update Status */}
-          <div className="flex items-center gap-1.5">
-            <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-            <span className="text-[10px] text-muted-foreground/80 font-light">
-              Updated in real time
-            </span>
-          </div>
+        {/* Price Display */}
+        <span 
+          className={`text-4xl font-extralight bg-gradient-to-r from-primary/90 via-purple-400/90 to-primary/90 bg-clip-text text-transparent transition-all duration-300 ${
+            priceChanged ? 'scale-105 drop-shadow-[0_0_8px_rgba(168,85,247,0.4)]' : 'scale-100'
+          }`}
+        >
+          ${ethPrice}
+        </span>
+        
+        {/* Update Status */}
+        <div className="flex items-center gap-1.5 opacity-60">
+          <div className="w-1 h-1 rounded-full bg-primary/70 animate-pulse" />
+          <span className="text-[10px] text-muted-foreground/60 font-extralight italic">
+            updated in real time
+          </span>
         </div>
       </div>
     </div>

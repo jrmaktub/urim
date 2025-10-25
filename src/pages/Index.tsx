@@ -273,9 +273,6 @@ const Index = () => {
           </p>
         </div>
 
-        {/* Live Price Feed Widget */}
-        <PythPriceTicker />
-
         {/* Two main cards */}
         <div className="grid md:grid-cols-2 gap-6 mb-16 animate-fade-in">
           
@@ -426,6 +423,9 @@ const Index = () => {
         {/* QUANTUM PYTH SECTION */}
         {currentPrice > 0 && aiBetIdeas.length > 0 && (
           <div className="mb-16 space-y-6 animate-fade-in">
+            {/* Live Pyth Price Widget */}
+            <PythPriceTicker />
+            
             <div className="text-center">
               <h2 className="text-3xl font-bold mb-2 bg-gradient-to-r from-primary via-purple-400 to-primary bg-clip-text text-transparent">
                 Quantum Pyth
