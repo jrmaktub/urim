@@ -17,6 +17,9 @@ import ERC20ABI from "@/contracts/ERC20.json";
 import { parseUnits } from "viem";
 import ExplorerLink from "@/components/ExplorerLink";
 import { getExplorerTxUrl, getExplorerAddressUrl } from "@/constants/blockscout";
+import PythPriceTicker from "@/components/PythPriceTicker";
+
+const ETH_USD_PRICE_FEED = "0xff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace";
 
 interface UserBet {
   marketId: number;
@@ -70,20 +73,28 @@ const Index = () => {
     setBettingIdx(scenarioIndex);
 
     try {
-      const duration = BigInt(7 * 24 * 60 * 60);
+      const duration = BigInt(24 * 60 * 60); // 1 day
       const probs = [BigInt(50), BigInt(50)]; // 50/50 for YES/NO
-      const priceFeedId = "0xff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace" as `0x${string}`; // ETH/USD
-      const priceBoundaries = [BigInt(parseInt(lowerBoundary) * 1e8), BigInt(parseInt(upperBoundary) * 1e8)];
+      // Auto-fetch price boundaries from Pyth (using placeholder values)
+      const currentPrice = 3750; // This would be fetched from Pyth in production
+      const delta = 250;
+      const priceBoundaries = [
+        BigInt((currentPrice - delta) * 1e8), 
+        BigInt((currentPrice + delta) * 1e8)
+      ];
 
-      await writeContractAsync({
+      const createTx = await writeContractAsync({
         address: URIM_QUANTUM_MARKET_ADDRESS as `0x${string}`,
         abi: UrimQuantumMarketABI.abi as any,
         functionName: "createQuantumMarket",
-        args: [question, scenarios, probs, duration, priceFeedId, priceBoundaries],
+        args: [question, scenarios, probs, duration, ETH_USD_PRICE_FEED as `0x${string}`, priceBoundaries],
         gas: BigInt(3_000_000),
       } as any);
 
       toast({ title: "Market created! Now placing bet..." });
+      
+      // Wait for market creation
+      await new Promise(resolve => setTimeout(resolve, 3000));
 
       const amountWei = parseUnits(amount, 6);
       await writeContractAsync({
@@ -93,12 +104,14 @@ const Index = () => {
         args: [URIM_QUANTUM_MARKET_ADDRESS, amountWei],
       } as any);
 
-      const latestId = quantumMarketIds.length > 0 ? quantumMarketIds[quantumMarketIds.length - 1] : 0n;
+      const latestId = quantumMarketIds.length > 0 ? quantumMarketIds[quantumMarketIds.length - 1] : BigInt(0);
+      const newMarketId = latestId + BigInt(1);
+      
       const txHash = await writeContractAsync({
         address: URIM_QUANTUM_MARKET_ADDRESS as `0x${string}`,
         abi: UrimQuantumMarketABI.abi as any,
         functionName: "buyScenarioShares",
-        args: [latestId, scenarioIndex, amountWei],
+        args: [newMarketId, scenarioIndex, amountWei],
         gas: BigInt(500_000),
       } as any);
 
@@ -117,6 +130,8 @@ const Index = () => {
         )
       });
       setBetAmounts(["", ""]);
+      setQuestion("");
+      setScenarios([]);
     } catch (error: any) {
       console.error(error);
       toast({ title: "Transaction failed", description: error?.shortMessage || "Try again", variant: "destructive" });
@@ -129,6 +144,7 @@ const Index = () => {
     <div className="min-h-screen w-full bg-background relative overflow-hidden">
       <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-transparent pointer-events-none" />
       <Navigation />
+      <PythPriceTicker />
 
       <section className="relative max-w-6xl mx-auto px-6 pt-32 pb-16">
         {/* Two cards side-by-side */}
@@ -138,8 +154,8 @@ const Index = () => {
             <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary to-primary-glow flex items-center justify-center glow-gold">
               <Sparkles className="w-7 h-7 text-background" />
             </div>
-            <h2 className="text-3xl font-bold">Quantum Bets</h2>
-            <p className="text-muted-foreground">Ask a question and generate 2 quantum scenarios (UP/DOWN) with AI.</p>
+            <h2 className="text-3xl font-bold">Quantum Pyth</h2>
+            <p className="text-sm text-muted-foreground">AI-generated futures from live Pyth prices.</p>
 
             {/* Generator UI */}
             <div className="space-y-4 pt-4">
@@ -156,26 +172,6 @@ const Index = () => {
                 </div>
               </div>
 
-              {/* Price Boundaries */}
-              <div className="space-y-2">
-                <Label className="text-sm font-semibold">Price Boundaries (for Pyth Oracle)</Label>
-                <div className="grid grid-cols-2 gap-2">
-                  <Input
-                    type="number"
-                    placeholder="Lower (e.g., 3500)"
-                    value={lowerBoundary}
-                    onChange={(e) => setLowerBoundary(e.target.value)}
-                    className="text-sm"
-                  />
-                  <Input
-                    type="number"
-                    placeholder="Upper (e.g., 4000)"
-                    value={upperBoundary}
-                    onChange={(e) => setUpperBoundary(e.target.value)}
-                    className="text-sm"
-                  />
-                </div>
-              </div>
 
               {generating && (
                 <div className="relative h-32 rounded-xl border-2 border-primary/30 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent overflow-hidden">
