@@ -209,16 +209,13 @@ const Index = () => {
     }
   };
 
-  const createAIBet = async (ideaIndex: number) => {
+  const createAIBet = async (idea: AIBetIdea, outcomeIndex: number) => {
     if (!address) {
       toast({ title: "Connect Wallet", variant: "destructive" });
       return;
     }
 
-    setCreatingAIBet(ideaIndex);
-
     try {
-      const idea = aiBetIdeas[ideaIndex];
       const duration = Math.floor(Date.now() / 1000) + 86400; // 24h from now
 
       const createTx = await writeContractAsync({
@@ -232,7 +229,7 @@ const Index = () => {
         title: "⚡ Market Created!",
         description: (
           <div className="space-y-2">
-            <p>{idea.question}</p>
+            <p>{idea.question} — {idea.outcomes[outcomeIndex]}</p>
             <button
               onClick={() => window.open(getExplorerTxUrl(createTx as string), '_blank')}
               className="text-xs text-primary hover:underline flex items-center gap-1"
@@ -249,8 +246,6 @@ const Index = () => {
         description: error?.shortMessage || "Try again", 
         variant: "destructive" 
       });
-    } finally {
-      setCreatingAIBet(null);
     }
   };
 
@@ -263,78 +258,60 @@ const Index = () => {
       <PythPriceTicker />
 
       <section className="relative max-w-6xl mx-auto px-6 pt-32 pb-16">
-        {/* AI-Generated Bet Ideas */}
-        {currentPrice > 0 && aiBetIdeas.length > 0 && (
-          <div className="mb-12 space-y-6 animate-fade-in">
-            <div className="flex items-center gap-3">
-              <Zap className="w-6 h-6 text-primary" />
-              <h2 className="text-2xl font-bold">AI-Generated Bet Ideas</h2>
-            </div>
-            <div className="grid md:grid-cols-3 gap-4">
-              {aiBetIdeas.map((idea, idx) => (
-                <Card
-                  key={idx}
-                  className="p-5 border-primary/20 hover:border-primary/40 transition-all bg-background/95 hover:shadow-lg hover:shadow-primary/10 group"
-                >
-                  <div className="space-y-4">
-                    <div className="text-sm font-semibold leading-snug">{idea.question}</div>
-                    <div className="flex gap-2 text-xs">
-                      {idea.outcomes.map((outcome, i) => (
-                        <Badge key={i} variant="outline" className="border-primary/30">
-                          {outcome}
-                        </Badge>
-                      ))}
-                    </div>
-                    <Button
-                      size="sm"
-                      disabled={creatingAIBet !== null}
-                      onClick={() => createAIBet(idx)}
-                      className="w-full bg-gradient-to-r from-primary to-primary/70 hover:shadow-lg hover:shadow-primary/20"
-                    >
-                      {creatingAIBet === idx ? <Sparkles className="w-4 h-4 animate-spin" /> : "Create Market"}
-                    </Button>
-                  </div>
-                </Card>
-              ))}
-            </div>
-          </div>
-        )}
+        {/* Hero */}
+        <div className="text-center mb-12 animate-fade-in">
+          <h1 className="text-5xl md:text-6xl font-bold mb-4 bg-gradient-to-r from-primary via-purple-400 to-primary bg-clip-text text-transparent">
+            URIM
+          </h1>
+          <p className="text-xl text-muted-foreground">
+            Quantum prediction markets powered by AI and Pyth oracles
+          </p>
+        </div>
 
         {/* Two main cards */}
-        <div className="grid md:grid-cols-2 gap-6 mb-12 animate-fade-in" style={{ animationDelay: "0.1s" }}>
+        <div className="grid md:grid-cols-2 gap-6 mb-16 animate-fade-in">
           
-          {/* QUANTUM PYTH CARD */}
-          <div className="glass-card p-8 space-y-6 border-primary/20 hover:border-primary/40 transition-all">
-            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center shadow-lg shadow-primary/20">
+          {/* QUANTUM BET CARD */}
+          <div className="glass-card p-8 space-y-6 border-primary/50 hover:border-primary/70 transition-all shadow-lg shadow-primary/10">
+            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center shadow-lg shadow-primary/30">
               <Sparkles className="w-7 h-7 text-background" />
             </div>
             
             <div>
-              <h2 className="text-3xl font-bold mb-2">Quantum Pyth</h2>
-              <p className="text-sm text-muted-foreground">AI-generated futures from live Pyth prices.</p>
+              <h2 className="text-3xl font-bold mb-2">Quantum Bet</h2>
+              <p className="text-sm text-muted-foreground">AI-powered multi-scenario predictions</p>
             </div>
 
             {/* Question Input */}
             <div className="space-y-4 pt-2">
               <div className="space-y-2">
-                <Label className="text-sm font-semibold">Your Question</Label>
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="e.g., Will ETH go up tomorrow?"
-                    value={question}
-                    onChange={(e) => setQuestion(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleGenerate()}
-                    className="flex-1 bg-background/50"
-                  />
-                  <Button 
-                    onClick={handleGenerate} 
-                    disabled={generating || !question.trim()}
-                    className="px-6"
-                  >
-                    {generating ? <Sparkles className="w-4 h-4 animate-spin" /> : "Generate"}
-                  </Button>
-                </div>
+                <Label className="text-sm font-semibold">What do you want to predict?</Label>
+                <Input
+                  placeholder="e.g., Who will win the U.S. election?"
+                  value={question}
+                  onChange={(e) => setQuestion(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleGenerate()}
+                  className="bg-background/50 border-primary/20 focus:border-primary"
+                />
               </div>
+
+              <Button 
+                onClick={handleGenerate} 
+                disabled={generating || !question.trim()}
+                className="w-full bg-gradient-to-r from-primary to-primary/70 hover:shadow-lg hover:shadow-primary/20"
+              >
+                {generating ? (
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 animate-spin" />
+                    Generating...
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4" />
+                    Generate
+                  </div>
+                )}
+              </Button>
 
               {/* AI Generation Animation */}
               {generating && (
@@ -343,7 +320,7 @@ const Index = () => {
                   <div className="absolute inset-0 flex items-center justify-center">
                     <div className="flex items-center gap-3">
                       <Sparkles className="w-5 h-5 text-primary animate-pulse" />
-                      <div className="text-primary font-semibold animate-pulse">Generating quantum scenarios...</div>
+                      <div className="text-primary font-semibold animate-pulse">Thinking...</div>
                       <Sparkles className="w-5 h-5 text-primary animate-pulse" />
                     </div>
                   </div>
@@ -352,33 +329,43 @@ const Index = () => {
 
               {/* Generated Scenarios */}
               {!generating && scenarios.length > 0 && (
-                <div className="space-y-3 animate-fade-in">
+                <div className="space-y-3 animate-fade-in pt-4 border-t border-primary/20">
                   {scenarios.map((scenario, i) => (
                     <Card
                       key={i}
-                      className="p-4 border-2 border-primary/20 hover:border-primary/50 transition-all bg-background/50"
+                      className="p-4 border-2 border-primary/30 hover:border-primary/60 transition-all bg-background/80 backdrop-blur-sm"
                     >
-                      <div className="text-xs font-bold text-primary mb-2">SCENARIO {i + 1}</div>
-                      <div className="text-sm font-semibold mb-3">{scenario}</div>
+                      <div className="flex items-start justify-between mb-3">
+                        <div>
+                          <div className="text-xs font-bold text-primary mb-1">SCENARIO {i + 1}</div>
+                          <div className="text-sm font-semibold">{scenario}</div>
+                        </div>
+                        <span className="text-xs font-mono text-primary/60">50%</span>
+                      </div>
                       
                       <div className="flex gap-2 mb-3">
                         <Input
                           type="number"
-                          placeholder="Amount (USDC)"
+                          placeholder="USDC amount"
                           value={betAmounts[i]}
                           onChange={(e) => {
                             const newAmounts = [...betAmounts];
                             newAmounts[i] = e.target.value;
                             setBetAmounts(newAmounts);
                           }}
-                          className="flex-1 bg-background/50"
+                          className="flex-1 bg-background/50 text-sm"
                         />
                         <Button
                           disabled={bettingIdx !== null}
                           onClick={() => createMarketAndBet(i)}
-                          className="bg-gradient-to-r from-primary to-primary/70 hover:shadow-lg hover:shadow-primary/20"
+                          size="sm"
+                          className="bg-primary/20 hover:bg-primary/30 border border-primary"
                         >
-                          {bettingIdx === i ? "Placing..." : "Place Bet"}
+                          {bettingIdx === i ? (
+                            <Sparkles className="w-4 h-4 animate-spin" />
+                          ) : (
+                            'Place Bet'
+                          )}
                         </Button>
                       </div>
 
@@ -386,19 +373,16 @@ const Index = () => {
                       <div className="pt-3 border-t border-border/30">
                         <Button
                           variant="outline"
-                          className="w-full border-primary/30 hover:bg-primary/5 hover:border-primary/50 text-xs group"
+                          size="sm"
+                          className="w-full border-primary/30 hover:bg-primary/5 hover:border-primary/50 text-xs"
                           onClick={() => {
                             toast({ 
-                              title: "🪐 Bridge & Execute", 
-                              description: "Cross-chain bridging with Avail coming soon!" 
+                              title: "🪐 Bridge & Execute with Avail", 
+                              description: "Bridge and bet across chains in one click." 
                             });
                           }}
                         >
-                          <span className="mr-2">🪐</span>
-                          Bridge & Execute with Avail
-                          <span className="ml-2 text-[10px] text-muted-foreground group-hover:text-primary transition-colors">
-                            (Cross-chain in one click)
-                          </span>
+                          🪐 Bridge & Execute with Avail
                         </Button>
                       </div>
                     </Card>
@@ -410,24 +394,68 @@ const Index = () => {
 
           {/* EVERYTHING BETS CARD */}
           <Link 
-            to="/everything-bets" 
-            className="glass-card p-8 space-y-6 border-primary/20 hover:border-primary/40 hover:shadow-lg hover:shadow-primary/10 transition-all block group"
+            to="/create-bet" 
+            className="glass-card p-8 space-y-6 border-primary/50 hover:border-primary/70 hover:shadow-lg hover:shadow-primary/20 transition-all block group"
           >
-            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center shadow-lg shadow-primary/20 group-hover:shadow-primary/30 transition-all">
+            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center shadow-lg shadow-primary/30 group-hover:scale-110 transition-transform">
               <TrendingUp className="w-7 h-7 text-background" />
             </div>
             
             <div>
               <h2 className="text-3xl font-bold mb-2">Everything Bets</h2>
-              <p className="text-sm text-muted-foreground">Traditional prediction markets for any question.</p>
+              <p className="text-sm text-muted-foreground">Create custom prediction markets on any topic</p>
             </div>
 
-            <div className="flex items-center gap-2 text-sm text-primary">
-              <span>Create custom market</span>
-              <ExternalLink className="w-4 h-4" />
+            <div className="pt-4">
+              <div className="text-sm text-primary flex items-center gap-2 group-hover:gap-3 transition-all">
+                <span>Create custom market</span>
+                <ExternalLink className="w-4 h-4" />
+              </div>
             </div>
           </Link>
         </div>
+
+        {/* QUANTUM PYTH SECTION */}
+        {currentPrice > 0 && aiBetIdeas.length > 0 && (
+          <div className="mb-16 space-y-6 animate-fade-in">
+            <div className="text-center">
+              <h2 className="text-3xl font-bold mb-2 bg-gradient-to-r from-primary via-purple-400 to-primary bg-clip-text text-transparent">
+                Quantum Pyth
+              </h2>
+              <p className="text-muted-foreground">AI-generated futures from live Pyth price feeds.</p>
+            </div>
+            <div className="grid md:grid-cols-3 gap-4">
+              {aiBetIdeas.map((idea, idx) => (
+                <Card
+                  key={idx}
+                  className="p-5 border-2 border-primary/30 hover:border-primary/60 transition-all bg-background/80 backdrop-blur-sm hover:shadow-lg hover:shadow-primary/20 group"
+                >
+                  <div className="space-y-4">
+                    <div className="text-sm font-semibold leading-snug group-hover:text-primary transition-colors">
+                      {idea.question}
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        onClick={() => createAIBet(idea, 0)}
+                        className="flex-1 bg-green-600/20 hover:bg-green-600/30 border border-green-500/50 hover:border-green-500 transition-all"
+                      >
+                        ✅ Yes
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={() => createAIBet(idea, 1)}
+                        className="flex-1 bg-red-600/20 hover:bg-red-600/30 border border-red-500/50 hover:border-red-500 transition-all"
+                      >
+                        ❌ No
+                      </Button>
+                    </div>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* ACTIVE QUANTUM MARKETS */}
         <div className="space-y-6 mb-12 animate-fade-in" style={{ animationDelay: "0.2s" }}>
