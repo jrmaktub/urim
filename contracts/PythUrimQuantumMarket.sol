@@ -8,7 +8,7 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {IPyth} from "@pythnetwork/pyth-sdk-solidity/IPyth.sol";
 import {PythStructs} from "@pythnetwork/pyth-sdk-solidity/PythStructs.sol";
 
-contract UrimMarket is Ownable, ReentrancyGuard {
+contract PythUrimQuantumMarket is Ownable, ReentrancyGuard {
     enum MarketOutcome {
         UNRESOLVED,
         OPTION_A,
