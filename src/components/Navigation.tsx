@@ -55,21 +55,12 @@ const Navigation = () => {
               </Link>
             );
           })}
-        <div className="mt-2">
-          <b>Wallet Status:</b> {isConnected ? 'Connected' : 'Not connected'}
         </div>
-        <div className="mt-2">
-          <b>Nexus SDK Initialization Status:</b> {initialized ? 'Initialized' : 'Not initialized'}
-        </div>
- 
-        {balances && (
-          <pre className="whitespace-pre-wrap">{JSON.stringify(balances, null, 2)}</pre>
-        )}        </div>
 
-        {/* Wallet Button */}
-        <WalletButton />
-        <InitButton className={btn} onReady={() => setInitialized(true)} />
-        <DeinitButton className={btn} onDone={() => { setInitialized(false); setBalances(null); }} />
+        {/* Right Side Actions */}
+        <div className="flex items-center gap-3">
+          <WalletButton />
+        </div>
       </div>
     </nav>
   );

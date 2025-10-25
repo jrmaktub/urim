@@ -7,71 +7,58 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Sparkles } from "lucide-react";
-import { URIM_QUANTUM_MARKET_ADDRESS, BASE_SEPOLIA_CHAIN_ID } from "@/constants/contracts";
-import UrimQuantumMarketABI from "@/contracts/UrimQuantumMarket.json";
+import { TrendingUp, Plus, X } from "lucide-react";
+import { URIM_MARKET_ADDRESS } from "@/constants/contracts";
+import UrimMarketABI from "@/contracts/UrimMarket.json";
 import { Card } from "@/components/ui/card";
+import { getExplorerTxUrl } from "@/constants/blockscout";
 import { useNotification } from "@blockscout/app-sdk";
 
 const CreateBet = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
-  const { chainId, address } = useAccount();
+  const { address } = useAccount();
   const { writeContractAsync } = useWriteContract();
   
   const [question, setQuestion] = useState("");
-  const [scenarios, setScenarios] = useState(["", "", ""]);
-  const [probabilities, setProbabilities] = useState(["33", "33", "34"]);
-  const [duration, setDuration] = useState("7");
+  const [outcomes, setOutcomes] = useState(["YES", "NO"]);
+  const [duration, setDuration] = useState("24");
   const [isCreating, setIsCreating] = useState(false);
   const { openTxToast } = useNotification();
 
 
-  const handleScenarioChange = (index: number, value: string) => {
-    const newScenarios = [...scenarios];
-    newScenarios[index] = value;
-    setScenarios(newScenarios);
+  const handleOutcomeChange = (index: number, value: string) => {
+    const newOutcomes = [...outcomes];
+    newOutcomes[index] = value;
+    setOutcomes(newOutcomes);
   };
 
-  const handleProbabilityChange = (index: number, value: string) => {
-    const newProbs = [...probabilities];
-    newProbs[index] = value;
-    setProbabilities(newProbs);
+  const addOutcome = () => {
+    if (outcomes.length < 3) {
+      setOutcomes([...outcomes, ""]);
+    }
+  };
+
+  const removeOutcome = (index: number) => {
+    if (outcomes.length > 2) {
+      setOutcomes(outcomes.filter((_, i) => i !== index));
+    }
   };
 
   const handleCreateMarket = async (txHash) => {
     if (!address) {
       toast({
         title: "Connect Wallet",
-        description: "Please connect your wallet first.",
         variant: "destructive",
       });
       return;
     }
 
-    if (!question || scenarios.some(s => !s.trim())) {
+    const validOutcomes = outcomes.filter(o => o.trim());
+    if (!question.trim() || validOutcomes.length < 2) {
       toast({
         title: "Missing Information",
-        description: "Please fill in all fields.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (chainId !== BASE_SEPOLIA_CHAIN_ID) {
-      toast({
-        title: "Wrong Network",
-        description: "Please switch to Base Sepolia testnet.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const totalProb = probabilities.reduce((sum, p) => sum + Number(p), 0);
-    if (totalProb !== 100) {
-      toast({
-        title: "Invalid Probabilities",
-        description: "Probabilities must sum to 100%.",
+        description: "Please fill in question and at least 2 outcomes.",
         variant: "destructive",
       });
       return;
@@ -80,43 +67,39 @@ const CreateBet = () => {
     setIsCreating(true);
     
     try {
-      // Log contract connection
-      console.log(`✅ Connected to UrimQuantumMarket on Base Sepolia: ${URIM_QUANTUM_MARKET_ADDRESS}`);
+      const durationInSeconds = parseInt(duration) * 3600;
+      const endTimestamp = Math.floor(Date.now() / 1000) + durationInSeconds;
       
-      toast({
-        title: "✅ Contract Connected",
-        description: `UrimQuantumMarket on Base Sepolia`,
-      });
-
-      const durationSeconds = BigInt(Number(duration) * 24 * 60 * 60);
-      const probabilitiesArray = probabilities.map(p => BigInt(p));
-      
-      // Using empty price feed for now (0x0...0) and empty boundaries
-      const priceFeedId = "0x0000000000000000000000000000000000000000000000000000000000000000";
-      const priceBoundaries: bigint[] = [];
-
-      await writeContractAsync({
-        address: URIM_QUANTUM_MARKET_ADDRESS as `0x${string}`,
-        abi: UrimQuantumMarketABI.abi as any,
-        functionName: "createQuantumMarket",
-        args: [question, scenarios, probabilitiesArray, durationSeconds, priceFeedId, priceBoundaries],
+      const txHash = await writeContractAsync({
+        address: URIM_MARKET_ADDRESS as `0x${string}`,
+        abi: UrimMarketABI.abi as any,
+        functionName: "createMarket",
+        args: [question, validOutcomes, BigInt(endTimestamp)],
       } as any);
 
       openTxToast("84532", txHash)
       
       toast({
-        title: "Quantum Market Created ⚡",
-        description: "Your market is now live on Base Sepolia",
+        title: "⚡ Market Created!",
+        description: (
+          <div className="space-y-2">
+            <p>{question}</p>
+            <button
+              onClick={() => window.open(getExplorerTxUrl(txHash as string), '_blank')}
+              className="text-xs text-primary hover:underline flex items-center gap-1"
+            >
+              View on BlockScout →
+            </button>
+          </div>
+        )
       });
       
-      setTimeout(() => {
-        navigate("/");
-      }, 1500);
-    } catch (error) {
-      console.error("Failed to create market:", error);
+      setTimeout(() => navigate("/"), 2000);
+    } catch (error: any) {
+      console.error(error);
       toast({
-        title: "Transaction Failed",
-        description: "Could not create market. Please try again.",
+        title: "Transaction failed",
+        description: error?.shortMessage || "Try again",
         variant: "destructive",
       });
     } finally {
@@ -125,103 +108,119 @@ const CreateBet = () => {
   };
 
   return (
-    <div className="min-h-screen w-full bg-background">
+    <div className="min-h-screen w-full bg-background relative overflow-hidden">
+      <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-transparent pointer-events-none" />
+      
       <Navigation />
       
-      <div className="pt-32 pb-24 px-6">
-        <div className="max-w-2xl mx-auto">
-          <div className="text-center mb-12 animate-fade-up">
-            <h1 className="text-5xl font-bold mb-4 text-primary flex items-center justify-center gap-3">
-              <Sparkles className="w-12 h-12" />
-              CREATE QUANTUM MARKET
-            </h1>
-            <p className="text-lg text-muted-foreground">
-              Create a quantum prediction market with AI-weighted scenarios
+      <section className="relative max-w-4xl mx-auto px-6 pt-32 pb-16">
+        <Card className="p-8 border-primary/20 bg-background/95 space-y-8 hover:border-primary/30 transition-all animate-fade-in">
+          <div className="space-y-2">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center shadow-lg shadow-primary/20">
+                <TrendingUp className="w-6 h-6 text-background" />
+              </div>
+              <h1 className="text-3xl font-bold">Create Everything Bet</h1>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Create a custom prediction market for any question.
             </p>
           </div>
 
-          <Card className="p-8 animate-fade-up" style={{ animationDelay: "0.2s" }}>
-            <div className="space-y-6">
-              {/* Question */}
-              <div>
-                <Label htmlFor="question" className="text-foreground font-bold mb-2 block">
-                  QUESTION
-                </Label>
-                <Input
-                  id="question"
-                  placeholder="What event do you want to predict?"
-                  value={question}
-                  onChange={(e) => setQuestion(e.target.value)}
-                />
-              </div>
+          <div className="space-y-6">
+            <div className="space-y-3">
+              <Label htmlFor="question" className="text-sm font-semibold">
+                Question
+              </Label>
+              <Input
+                id="question"
+                placeholder="e.g., Will BTC reach $100k by end of 2024?"
+                value={question}
+                onChange={(e) => setQuestion(e.target.value)}
+                className="bg-background/50 border-primary/20 focus:border-primary/40"
+              />
+            </div>
 
-              {/* Scenarios */}
-              <div>
-                <Label className="text-foreground font-bold mb-2 block">
-                  SCENARIOS (3 required)
-                </Label>
-                
-                <div className="space-y-4">
-                  {scenarios.map((scenario, index) => (
-                    <div key={index} className="space-y-2">
-                      <Input
-                        placeholder={`Scenario ${index + 1}`}
-                        value={scenario}
-                        onChange={(e) => handleScenarioChange(index, e.target.value)}
-                      />
-                      <div className="flex items-center gap-2">
-                        <Label className="text-sm text-muted-foreground">Probability %:</Label>
-                        <Input
-                          type="number"
-                          min="0"
-                          max="100"
-                          className="w-24"
-                          value={probabilities[index]}
-                          onChange={(e) => handleProbabilityChange(index, e.target.value)}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
+            <div className="space-y-3">
+              <Label className="text-sm font-semibold">Outcomes</Label>
+              <div className="space-y-2">
+                {outcomes.map((outcome, index) => (
+                  <div key={index} className="flex gap-2">
+                    <Input
+                      placeholder={`Outcome ${index + 1}`}
+                      value={outcome}
+                      onChange={(e) => handleOutcomeChange(index, e.target.value)}
+                      className="flex-1 bg-background/50 border-primary/20 focus:border-primary/40"
+                    />
+                    {outcomes.length > 2 && (
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() => removeOutcome(index)}
+                        className="border-destructive/30 hover:bg-destructive/10 hover:border-destructive/50"
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    )}
+                  </div>
+                ))}
+                {outcomes.length < 3 && (
+                  <Button
+                    variant="outline"
+                    onClick={addOutcome}
+                    className="w-full border-primary/30 hover:bg-primary/5 hover:border-primary/50"
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Outcome
+                  </Button>
+                )}
               </div>
+            </div>
 
-              {/* Duration */}
-              <div>
-                <Label htmlFor="duration" className="text-foreground font-bold mb-2 block">
-                  DURATION (days)
-                </Label>
-                <Input
-                  id="duration"
-                  type="number"
-                  min="1"
-                  max="365"
-                  value={duration}
-                  onChange={(e) => setDuration(e.target.value)}
-                />
-              </div>
+            <div className="space-y-3">
+              <Label htmlFor="duration" className="text-sm font-semibold">
+                Duration (hours)
+              </Label>
+              <Input
+                id="duration"
+                type="number"
+                placeholder="24"
+                value={duration}
+                onChange={(e) => setDuration(e.target.value)}
+                className="bg-background/50 border-primary/20 focus:border-primary/40"
+              />
+            </div>
 
-              {/* Info */}
-              <div className="bg-muted/30 p-4 rounded-lg">
-                <p className="text-sm text-muted-foreground">
-                  <span className="font-bold text-foreground">Settlement:</span> Manual resolution by contract owner
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  All bets placed in USDC on Base Sepolia
-                </p>
-              </div>
+            <Button
+              onClick={handleCreateMarket}
+              disabled={isCreating}
+              className="w-full bg-gradient-to-r from-primary to-primary/70 hover:shadow-lg hover:shadow-primary/20 transition-all"
+              size="lg"
+            >
+              {isCreating ? "Creating..." : "Create Market"}
+            </Button>
 
-              {/* Create Button */}
+            <div className="pt-4 border-t border-border/30">
               <Button
-                onClick={handleCreateMarket}
-                disabled={isCreating}
-                className="w-full h-14 text-base mt-8"
+                variant="outline"
+                className="w-full border-primary/30 hover:bg-primary/5 hover:border-primary/50 transition-all group"
+                onClick={() => {
+                  toast({ 
+                    title: "🪐 Bridge & Execute", 
+                    description: "Cross-chain bridging with Avail coming soon!" 
+                  });
+                }}
               >
-                {isCreating ? "CREATING MARKET..." : "CREATE QUANTUM MARKET"}
+                <span className="mr-2">🪐</span>
+                Bridge & Execute with Avail
+                <span className="ml-2 text-xs text-muted-foreground group-hover:text-primary transition-colors">
+                  (Cross-chain in one click)
+                </span>
               </Button>
             </div>
-          </Card>
-        </div>
-      </div>
+          </div>
+        </Card>
+      </section>
 
       <Footer />
     </div>

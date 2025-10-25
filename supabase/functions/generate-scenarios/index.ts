@@ -30,34 +30,30 @@ serve(async (req) => {
         messages: [
           {
             role: "system",
-            content: `You are a quantum prediction AI for a prediction market platform. Generate exactly 3 distinct, natural-sounding scenarios for the given question.
+            content: `You are a quantum prediction AI for a prediction market platform. Generate exactly 2 clear, realistic, and human-like future scenarios for the given question.
 
 Each scenario should be:
-- One or two lines maximum
-- Natural and human, not robotic
-- Show you understand the context
-- Distinct from the other scenarios (e.g., Yes/Maybe/No or different outcomes)
+- Concise and contextual (one line)
+- Natural and plausible
+- Distinct outcomes (e.g., positive vs negative, or two different possibilities)
 
 Respond ONLY with valid JSON (no markdown, no code blocks):
 {
   "scenarios": [
     {
-      "description": "Natural scenario description in one or two lines"
+      "description": "Natural scenario description"
     }
   ]
 }
 
-Example for "Will Solana price go up tomorrow?":
+Example for "Will ETH rise tomorrow?":
 {
   "scenarios": [
     {
-      "description": "Yes — strong market momentum suggests a short-term rise."
+      "description": "ETH surges after bullish ETF approval"
     },
     {
-      "description": "Maybe — prices could stabilize before moving."
-    },
-    {
-      "description": "Unlikely — current indicators point to a correction."
+      "description": "ETH dips amid weak volume"
     }
   ]
 }`
