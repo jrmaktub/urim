@@ -617,157 +617,21 @@ const Index = () => {
         </p>
       </section>
 
-      {/* Avail Nexus Integration Section */}
-      {isConnected && (
-        <section className="max-w-2xl mx-auto px-6 pb-12">
-          <div className="bg-black border border-purple-500/50 rounded-lg p-6 shadow-lg">
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-3">
-                <div className="p-3 rounded-xl bg-gradient-to-br from-purple-600/20 to-purple-700/20 border border-purple-500/30">
-                  <Zap className="w-6 h-6 text-purple-400" />
+      {/* Main Content Area with Two-Column Layout */}
+      <div className="max-w-7xl mx-auto px-6 pb-16">
+        <div className="flex flex-col lg:flex-row gap-8 items-start">
+          
+          {/* Main Content - Quantum Bets (Left/Primary) */}
+          <div className="w-full lg:w-[60%] flex-shrink-0">
+            <section className="max-w-2xl mx-auto">
+              <div className="text-center mb-8">
+                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/20 border border-primary/30 mb-4">
+                  <Sparkles className="w-4 h-4 text-primary" />
+                  <span className="text-xs font-bold uppercase tracking-wider">AI-Powered</span>
                 </div>
-                <h3 className="text-2xl font-bold">⚡ Avail Nexus Integration</h3>
+                <h2 className="text-4xl font-bold mb-3">🧠 Quantum Bets</h2>
+                <p className="text-muted-foreground text-lg">AI generates possible futures. You bet on outcomes.</p>
               </div>
-              {nexusInitialized && (
-                <Button
-                  onClick={fetchBalances}
-                  disabled={balanceLoading}
-                  variant="ghost"
-                  size="sm"
-                  className="text-purple-400 hover:text-purple-300"
-                >
-                  <RefreshCw className={`w-4 h-4 ${balanceLoading ? 'animate-spin' : ''}`} />
-                </Button>
-              )}
-            </div>
-
-            <p className="text-sm text-muted-foreground mb-6">
-              Cross-chain unified balance powered by Avail Nexus
-            </p>
-
-            <div className="mb-6">
-              <p className="text-sm text-muted-foreground mb-1">Unified Balance</p>
-              <p className="text-3xl font-bold text-purple-400">
-                {balanceLoading || initializingNexus ? (
-                  <span className="text-lg">Loading...</span>
-                ) : (
-                  `${unifiedBalance} ETH`
-                )}
-              </p>
-            </div>
-
-            {nexusInitialized && (
-              <div className="space-y-4">
-              {balanceLoading ? (
-                <div className="flex items-center justify-center gap-3 py-8">
-                  <div className="w-6 h-6 border-3 border-purple-500 border-t-transparent rounded-full animate-spin" />
-                  <span className="text-lg font-medium text-muted-foreground">Loading balances...</span>
-                </div>
-              ) : balanceError ? (
-                <div className="p-4 rounded-lg bg-red-500/10 border border-red-500/30">
-                  <p className="text-red-400 text-sm">{balanceError}</p>
-                </div>
-              ) : processedBalances.length === 0 ? (
-                <div className="p-6 rounded-lg bg-gradient-to-r from-purple-600/10 to-purple-700/10 border border-purple-500/20 text-center">
-                  <p className="text-muted-foreground">No balances found</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {processedBalances.map((token) => {
-                    const isExpanded = expandedTokens.has(token.symbol);
-                    
-                    return (
-                      <div key={token.symbol} className="rounded-lg border border-purple-500/20 overflow-hidden">
-                        <button
-                          onClick={() => toggleTokenExpansion(token.symbol)}
-                          className="w-full p-4 bg-gradient-to-r from-purple-600/10 to-purple-700/10 hover:from-purple-600/15 hover:to-purple-700/15 transition-all flex items-center justify-between"
-                        >
-                          <div className="flex items-center gap-3">
-                            {token.icon && (
-                              <img src={token.icon} alt={token.symbol} className="w-8 h-8 rounded-full" />
-                            )}
-                            <div className="text-left">
-                              <div className="flex items-center gap-2">
-                                <span className="font-bold text-lg">{token.symbol}</span>
-                              </div>
-                              <div className="text-2xl font-bold text-purple-400">
-                                {parseFloat(token.totalBalance).toFixed(6)}
-                              </div>
-                            </div>
-                          </div>
-                          <ChevronUp className={`w-5 h-5 text-muted-foreground transition-transform ${isExpanded ? '' : 'rotate-180'}`} />
-                        </button>
-                        
-                        {isExpanded && (
-                          <div className="p-4 bg-background/50 space-y-2">
-                            {token.chains.map((chainBal, idx) => (
-                              <div
-                                key={idx}
-                                className="flex items-center justify-between p-3 rounded-lg bg-gradient-to-r from-gray-500/20 to-gray-600/20 border border-gray-500/30"
-                              >
-                                <div className="flex items-center gap-2">
-                                  {chainBal.icon && (
-                                    <img src={chainBal.icon} alt={chainBal.chainName} className="w-5 h-5 rounded-full" />
-                                  )}
-                                  <span className="text-sm font-medium">{chainBal.chainName}</span>
-                                </div>
-                                <span className="text-sm font-bold">
-                                  {parseFloat(chainBal.balance).toFixed(6)}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-
-              <div className="pt-4">
-                <div className="text-sm text-muted-foreground text-center mb-3">
-                  Use "Bridge & Bet" buttons in markets below to bridge from Optimism Sepolia
-                </div>
-                <BridgeAndExecuteButton
-                  contractAddress={URIM_QUANTUM_MARKET_ADDRESS as `0x${string}`}
-                  contractAbi={UrimQuantumMarketABI.abi as any}
-                  functionName="buyScenarioShares"
-                  buildFunctionParams={() => ({
-                    functionParams: [BigInt(0), BigInt(0), parseUnits("1", 6)]
-                  })}
-                  prefill={{
-                    toChainId: baseSepolia.id,
-                    token: 'USDC',
-                    amount: '1'
-                  }}
-                >
-                  {({ onClick, isLoading, disabled }) => (
-                    <Button
-                      onClick={onClick}
-                      disabled={isLoading || disabled}
-                      className="w-full bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800"
-                      size="lg"
-                    >
-                      {isLoading ? "🌉 Bridging..." : "Bridge"}
-                    </Button>
-                  )}
-                </BridgeAndExecuteButton>
-              </div>
-            </div>
-          )}
-          </div>
-        </section>
-      )}
-
-      <section className="max-w-2xl mx-auto px-6 py-16">
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/20 border border-primary/30 mb-4">
-            <Sparkles className="w-4 h-4 text-primary" />
-            <span className="text-xs font-bold uppercase tracking-wider">AI-Powered</span>
-          </div>
-          <h2 className="text-4xl font-bold mb-3">🧠 Quantum Bets</h2>
-          <p className="text-muted-foreground text-lg">AI generates possible futures. You bet on outcomes.</p>
-        </div>
 
         <div className="glass-card p-8 space-y-6">
           <div className="space-y-3">
@@ -802,7 +666,150 @@ const Index = () => {
             )}
           </Button>
         </div>
-      </section>
+            </section>
+          </div>
+
+          {/* Avail Nexus Integration Widget (Right Sidebar) */}
+          {isConnected && (
+            <aside className="w-full lg:w-[38%] lg:sticky lg:top-24">
+              <div className="bg-black border border-purple-500/50 rounded-lg p-5 shadow-xl shadow-purple-500/10 animate-fade-in">
+                <div className="flex items-center justify-between mb-5">
+                  <div className="flex items-center gap-2">
+                    <div className="p-2 rounded-lg bg-gradient-to-br from-purple-600/20 to-purple-700/20 border border-purple-500/30">
+                      <Zap className="w-4 h-4 text-purple-400" />
+                    </div>
+                    <h3 className="text-lg font-bold">⚡ Avail Nexus</h3>
+                  </div>
+                  {nexusInitialized && (
+                    <Button
+                      onClick={fetchBalances}
+                      disabled={balanceLoading}
+                      variant="ghost"
+                      size="sm"
+                      className="text-purple-400 hover:text-purple-300"
+                    >
+                      <RefreshCw className={`w-3 h-3 ${balanceLoading ? 'animate-spin' : ''}`} />
+                    </Button>
+                  )}
+                </div>
+
+                <p className="text-xs text-muted-foreground mb-4">
+                  Cross-chain unified balance
+                </p>
+
+                <div className="mb-4">
+                  <p className="text-xs text-muted-foreground mb-1">Unified Balance</p>
+                  <p className="text-2xl font-bold text-purple-400">
+                    {balanceLoading || initializingNexus ? (
+                      <span className="text-sm">Loading...</span>
+                    ) : (
+                      `${unifiedBalance} ETH`
+                    )}
+                  </p>
+                </div>
+
+                {nexusInitialized && (
+                  <div className="space-y-3">
+                    {balanceLoading ? (
+                      <div className="flex items-center justify-center gap-2 py-6">
+                        <div className="w-4 h-4 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
+                        <span className="text-sm text-muted-foreground">Loading...</span>
+                      </div>
+                    ) : balanceError ? (
+                      <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/30">
+                        <p className="text-red-400 text-xs">{balanceError}</p>
+                      </div>
+                    ) : processedBalances.length === 0 ? (
+                      <div className="p-4 rounded-lg bg-gradient-to-r from-purple-600/10 to-purple-700/10 border border-purple-500/20 text-center">
+                        <p className="text-muted-foreground text-xs">No balances found</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2 max-h-[400px] overflow-y-auto">
+                        {processedBalances.map((token) => {
+                          const isExpanded = expandedTokens.has(token.symbol);
+                          
+                          return (
+                            <div key={token.symbol} className="rounded-lg border border-purple-500/20 overflow-hidden">
+                              <button
+                                onClick={() => toggleTokenExpansion(token.symbol)}
+                                className="w-full p-3 bg-gradient-to-r from-purple-600/10 to-purple-700/10 hover:from-purple-600/15 hover:to-purple-700/15 transition-all flex items-center justify-between"
+                              >
+                                <div className="flex items-center gap-2">
+                                  {token.icon && (
+                                    <img src={token.icon} alt={token.symbol} className="w-6 h-6 rounded-full" />
+                                  )}
+                                  <div className="text-left">
+                                    <span className="font-bold text-sm">{token.symbol}</span>
+                                    <div className="text-lg font-bold text-purple-400">
+                                      {parseFloat(token.totalBalance).toFixed(6)}
+                                    </div>
+                                  </div>
+                                </div>
+                                <ChevronUp className={`w-4 h-4 text-muted-foreground transition-transform ${isExpanded ? '' : 'rotate-180'}`} />
+                              </button>
+                              
+                              {isExpanded && (
+                                <div className="p-3 bg-background/50 space-y-1.5">
+                                  {token.chains.map((chainBal, idx) => (
+                                    <div
+                                      key={idx}
+                                      className="flex items-center justify-between p-2 rounded-lg bg-gradient-to-r from-gray-500/20 to-gray-600/20 border border-gray-500/30"
+                                    >
+                                      <div className="flex items-center gap-2">
+                                        {chainBal.icon && (
+                                          <img src={chainBal.icon} alt={chainBal.chainName} className="w-4 h-4 rounded-full" />
+                                        )}
+                                        <span className="text-xs font-medium">{chainBal.chainName}</span>
+                                      </div>
+                                      <span className="text-xs font-bold">
+                                        {parseFloat(chainBal.balance).toFixed(6)}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    <div className="pt-3 border-t border-purple-500/20">
+                      <div className="text-xs text-muted-foreground text-center mb-2">
+                        Bridge from Optimism Sepolia
+                      </div>
+                      <BridgeAndExecuteButton
+                        contractAddress={URIM_QUANTUM_MARKET_ADDRESS as `0x${string}`}
+                        contractAbi={UrimQuantumMarketABI.abi as any}
+                        functionName="buyScenarioShares"
+                        buildFunctionParams={() => ({
+                          functionParams: [BigInt(0), BigInt(0), parseUnits("1", 6)]
+                        })}
+                        prefill={{
+                          toChainId: baseSepolia.id,
+                          token: 'USDC',
+                          amount: '1'
+                        }}
+                      >
+                        {({ onClick, isLoading, disabled }) => (
+                          <Button
+                            onClick={onClick}
+                            disabled={isLoading || disabled}
+                            className="w-full bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800"
+                            size="sm"
+                          >
+                            {isLoading ? "🌉 Bridging..." : "Bridge"}
+                          </Button>
+                        )}
+                      </BridgeAndExecuteButton>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </aside>
+          )}
+        </div>
+      </div>
 
       {liveQuantumMarkets.length > 0 && (
         <section className="max-w-4xl mx-auto px-6 pb-16">
