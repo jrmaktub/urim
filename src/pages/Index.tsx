@@ -255,7 +255,6 @@ const Index = () => {
       <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-transparent pointer-events-none" />
       
       <Navigation />
-      <PythPriceTicker />
 
       <section className="relative max-w-6xl mx-auto px-6 pt-32 pb-16">
         {/* Hero */}
@@ -267,6 +266,9 @@ const Index = () => {
             Quantum prediction markets powered by AI and Pyth oracles
           </p>
         </div>
+
+        {/* Live Price Feed Widget */}
+        <PythPriceTicker />
 
         {/* Two main cards */}
         <div className="grid md:grid-cols-2 gap-6 mb-16 animate-fade-in">
