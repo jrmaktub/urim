@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Clock } from "lucide-react";
+import { Clock, Zap, RefreshCw } from "lucide-react";
 import { URIM_QUANTUM_MARKET_ADDRESS, USDC_ADDRESS } from "@/constants/contracts";
 import UrimQuantumMarketABI from "@/contracts/UrimQuantumMarket.json";
 import ERC20ABI from "@/contracts/ERC20.json";
@@ -14,6 +14,7 @@ import { BridgeAndExecuteButton } from '@avail-project/nexus-widgets';
 import { optimismSepolia, baseSepolia } from 'wagmi/chains';
 import { useNotification } from "@blockscout/app-sdk";
 import { cn } from "@/lib/utils";
+import { EvmPriceServiceConnection } from "@pythnetwork/pyth-evm-js";
 
 type MarketData = {
   marketId: bigint;
@@ -242,8 +243,10 @@ function LiveMarketCard({
   const { switchChain } = useSwitchChain();
   const { toast } = useToast();
   const { writeContractAsync } = useWriteContract();
+  const { openTxToast } = useNotification();
   const [bridgeChoice, setBridgeChoice] = useState<'yes' | 'no' | null>(null);
   const [isApproving, setIsApproving] = useState(false);
+  const [isResolving, setIsResolving] = useState(false);
 
   const isOnOptimismSepolia = chain?.id === optimismSepolia.id;
   const isOnBaseSepolia = chain?.id === baseSepolia.id;
@@ -307,6 +310,77 @@ function LiveMarketCard({
     }
   };
 
+  const handleResolveMarket = async (priceFeedId: string) => {
+    if (!address) {
+      toast({ title: "Connect Wallet", description: "Please connect your wallet first.", variant: "destructive" });
+      return;
+    }
+
+    if (chain?.id !== baseSepolia.id) {
+      toast({ 
+        title: "Wrong Network", 
+        description: "Please switch to Base Sepolia to resolve markets.", 
+        variant: "destructive" 
+      });
+      return;
+    }
+
+    setIsResolving(true);
+
+    try {
+      toast({ title: "🔮 Fetching Pyth price data...", description: "Getting latest price feed" });
+
+      // Initialize Pyth connection
+      const connection = new EvmPriceServiceConnection("https://hermes.pyth.network");
+      
+      // Get price update data from Pyth
+      const priceIds = [priceFeedId as `0x${string}`];
+      const priceUpdateData = await connection.getPriceFeedsUpdateData(priceIds);
+      
+      console.log("Price update data:", priceUpdateData);
+
+      // Estimate the fee (usually around 0.0001 ETH on testnets)
+      const fee = BigInt("100000000000000"); // 0.0001 ETH
+
+      toast({ title: "⚡ Resolving market...", description: "Submitting resolution transaction" });
+
+      // Call resolveMarket with price update data and ETH for fee
+      const hash = await writeContractAsync({
+        address: URIM_QUANTUM_MARKET_ADDRESS as `0x${string}`,
+        abi: UrimQuantumMarketABI.abi as any,
+        functionName: "resolveMarket",
+        args: [marketId, priceUpdateData],
+        value: fee,
+        gas: BigInt(1_000_000),
+      } as any);
+
+      openTxToast("84532", hash);
+      console.log("Resolve transaction sent:", hash);
+
+      toast({ 
+        title: "✅ Market resolved!", 
+        description: "The outcome has been determined using Pyth oracle data" 
+      });
+      
+      // Wait and refetch market info
+      setTimeout(() => {
+        refetch();
+      }, 3000);
+
+    } catch (error: any) {
+      console.error("Resolve error:", error);
+      const errorMsg = error?.shortMessage || error?.message || "Failed to resolve market";
+      
+      toast({
+        title: "❌ Resolution failed",
+        description: errorMsg,
+        variant: "destructive",
+      });
+    } finally {
+      setIsResolving(false);
+    }
+  };
+
   // Auto-refresh every 10 seconds
   useEffect(() => {
     const interval = setInterval(() => {
@@ -323,8 +397,8 @@ function LiveMarketCard({
     );
   }
 
-  const [question, optionA, optionB, endTime, outcome, totalOptionAShares, totalOptionBShares, resolved, cancelled] = marketInfo as [
-    string, string, string, bigint, number, bigint, bigint, boolean, boolean
+  const [question, optionA, optionB, endTime, outcome, totalOptionAShares, totalOptionBShares, resolved, cancelled, priceFeedId, targetPrice] = marketInfo as [
+    string, string, string, bigint, number, bigint, bigint, boolean, boolean, string, bigint
   ];
 
   if (cancelled) return null;
@@ -332,7 +406,11 @@ function LiveMarketCard({
   const now = Math.floor(Date.now() / 1000);
   const isActive = !resolved && now < Number(endTime);
   const isResolved = resolved;
-  const winningOutcome = outcome; // 0 = OptionA, 1 = OptionB, 2 = Tie
+  const isEnded = !resolved && now >= Number(endTime);
+  const winningOutcome = outcome; // 0 = UNRESOLVED, 1 = OPTION_A, 2 = OPTION_B
+  
+  // Check if market can be resolved
+  const canResolve = isEnded && !resolved && !cancelled && priceFeedId && priceFeedId !== "0x0000000000000000000000000000000000000000000000000000000000000000";
 
   return (
     <Card className={`p-6 border-2 transition-all ${
@@ -361,7 +439,7 @@ function LiveMarketCard({
       {isResolved && (
         <div className="mb-4 p-3 rounded-lg bg-green-500/10 border border-green-500/30">
           <div className="text-sm font-semibold text-green-500">
-            Market resolved: {winningOutcome === 0 ? optionA : winningOutcome === 1 ? optionB : 'Tie'}
+            ✅ Market resolved: {winningOutcome === 1 ? optionA : winningOutcome === 2 ? optionB : 'Unresolved'}
           </div>
         </div>
       )}
@@ -393,7 +471,7 @@ function LiveMarketCard({
               <span className="text-lg">🔮</span>
               <span>{optionA || 'YES'}</span>
             </div>
-            {isResolved && winningOutcome === 0 && (
+            {isResolved && winningOutcome === 1 && (
               <Badge className="bg-green-500">Winner</Badge>
             )}
           </div>
@@ -428,7 +506,7 @@ function LiveMarketCard({
               <span className="text-lg">🪶</span>
               <span>{optionB || 'NO'}</span>
             </div>
-            {isResolved && winningOutcome === 1 && (
+            {isResolved && winningOutcome === 2 && (
               <Badge className="bg-green-500">Winner</Badge>
             )}
           </div>
@@ -625,6 +703,53 @@ function LiveMarketCard({
             </>
           )}
         </>
+      )}
+
+      {/* Resolve Market Button - Show when market has ended but not resolved */}
+      {canResolve && (
+        <div className="mt-6 pt-4 border-t border-border/50">
+          <div className="p-4 rounded-lg bg-blue-500/10 border border-blue-500/30 mb-3">
+            <div className="text-sm font-semibold text-blue-400 mb-1">
+              ⏰ Market has ended
+            </div>
+            <div className="text-xs text-muted-foreground">
+              This market can now be resolved using Pyth oracle. Anyone can trigger resolution.
+            </div>
+          </div>
+
+          {!isOnBaseSepolia ? (
+            <Button
+              onClick={() => switchChain({ chainId: baseSepolia.id })}
+              className="w-full bg-gradient-to-r from-orange-500 to-orange-600 hover:opacity-90"
+            >
+              Switch to Base Sepolia to Resolve
+            </Button>
+          ) : (
+            <Button
+              onClick={() => handleResolveMarket(priceFeedId)}
+              disabled={isResolving}
+              className="w-full min-h-[52px] bg-gradient-to-r from-blue-500 to-blue-600 hover:opacity-90 font-semibold"
+            >
+              {isResolving ? (
+                <>
+                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                  Resolving Market...
+                </>
+              ) : (
+                <>
+                  <Zap className="w-4 h-4 mr-2" />
+                  Resolve Market with Pyth Oracle
+                </>
+              )}
+            </Button>
+          )}
+          
+          {priceFeedId && targetPrice && (
+            <div className="mt-3 p-2 rounded bg-muted/30 text-xs text-muted-foreground">
+              <div className="font-mono">Target: ${(Number(targetPrice) / 1e8).toFixed(2)}</div>
+            </div>
+          )}
+        </div>
       )}
     </Card>
   );
