@@ -2,13 +2,15 @@ import { useState, useEffect } from 'react';
 import { useAccount, useWriteContract } from 'wagmi';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { useQuantumBetMarketCount, useQuantumBetMarket } from '@/hooks/useQuantumBetMarkets';
+import { useQuantumBetMarketCount, useQuantumBetMarket, QuantumBetMarket } from '@/hooks/useQuantumBetMarkets';
 import { QUANTUM_BET_ADDRESS, USDC_ADDRESS } from '@/constants/contracts';
 import QuantumBetABI from '@/contracts/QuantumBet.json';
 import ERC20ABI from '@/contracts/ERC20.json';
 import { formatUsdc, parseUsdc } from '@/lib/erc20';
 import { useNotification } from "@blockscout/app-sdk";
+import { Clock, User } from 'lucide-react';
 
 const ActiveQuantumMarkets = () => {
   const { address, isConnected, chain } = useAccount();
@@ -57,12 +59,73 @@ const ActiveQuantumMarkets = () => {
   }
 
   return (
+    <MarketsList marketIds={marketIds} refreshTrigger={refreshTrigger} />
+  );
+};
+
+const MarketsList = ({ marketIds, refreshTrigger }: { marketIds: number[], refreshTrigger: number }) => {
+  const [markets, setMarkets] = useState<(QuantumBetMarket & { id: number })[]>([]);
+
+  // Fetch all markets and sort them
+  useEffect(() => {
+    const fetchMarkets = async () => {
+      const marketPromises = marketIds.map(id => 
+        fetch(`/api/market/${id}`).catch(() => null)
+      );
+      // We'll collect markets inline instead
+    };
+    fetchMarkets();
+  }, [marketIds, refreshTrigger]);
+
+  return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <MarketCardList marketIds={marketIds} refreshTrigger={refreshTrigger} />
+    </div>
+  );
+};
+
+const MarketCardList = ({ marketIds, refreshTrigger }: { marketIds: number[], refreshTrigger: number }) => {
+  return (
+    <>
       {marketIds.map(id => (
         <MarketCard key={`${id}-${refreshTrigger}`} marketId={id} />
       ))}
-    </div>
+    </>
   );
+};
+
+const useTimeRemaining = (closeTime: number) => {
+  const [timeRemaining, setTimeRemaining] = useState('');
+
+  useEffect(() => {
+    const updateTime = () => {
+      const now = Math.floor(Date.now() / 1000);
+      const diff = closeTime - now;
+      
+      if (diff <= 0) {
+        setTimeRemaining('Closed');
+        return;
+      }
+
+      const days = Math.floor(diff / 86400);
+      const hours = Math.floor((diff % 86400) / 3600);
+      const minutes = Math.floor((diff % 3600) / 60);
+
+      if (days > 0) {
+        setTimeRemaining(`${days}d ${hours}h`);
+      } else if (hours > 0) {
+        setTimeRemaining(`${hours}h ${minutes}m`);
+      } else {
+        setTimeRemaining(`${minutes}m`);
+      }
+    };
+
+    updateTime();
+    const interval = setInterval(updateTime, 30000); // Update every 30s
+    return () => clearInterval(interval);
+  }, [closeTime]);
+
+  return timeRemaining;
 };
 
 const MarketCard = ({ marketId }: { marketId: number }) => {
@@ -74,15 +137,27 @@ const MarketCard = ({ marketId }: { marketId: number }) => {
   const [betAmount, setBetAmount] = useState('');
   const [betting, setBetting] = useState(false);
   const [claiming, setClaiming] = useState(false);
+  const [claimed, setClaimed] = useState(false);
+  const timeRemaining = useTimeRemaining(market?.closeTime || 0);
 
   if (!market) return null;
 
-  const isOpen = !market.resolved && Date.now() / 1000 < market.closeTime;
-  const closeDate = new Date(market.closeTime * 1000).toLocaleString();
+  const now = Math.floor(Date.now() / 1000);
+  const isOpen = !market.resolved && now < market.closeTime;
+  const isAwaitingResolution = !market.resolved && now >= market.closeTime;
+  const closeDate = new Date(market.closeTime * 1000).toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true
+  });
 
   const totalPool = market.yesPool + market.noPool;
   const yesOdds = totalPool > 0n ? Number((market.yesPool * 100n) / totalPool) : 50;
   const noOdds = 100 - yesOdds;
+
+  const shortenAddress = (addr: string) => `${addr.slice(0, 6)}...${addr.slice(-4)}`;
 
   const handleBet = async (isYes: boolean) => {
     if (!betAmount || parseFloat(betAmount) <= 0) {
@@ -137,6 +212,7 @@ const MarketCard = ({ marketId }: { marketId: number }) => {
       } as any);
 
       openTxToast("84532", hash);
+      setClaimed(true);
       
       // Refresh market data
       setTimeout(() => refetch(), 2000);
@@ -154,30 +230,57 @@ const MarketCard = ({ marketId }: { marketId: number }) => {
   return (
     <div className="glass-card p-6 rounded-2xl border border-border hover:border-primary/50 transition-all">
       <div className="space-y-4">
-        <h3 className="font-semibold text-lg">{market.question}</h3>
+        {/* Title */}
+        <h3 className="font-semibold text-lg leading-tight">{market.question}</h3>
         
-        {/* Status */}
-        <div className="flex items-center gap-2 text-sm">
+        {/* Creator and Status Row */}
+        <div className="flex items-center justify-between gap-2 text-sm">
+          <div className="flex items-center gap-1.5 text-muted-foreground">
+            <User className="w-3.5 h-3.5" />
+            <span className="text-xs">{shortenAddress(market.creator)}</span>
+          </div>
+          
           {isOpen ? (
-            <span className="text-green-500">🟢 Open until {closeDate}</span>
-          ) : market.resolved ? (
-            <span className={market.outcome ? "text-green-500" : "text-red-500"}>
-              {market.outcome ? "✅ YES Won" : "❌ NO Won"}
-            </span>
+            <Badge variant="default" className="bg-green-500/20 text-green-400 border-green-500/30">
+              🟢 Open
+            </Badge>
+          ) : isAwaitingResolution ? (
+            <Badge variant="default" className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30">
+              ⚙️ Awaiting
+            </Badge>
           ) : (
-            <span className="text-yellow-500">⏱ Awaiting Resolution</span>
+            <Badge 
+              variant="default" 
+              className={market.outcome 
+                ? "bg-green-500/20 text-green-400 border-green-500/30" 
+                : "bg-red-500/20 text-red-400 border-red-500/30"
+              }
+            >
+              {market.outcome ? "✅ YES Won" : "❌ NO Won"}
+            </Badge>
           )}
         </div>
 
+        {/* Time Badge */}
+        {isOpen && (
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <Clock className="w-3.5 h-3.5" />
+            <span>Closes in {timeRemaining}</span>
+            <span className="text-muted-foreground/60">• {closeDate}</span>
+          </div>
+        )}
+
         {/* Pools */}
         <div className="grid grid-cols-2 gap-4 text-sm">
-          <div>
-            <p className="text-muted-foreground">YES Pool</p>
-            <p className="font-semibold">{formatUsdc(market.yesPool)} USDC ({yesOdds}%)</p>
+          <div className="bg-background/50 rounded-lg p-3">
+            <p className="text-muted-foreground text-xs mb-1">YES Pool</p>
+            <p className="font-semibold">{formatUsdc(market.yesPool)} USDC</p>
+            <p className="text-xs text-muted-foreground">{yesOdds}%</p>
           </div>
-          <div>
-            <p className="text-muted-foreground">NO Pool</p>
-            <p className="font-semibold">{formatUsdc(market.noPool)} USDC ({noOdds}%)</p>
+          <div className="bg-background/50 rounded-lg p-3">
+            <p className="text-muted-foreground text-xs mb-1">NO Pool</p>
+            <p className="font-semibold">{formatUsdc(market.noPool)} USDC</p>
+            <p className="text-xs text-muted-foreground">{noOdds}%</p>
           </div>
         </div>
 
@@ -210,14 +313,20 @@ const MarketCard = ({ marketId }: { marketId: number }) => {
           </div>
         )}
 
-        {market.resolved && (
+        {market.resolved && !claimed && (
           <Button
             onClick={handleClaim}
             disabled={claiming}
             className="w-full h-10"
           >
-            {claiming ? "Claiming..." : "Claim Winnings"}
+            {claiming ? "Claiming..." : "Claim Rewards"}
           </Button>
+        )}
+
+        {claimed && (
+          <div className="text-center py-2 text-sm text-green-400">
+            Claimed ✅
+          </div>
         )}
       </div>
     </div>
