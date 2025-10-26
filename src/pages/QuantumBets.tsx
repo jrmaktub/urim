@@ -13,7 +13,7 @@ import { URIM_QUANTUM_MARKET_ADDRESS, USDC_ADDRESS } from "@/constants/contracts
 import UrimQuantumMarketABI from "@/contracts/UrimQuantumMarket.json";
 import ERC20ABI from "@/contracts/ERC20.json";
 import { parseUnits } from "viem";
-import { useNotification } from "@blockscout/app-sdk";
+import { useNotification, useTransactionPopup } from "@blockscout/app-sdk";
 
 
 export default function QuantumBets() {
@@ -27,7 +27,8 @@ export default function QuantumBets() {
   const [betAmounts, setBetAmounts] = useState<string[]>(["", "", ""]);
   const [bettingIdx, setBettingIdx] = useState<number | null>(null);
   const [selectedScenario, setSelectedScenario] = useState<number | null>(null);
-    const { openTxToast } = useNotification();
+  const { openTxToast } = useNotification();
+  const { openPopup } = useTransactionPopup();
 
   // Fetch all market IDs
   const { data: marketIdsData, refetch: refetchMarkets } = useReadContract({
@@ -109,30 +110,29 @@ export default function QuantumBets() {
       } as any);
 
       // Buy shares - use new buyShares function with isOptionA boolean
-            const handleBuyShares = async () => {
-              try{
-            const isOptionA = scenarioIndex === 0; // First scenario is Option A
-            const tx = await writeContractAsync({
-              address: URIM_QUANTUM_MARKET_ADDRESS as `0x${string}`,
-              abi: UrimQuantumMarketABI.abi as any,
-              functionName: "buyShares",
-              args: [latestId, isOptionA, amountWei],
-              gas: BigInt(500_000),
-            } as any);
-      
-              openTxToast("84532", tx)
-            console.log("Transaction sent:", tx);
-              }
-              catch (error) {
-                console.error("Transaction failed: ", error)
-              }
-            }
-      
-            await handleBuyShares();
-      
-            toast({ title: "Bet placed!", description: `${amount} USDC on ${scenarios[scenarioIndex]}` });
-            setBetAmounts(["", "", ""]);
-            await refetchMarkets();
+      const isOptionA = scenarioIndex === 0; // First scenario is Option A
+      const tx = await writeContractAsync({
+        address: URIM_QUANTUM_MARKET_ADDRESS as `0x${string}`,
+        abi: UrimQuantumMarketABI.abi as any,
+        functionName: "buyShares",
+        args: [latestId, isOptionA, amountWei],
+        gas: BigInt(500_000),
+      } as any);
+
+      // Open transaction toast notification (useNotification)
+      openTxToast("84532", tx);
+      console.log("Transaction sent:", tx);
+
+      // Optionally open transaction popup to show transaction history
+      // You can call this if you want to show the popup immediately after the transaction
+      // openPopup({
+      //   chainId: "84532",
+      //   address: address,
+      // });
+
+      toast({ title: "Bet placed!", description: `${amount} USDC on ${scenarios[scenarioIndex]}` });
+      setBetAmounts(["", "", ""]);
+      await refetchMarkets();
     } catch (error: any) {
       console.error(error);
       const errorMsg = error?.shortMessage || error?.message || "Try again";
@@ -207,38 +207,33 @@ export default function QuantumBets() {
                     }`}
                     onClick={() => setSelectedScenario(i)}
                   >
-                    <div className="text-xs font-bold text-primary mb-1">SCENARIO {i + 1}</div>
-                    <div className="text-sm mb-4 min-h-[3rem]">{sc}</div>
+                    <div className="mb-4">
+                      <div className="text-sm font-semibold text-primary mb-2">Scenario {i + 1}</div>
+                      <div className="text-base">{sc}</div>
+                    </div>
                     <div className="space-y-2">
-                      <Label className="text-xs font-semibold">Amount (USDC)</Label>
                       <Input
                         type="number"
-                        placeholder="0.00"
+                        placeholder="Bet amount (USDC)"
                         value={betAmounts[i]}
                         onChange={(e) => {
-                          e.stopPropagation();
                           const newAmounts = [...betAmounts];
                           newAmounts[i] = e.target.value;
                           setBetAmounts(newAmounts);
                         }}
                         onClick={(e) => e.stopPropagation()}
-                        className="bg-background/50"
                       />
+                      <Button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          createMarketAndBet(i);
+                        }}
+                        disabled={bettingIdx !== null}
+                        className="w-full bg-gradient-to-r from-primary to-primary-glow"
+                      >
+                        {bettingIdx === i ? "Placing..." : "Place Bet"}
+                      </Button>
                     </div>
-                    <Button
-                      className={`mt-4 w-full ${
-                        selectedScenario === i 
-                          ? 'bg-gradient-to-r from-primary to-primary-glow' 
-                          : 'bg-muted'
-                      }`}
-                      disabled={bettingIdx !== null}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        createMarketAndBet(i);
-                      }}
-                    >
-                      {bettingIdx === i ? "Placing..." : "Place Bet"}
-                    </Button>
                   </Card>
                 ))}
               </div>
@@ -246,32 +241,40 @@ export default function QuantumBets() {
           </div>
         </div>
 
-        {/* Quantum Markets */}
-        <div className="space-y-6 mb-12">
-          <h2 className="text-2xl font-bold">Quantum Markets</h2>
-          <div className="grid gap-4">
-            {marketIds.length === 0 ? (
-              <Card className="p-8 text-center text-muted-foreground">
-                No markets yet. Create one above!
-              </Card>
-            ) : (
-              marketIds.map((id) => <MarketCard key={id.toString()} marketId={id} address={address} />)
-            )}
+        {/* Active Markets */}
+        {marketIds.length > 0 && (
+          <div className="mb-12">
+            <h2 className="text-2xl font-bold mb-6">Active Markets</h2>
+            <div className="grid md:grid-cols-2 gap-6">
+              {marketIds.map((id) => (
+                <MarketCard key={id.toString()} marketId={id} address={address} />
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
-        {/* Your Quantum Bets */}
-        {address && (
-          <div className="space-y-6">
-            <h2 className="text-2xl font-bold">Your Quantum Bets</h2>
-            <div className="grid gap-4">
-              {marketIds.length === 0 ? (
-                <Card className="p-8 text-center text-muted-foreground">
-                  No bets placed yet.
-                </Card>
-              ) : (
-                marketIds.map((id) => <UserBetsCard key={id.toString()} marketId={id} userAddress={address} />)
-              )}
+        {/* User Bets */}
+        {address && marketIds.length > 0 && (
+          <div>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold">Your Bets</h2>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  // Open transaction popup to show all user's transactions
+                  openPopup({
+                    chainId: "84532", // Base Sepolia
+                    address: address,
+                  });
+                }}
+              >
+                View Transaction History
+              </Button>
+            </div>
+            <div className="grid md:grid-cols-2 gap-6">
+              {marketIds.map((id) => (
+                <UserBetsCard key={id.toString()} marketId={id} userAddress={address} />
+              ))}
             </div>
           </div>
         )}
@@ -287,6 +290,9 @@ function MarketCard({ marketId, address }: { marketId: bigint; address: `0x${str
   const { writeContractAsync } = useWriteContract();
   const [bettingScenario, setBettingScenario] = useState<number | null>(null);
   const [betAmount, setBetAmount] = useState("");
+  const { openTxToast } = useNotification();
+  const { openPopup } = useTransactionPopup();
+
   const { data: marketInfo } = useReadContract({
     address: URIM_QUANTUM_MARKET_ADDRESS as `0x${string}`,
     abi: UrimQuantumMarketABI.abi as any,
@@ -329,13 +335,17 @@ function MarketCard({ marketId, address }: { marketId: bigint; address: `0x${str
 
       // Buy shares - use new buyShares function with isOptionA boolean
       const isOptionA = scenarioIdx === 0;
-      await writeContractAsync({
+      const tx = await writeContractAsync({
         address: URIM_QUANTUM_MARKET_ADDRESS as `0x${string}`,
         abi: UrimQuantumMarketABI.abi as any,
         functionName: "buyShares",
         args: [marketId, isOptionA, amountWei],
         gas: BigInt(500_000),
       } as any);
+
+      // Open transaction toast notification
+      openTxToast("84532", tx);
+      console.log("Transaction sent:", tx);
 
       toast({ title: "Bet placed!", description: `${betAmount} USDC on ${scenarioList[scenarioIdx]}` });
       setBetAmount("");
