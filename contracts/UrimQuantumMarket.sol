@@ -1,131 +1,209 @@
-// SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.28;
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+/*
+ URIM QUANTUM MARKET — FINAL INTEGRATED VERSION
+ ------------------------------------------------------------
+ ✅ Base Sepolia compatible
+ ✅ Single deployment handles all markets
+ ✅ Uses Chainlink Functions + OpenAI (via your Chainlink sub ID 503)
+ ✅ Automatic outcome resolution with claim-based payouts
 
-/**
- * @title UrimQuantumMarketSimple
- * @notice Minimal, user-generated YES/NO markets without any oracle.
- *         Anyone can create a market, others can bet with USDC (or any ERC20).
- *         Later, optimistic resolution is used (manual proposal + dispute).
- */
-contract UrimQuantumMarketSimple is ReentrancyGuard {
+*/
+
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import {FunctionsClient} from "@chainlink/contracts/src/v0.8/functions/v1_0_0/FunctionsClient.sol";
+import {FunctionsRequest} from "@chainlink/contracts/src/v0.8/functions/v1_0_0/libraries/FunctionsRequest.sol";
+import {ConfirmedOwner} from "@chainlink/contracts/src/v0.8/shared/access/ConfirmedOwner.sol";
+
+contract UrimQuantumMarket is ReentrancyGuard, FunctionsClient, ConfirmedOwner {
+    using SafeERC20 for IERC20;
+    using FunctionsRequest for FunctionsRequest.Request;
+    using FunctionsRequest for FunctionsRequest.Request;
+
+    // ----------- STRUCTS -----------
     struct Market {
         string question;
-        uint256 endTime;
+        address creator;
+        uint256 yesPool;
+        uint256 noPool;
         bool resolved;
-        uint8 winningScenario; // 0 = YES, 1 = NO
-        uint256[2] totalBets;  // YES / NO totals
-        mapping(address => uint256[2]) userBets;
-        bool hasClaimed;
-        uint8 proposedOutcome;
-        uint64 proposedAt;
-        address proposer;
-        bool disputed;
+        bool outcome; // true = YES wins
+        uint256 closeTime;
+        mapping(address => uint256) yesBets;
+        mapping(address => uint256) noBets;
     }
 
-    IERC20 public immutable bettingToken;
+    // ----------- STORAGE -----------
+    mapping(uint256 => Market) public markets;
     uint256 public marketCount;
-    mapping(uint256 => Market) private markets;
 
-    uint256 public minBond = 1e6; // 1 USDC if 6 decimals
-    uint64 public livenessSeconds = 12 hours;
-    uint8 private constant NO_PROPOSAL = type(uint8).max;
+    IERC20 public immutable collateral;   // e.g. USDC / PYUSD
+    bytes32 public lastRequestId;
+    string public sourceCode;             // Chainlink Functions JS code
+    uint64 public constant SUBSCRIPTION_ID = 503; // your Chainlink sub ID
+    uint32 public constant GAS_LIMIT = 300000;
+    bytes32 public donId; // DON ID for Chainlink Functions
 
-    event MarketCreated(uint256 indexed id, string question, uint256 endTime);
-    event BetPlaced(uint256 indexed id, address indexed user, uint8 side, uint256 amount);
-    event OutcomeProposed(uint256 indexed id, uint8 outcome, address proposer);
-    event OutcomeFinalized(uint256 indexed id, uint8 outcome);
+    // ----------- EVENTS -----------
+    event MarketCreated(uint256 indexed id, string question, uint256 closeTime);
+    event BetPlaced(uint256 indexed id, address indexed user, bool yes, uint256 amount);
+    event MarketResolved(uint256 indexed id, bool outcome);
+    event Claimed(uint256 indexed id, address indexed user, uint256 payout);
+    event OracleRequestSent(bytes32 indexed requestId, uint256 indexed marketId);
 
-    constructor(address _token) {
-        bettingToken = IERC20(_token);
+    // ----------- CONSTRUCTOR -----------
+    constructor(address _collateral, address _functionsRouter, bytes32 _donId)
+        FunctionsClient(_functionsRouter)
+        ConfirmedOwner(msg.sender)
+    {
+        collateral = IERC20(_collateral);
+        donId = _donId;
+
+        // Chainlink Functions source code (OpenAI integration)
+        sourceCode = string(
+            abi.encodePacked(
+                "const question = args[0];",
+                "const resp = await Functions.makeHttpRequest({",
+                "  url: 'https://api.openai.com/v1/chat/completions',",
+                "  method: 'POST',",
+                "  headers: {",
+                "    'Authorization': `Bearer ${secrets.openAiKey}`,",
+                "    'Content-Type': 'application/json'",
+                "  },",
+                "  data: {",
+                "    model: 'gpt-4o-mini',",
+                "    messages: [",
+                "      { role: 'system', content: \"Return only 'true' if the YES outcome is correct, otherwise return 'false'.\" },",
+                "      { role: 'user', content: question }",
+                "    ]",
+                "  }",
+                "});",
+                "const reply = resp.data.choices[0].message.content.toLowerCase();",
+                "const result = reply.includes('true') ? 'true' : 'false';",
+                "return Functions.encodeString(result);"
+            )
+        );
     }
 
-    // Anyone can create a new market
-    function createMarket(string memory _question, uint256 _duration) external returns (uint256) {
-        require(_duration > 0, "Bad duration");
-        uint256 id = marketCount++;
+    // ----------- CORE LOGIC -----------
+
+    function createMarket(string calldata question, uint256 duration)
+        external
+        returns (uint256 id)
+    {
+        id = marketCount++;
         Market storage m = markets[id];
-        m.question = _question;
-        m.endTime = block.timestamp + _duration;
-        m.resolved = false;
-        m.proposedOutcome = NO_PROPOSAL;
-        emit MarketCreated(id, _question, m.endTime);
-        return id;
+        m.question = question;
+        m.creator = msg.sender;
+        m.closeTime = block.timestamp + duration;
+
+        emit MarketCreated(id, question, m.closeTime);
     }
 
-    // Place a bet (0=YES, 1=NO)
-    function bet(uint256 id, uint8 side, uint256 amount) external nonReentrant {
-        require(side < 2, "Invalid side");
+    function bet(uint256 id, bool yes, uint256 amount) external nonReentrant {
         Market storage m = markets[id];
-        require(block.timestamp < m.endTime, "Ended");
-        require(!m.resolved, "Resolved");
-        require(amount > 0, "Zero amount");
+        require(block.timestamp < m.closeTime, "Market closed");
+        require(amount > 0, "Zero bet");
+        collateral.safeTransferFrom(msg.sender, address(this), amount);
 
-        bettingToken.transferFrom(msg.sender, address(this), amount);
-        m.userBets[msg.sender][side] += amount;
-        m.totalBets[side] += amount;
+        if (yes) {
+            m.yesBets[msg.sender] += amount;
+            m.yesPool += amount;
+        } else {
+            m.noBets[msg.sender] += amount;
+            m.noPool += amount;
+        }
 
-        emit BetPlaced(id, msg.sender, side, amount);
+        emit BetPlaced(id, msg.sender, yes, amount);
     }
 
-    // Optimistic resolution (manual proposal)
-    function proposeOutcome(uint256 id, uint8 outcome) external nonReentrant {
-        Market storage m = markets[id];
-        require(block.timestamp >= m.endTime, "Not ended");
-        require(!m.resolved, "Resolved");
-        require(outcome < 2, "Invalid");
-        require(m.proposedOutcome == NO_PROPOSAL, "Already proposed");
-        bettingToken.transferFrom(msg.sender, address(this), minBond);
+    // ----------- ORACLE RESOLUTION -----------
 
-        m.proposedOutcome = outcome;
-        m.proposedAt = uint64(block.timestamp);
-        m.proposer = msg.sender;
-        emit OutcomeProposed(id, outcome, msg.sender);
+    function resolveFromOracle(uint256 marketId) external onlyOwner {
+        Market storage m = markets[marketId];
+        require(!m.resolved, "Already resolved");
+        require(block.timestamp >= m.closeTime, "Too early");
+
+        string[] memory args = new string[](1);
+        args[0] = m.question;
+
+        bytes32 reqId = _sendRequest(
+            sourceCode,
+            SUBSCRIPTION_ID,
+            GAS_LIMIT,
+            args
+        );
+        lastRequestId = reqId;
+
+        emit OracleRequestSent(reqId, marketId);
     }
 
-    function finalize(uint256 id) external nonReentrant {
-        Market storage m = markets[id];
-        require(!m.resolved, "Resolved");
-        require(m.proposedOutcome != NO_PROPOSAL, "No proposal");
-        require(block.timestamp >= m.proposedAt + livenessSeconds, "Still live");
-        m.resolved = true;
-        m.winningScenario = m.proposedOutcome;
-        bettingToken.transfer(m.proposer, minBond);
-        emit OutcomeFinalized(id, m.winningScenario);
+    function _sendRequest(
+        string memory src,
+        uint64 subId,
+        uint32 gasLimit,
+        string[] memory args
+    ) internal returns (bytes32 requestId) {
+        FunctionsRequest.Request memory req;
+        req.initializeRequestForInlineJavaScript(src);
+        if (args.length > 0) req.setArgs(args);
+        requestId = _sendRequest(req.encodeCBOR(), subId, gasLimit, donId);
     }
+
+    function fulfillRequest(bytes32 requestId, bytes memory response, bytes memory /* err */)
+        internal
+        override
+    {
+        bool outcome = keccak256(response) == keccak256(bytes("true"));
+        for (uint256 i; i < marketCount; i++) {
+            Market storage m = markets[i];
+            if (!m.resolved && requestId == lastRequestId) {
+                m.resolved = true;
+                m.outcome = outcome;
+                emit MarketResolved(i, outcome);
+                break;
+            }
+        }
+    }
+
+    // ----------- CLAIMING -----------
 
     function claim(uint256 id) external nonReentrant {
         Market storage m = markets[id];
-        require(m.resolved, "Not resolved");
-        require(!m.hasClaimed, "Claimed");
+        require(m.resolved, "Not resolved yet");
 
-        uint8 win = m.winningScenario;
-        uint256 userStake = m.userBets[msg.sender][win];
-        require(userStake > 0, "No win");
-        uint256 totalYes = m.totalBets[0];
-        uint256 totalNo = m.totalBets[1];
-        uint256 totalPool = totalYes + totalNo;
-        uint256 winningPool = win == 0 ? totalYes : totalNo;
-        uint256 payout = (userStake * totalPool) / winningPool;
+        uint256 payout;
+        if (m.outcome && m.yesBets[msg.sender] > 0) {
+            payout = (m.yesBets[msg.sender] * (m.yesPool + m.noPool)) / m.yesPool;
+            m.yesBets[msg.sender] = 0;
+        } else if (!m.outcome && m.noBets[msg.sender] > 0) {
+            payout = (m.noBets[msg.sender] * (m.yesPool + m.noPool)) / m.noPool;
+            m.noBets[msg.sender] = 0;
+        }
 
-        m.hasClaimed = true;
-        bettingToken.transfer(msg.sender, payout);
+        require(payout > 0, "Nothing to claim");
+        collateral.safeTransfer(msg.sender, payout);
+        emit Claimed(id, msg.sender, payout);
     }
 
-    // -------- View functions --------
+    // ----------- VIEW HELPERS -----------
+
     function getMarket(uint256 id)
         external
         view
-        returns (string memory question, uint256 endTime, bool resolved, uint8 winningScenario, uint256 yesTotal, uint256 noTotal)
+        returns (
+            string memory question,
+            address creator,
+            uint256 yesPool,
+            uint256 noPool,
+            bool resolved,
+            bool outcome,
+            uint256 closeTime
+        )
     {
         Market storage m = markets[id];
-        return (m.question, m.endTime, m.resolved, m.winningScenario, m.totalBets[0], m.totalBets[1]);
-    }
-
-    function getAllMarketIds() external view returns (uint256[] memory ids) {
-        ids = new uint256[](marketCount);
-        for (uint256 i = 0; i < marketCount; i++) ids[i] = i;
+        return (m.question, m.creator, m.yesPool, m.noPool, m.resolved, m.outcome, m.closeTime);
     }
 }
