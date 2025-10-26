@@ -7,6 +7,7 @@ export const USDC_ADDRESS = "0x036CbD53842c5426634e7929541eC2318f3dCF7e";
 // Live Contract Addresses on Base Sepolia
 export const URIM_MARKET_ADDRESS = "0x8bFaF540467D3661CF50aF4A1f9a4818cAe47897"; // Everything Bets
 export const URIM_QUANTUM_MARKET_ADDRESS = "0x7fE72eaa31a8c51B05FAc65A271Ad093C1b6032C"; // Quantum Bets (PythUrimQuantumMarket)
+export const QUANTUM_BET_ADDRESS = "0x71fe60470dA19F1E70f9BDEdc05aD320679C791C"; // User-generated Quantum Bets
 
 export const MAX_OUTCOMES = 3;
 
