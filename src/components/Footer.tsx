@@ -1,7 +1,7 @@
-import { Shield, TrendingUp } from "lucide-react";
+import { Shield, TrendingUp, Search } from "lucide-react";
 import { ExternalLink } from "lucide-react";
-import { 
-  URIM_QUANTUM_MARKET_ADDRESS, 
+import {
+  URIM_QUANTUM_MARKET_ADDRESS,
   USDC_ADDRESS
 } from "@/constants/contracts";
 import { getExplorerContractUrl } from "@/constants/blockscout";
@@ -18,7 +18,7 @@ const Footer = () => {
             </div>
             <span className="text-lg font-bold text-foreground">URIM</span>
           </div>
-          
+
           {/* Sponsor Integration Section */}
           <div className="flex flex-col md:flex-row items-center gap-6 text-sm">
             <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary/5 border border-primary/20 hover:border-primary/40 transition-all group">
@@ -27,7 +27,11 @@ const Footer = () => {
             </div>
             <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary/5 border border-primary/20 hover:border-primary/40 transition-all group">
               <Shield className="w-4 h-4 text-primary group-hover:scale-110 transition-transform animate-glow" />
-              <span className="text-muted-foreground">Secured by <span className="text-primary font-semibold">Avail DA</span></span>
+              <span className="text-muted-foreground">Cross-Chain Transactions by <span className="text-primary font-semibold">Avail</span></span>
+            </div>
+            <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary/5 border border-primary/20 hover:border-primary/40 transition-all group">
+              <Search className="w-4 h-4 text-primary group-hover:scale-110 transition-transform" />
+              <span className="text-muted-foreground">Explorer by <span className="text-primary font-semibold">Blockscout</span></span>
             </div>
           </div>
 
@@ -36,14 +40,14 @@ const Footer = () => {
             <div className="text-sm text-muted-foreground space-y-3">
               <div className="font-semibold text-foreground text-center mb-3">Smart Contracts on Base Sepolia</div>
               <div className="flex flex-col sm:flex-row justify-center gap-4">
-                
+
                 <a
                   href={getExplorerContractUrl(URIM_QUANTUM_MARKET_ADDRESS)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
                 >
-                  <span>Quantum Market</span>
+                  <span>Pyth Quantum Market</span>
                   <ExternalLink className="w-3 h-3" />
                 </a>
                 <a
@@ -65,7 +69,7 @@ const Footer = () => {
               Urim is an AI-powered quantum prediction market built on Base, with live oracle data from Pyth Network, verified infrastructure by Avail, and transparent blockchain exploration via Blockscout.
             </p>
           </div>
-          
+
           {/* Copyright */}
           <div className="text-center space-y-2">
             <p className="text-sm text-muted-foreground font-medium">
