@@ -496,8 +496,72 @@ const Index = () => {
     <div className="min-h-screen w-full bg-background relative">
       <Navigation />
       
-      {/* Hero and content sections remain the same... */}
-      {/* Keeping the full UI structure but with Blockscout toasts integrated */}
+      {/* Quantum Market Generator Section - Top of Page */}
+      <section className="max-w-4xl mx-auto px-6 pt-20 md:pt-28 lg:pt-32 pb-16">
+        <div className="text-center mb-8">
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/20 border border-primary/30 mb-4">
+            <Sparkles className="w-4 h-4 text-primary" />
+            <span className="text-xs font-bold uppercase tracking-wider">🧠 AI-Powered</span>
+          </div>
+          <h2 className="text-4xl font-bold mb-3">✦ Quantum Market Generator</h2>
+          <p className="text-muted-foreground text-lg">Create custom prediction markets with AI-generated outcomes.</p>
+        </div>
+
+        <div className="glass-card p-8 mb-8">
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-semibold mb-2 block">Your Question</label>
+              <Input
+                type="text"
+                placeholder="Will ETH close above $4000 tomorrow?"
+                value={question}
+                onChange={(e) => setQuestion(e.target.value)}
+                className="text-lg font-semibold"
+                style={{
+                  background: '#171218',
+                  color: '#FFFFFF',
+                  border: '1px solid #5B3FB8',
+                }}
+                onFocus={(e) => e.target.style.borderColor = '#8B6DFF'}
+                onBlur={(e) => e.target.style.borderColor = '#5B3FB8'}
+              />
+            </div>
+
+            <Button
+              onClick={handleGenerate}
+              disabled={generating || creatingQuantumMarket || !question.trim()}
+              className="w-full bg-gradient-to-r from-primary to-primary-glow hover:shadow-[0_0_40px_rgba(139,109,255,0.4)] transition-all duration-300"
+              size="lg"
+            >
+              {generating || creatingQuantumMarket ? (
+                <>
+                  <RefreshCw className="w-5 h-5 mr-2 animate-spin" />
+                  {generating ? "Generating..." : "Creating Market..."}
+                </>
+              ) : (
+                <>
+                  <Zap className="w-5 h-5 mr-2" />
+                  Generate Quantum Market
+                </>
+              )}
+            </Button>
+
+            {scenarios.length > 0 && (
+              <div className="mt-6 p-4 rounded-lg bg-primary/10 border border-primary/30 animate-fade-in">
+                <div className="text-sm font-semibold mb-2">✨ AI-Generated Outcomes:</div>
+                <div className="space-y-2">
+                  <div className="text-sm bg-green-500/20 border border-green-500/30 rounded px-3 py-2">
+                    ✓ {scenarios[0]}
+                  </div>
+                  <div className="text-sm bg-red-500/20 border border-red-500/30 rounded px-3 py-2">
+                    ✗ {scenarios[1]}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
 
       <PythPriceTicker />
       <section className="max-w-4xl mx-auto px-6 pb-24">
@@ -607,72 +671,6 @@ const Index = () => {
               )}
             </div>
           ))}
-        </div>
-      </section>
-
-      <section className="max-w-4xl mx-auto px-6 pb-16">
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/20 border border-primary/30 mb-4">
-            <Sparkles className="w-4 h-4 text-primary" />
-            <span className="text-xs font-bold uppercase tracking-wider">🧠 AI-Powered</span>
-          </div>
-          <h2 className="text-4xl font-bold mb-3">✦ Quantum Market Generator</h2>
-          <p className="text-muted-foreground text-lg">Create custom prediction markets with AI-generated outcomes.</p>
-        </div>
-
-        <div className="glass-card p-8 mb-8">
-          <div className="space-y-4">
-            <div>
-              <label className="text-sm font-semibold mb-2 block">Your Question</label>
-              <Input
-                type="text"
-                placeholder="Will ETH close above $4000 tomorrow?"
-                value={question}
-                onChange={(e) => setQuestion(e.target.value)}
-                className="text-lg font-semibold"
-                style={{
-                  background: '#171218',
-                  color: '#FFFFFF',
-                  border: '1px solid #5B3FB8',
-                }}
-                onFocus={(e) => e.target.style.borderColor = '#8B6DFF'}
-                onBlur={(e) => e.target.style.borderColor = '#5B3FB8'}
-              />
-            </div>
-
-            <Button
-              onClick={handleGenerate}
-              disabled={generating || creatingQuantumMarket || !question.trim()}
-              className="w-full bg-gradient-to-r from-primary to-primary-glow hover:shadow-[0_0_40px_rgba(139,109,255,0.4)] transition-all duration-300"
-              size="lg"
-            >
-              {generating || creatingQuantumMarket ? (
-                <>
-                  <RefreshCw className="w-5 h-5 mr-2 animate-spin" />
-                  {generating ? "Generating..." : "Creating Market..."}
-                </>
-              ) : (
-                <>
-                  <Zap className="w-5 h-5 mr-2" />
-                  Generate Quantum Market
-                </>
-              )}
-            </Button>
-
-            {scenarios.length > 0 && (
-              <div className="mt-6 p-4 rounded-lg bg-primary/10 border border-primary/30 animate-fade-in">
-                <div className="text-sm font-semibold mb-2">✨ AI-Generated Outcomes:</div>
-                <div className="space-y-2">
-                  <div className="text-sm bg-green-500/20 border border-green-500/30 rounded px-3 py-2">
-                    ✓ {scenarios[0]}
-                  </div>
-                  <div className="text-sm bg-red-500/20 border border-red-500/30 rounded px-3 py-2">
-                    ✗ {scenarios[1]}
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
         </div>
       </section>
 
