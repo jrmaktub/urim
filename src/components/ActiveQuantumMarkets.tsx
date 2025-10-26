@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useAccount, useWriteContract } from 'wagmi';
+import { useAccount, useWriteContract, useReadContract } from 'wagmi';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -10,7 +10,8 @@ import QuantumBetABI from '@/contracts/QuantumBet.json';
 import ERC20ABI from '@/contracts/ERC20.json';
 import { formatUsdc, parseUsdc } from '@/lib/erc20';
 import { useNotification } from "@blockscout/app-sdk";
-import { Clock, User } from 'lucide-react';
+import { Clock, User, ExternalLink } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 const ActiveQuantumMarkets = () => {
   const { address, isConnected, chain } = useAccount();
@@ -129,7 +130,7 @@ const useTimeRemaining = (closeTime: number) => {
 };
 
 const MarketCard = ({ marketId }: { marketId: number }) => {
-  const { address } = useAccount();
+  const { address, chain } = useAccount();
   const { toast } = useToast();
   const { writeContractAsync } = useWriteContract();
   const { openTxToast } = useNotification();
@@ -139,7 +140,17 @@ const MarketCard = ({ marketId }: { marketId: number }) => {
   const [claiming, setClaiming] = useState(false);
   const [claimed, setClaimed] = useState(false);
   const [selectedOutcome, setSelectedOutcome] = useState<boolean | null>(null);
+  const [showDetails, setShowDetails] = useState(false);
+  const [approving, setApproving] = useState(false);
   const timeRemaining = useTimeRemaining(market?.closeTime || 0);
+
+  // Check USDC allowance
+  const { data: allowance, refetch: refetchAllowance } = useReadContract({
+    address: USDC_ADDRESS as `0x${string}`,
+    abi: ERC20ABI.abi,
+    functionName: 'allowance',
+    args: address ? [address, QUANTUM_BET_ADDRESS] : undefined,
+  });
 
   if (!market) return null;
 
@@ -159,32 +170,58 @@ const MarketCard = ({ marketId }: { marketId: number }) => {
   const noOdds = 100 - yesOdds;
 
   const shortenAddress = (addr: string) => `${addr.slice(0, 6)}...${addr.slice(-4)}`;
+  const getExplorerLink = (addr: string) => `https://sepolia.basescan.org/address/${addr}`;
   const description = market.question.length > 120 ? market.question.slice(0, 120) + '...' : market.question;
 
   const handleBet = async () => {
+    if (!address) {
+      toast({ title: "Connect your wallet", variant: "destructive" });
+      return;
+    }
+
+    if (chain?.id !== 84532) {
+      toast({ title: "Switch to Base Sepolia", variant: "destructive" });
+      return;
+    }
+
     if (selectedOutcome === null) {
       toast({ title: "Select YES or NO", variant: "destructive" });
       return;
     }
 
-    if (!betAmount || parseFloat(betAmount) <= 0) {
-      toast({ title: "Enter bet amount", variant: "destructive" });
+    if (!betAmount || parseFloat(betAmount) < 0.01) {
+      toast({ title: "Minimum bet is 0.01 USDC", variant: "destructive" });
       return;
     }
 
-    setBetting(true);
     try {
       const amountWei = parseUsdc(betAmount);
+      const currentAllowance = (allowance as bigint) || 0n;
 
-      // Approve USDC
-      await writeContractAsync({
-        address: USDC_ADDRESS as `0x${string}`,
-        abi: ERC20ABI.abi as any,
-        functionName: "approve",
-        args: [QUANTUM_BET_ADDRESS, amountWei],
-      } as any);
+      // Check if approval is needed
+      if (currentAllowance < amountWei) {
+        setApproving(true);
+        toast({ title: "Approving USDC...", description: "Please confirm the approval transaction" });
+        
+        const approvalHash = await writeContractAsync({
+          address: USDC_ADDRESS as `0x${string}`,
+          abi: ERC20ABI.abi as any,
+          functionName: "approve",
+          args: [QUANTUM_BET_ADDRESS, amountWei],
+        } as any);
+
+        openTxToast("84532", approvalHash);
+        
+        // Wait for approval confirmation
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        await refetchAllowance();
+        setApproving(false);
+      }
 
       // Place bet
+      setBetting(true);
+      toast({ title: "Placing bet...", description: "Please confirm the bet transaction" });
+      
       const hash = await writeContractAsync({
         address: QUANTUM_BET_ADDRESS as `0x${string}`,
         abi: QuantumBetABI.abi as any,
@@ -193,18 +230,26 @@ const MarketCard = ({ marketId }: { marketId: number }) => {
       } as any);
 
       openTxToast("84532", hash);
+      
+      toast({ 
+        title: "Bet placed successfully!", 
+        description: `${betAmount} USDC on ${selectedOutcome ? 'YES' : 'NO'}` 
+      });
+
       setBetAmount('');
       setSelectedOutcome(null);
       
       // Refresh market data
-      setTimeout(() => refetch(), 2000);
+      setTimeout(() => refetch(), 3000);
     } catch (error: any) {
+      const errorMsg = error.message || error.toString();
       toast({
-        title: "Bet failed",
-        description: error.message || "Please try again",
+        title: approving ? "Approval failed" : "Bet failed",
+        description: errorMsg.includes("User rejected") ? "Transaction rejected" : "Please try again",
         variant: "destructive",
       });
     } finally {
+      setApproving(false);
       setBetting(false);
     }
   };
@@ -241,7 +286,12 @@ const MarketCard = ({ marketId }: { marketId: number }) => {
         {/* Header */}
         <div className="space-y-2">
           <div className="flex items-start justify-between gap-3">
-            <h3 className="font-bold text-xl leading-tight text-foreground">{market.question}</h3>
+            <h3 
+              className="font-bold text-xl leading-tight text-foreground cursor-pointer hover:text-primary transition-colors line-clamp-2"
+              onClick={() => setShowDetails(true)}
+            >
+              {market.question}
+            </h3>
             {isOpen ? (
               <Badge className="bg-green-500/20 text-green-400 border-green-500/30 whitespace-nowrap">
                 🟢 Open
@@ -265,7 +315,15 @@ const MarketCard = ({ marketId }: { marketId: number }) => {
           <div className="flex items-center gap-3 text-sm text-muted-foreground">
             <div className="flex items-center gap-1.5">
               <User className="w-3.5 h-3.5" />
-              <span className="text-xs">Created by {shortenAddress(market.creator)}</span>
+              <a 
+                href={getExplorerLink(market.creator)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs hover:text-primary transition-colors flex items-center gap-1"
+              >
+                {shortenAddress(market.creator)}
+                <ExternalLink className="w-3 h-3" />
+              </a>
             </div>
             {isOpen && (
               <>
@@ -352,10 +410,10 @@ const MarketCard = ({ marketId }: { marketId: number }) => {
                 />
                 <Button
                   onClick={handleBet}
-                  disabled={betting}
+                  disabled={betting || approving}
                   className="w-full h-12 bg-gradient-to-r from-primary to-primary-glow hover:shadow-[0_0_25px_rgba(var(--primary-rgb),0.5)] transition-all duration-300"
                 >
-                  {betting ? "Placing Bet..." : "Place Bet"}
+                  {approving ? "Approving USDC..." : betting ? "Placing Bet..." : "Place Bet"}
                 </Button>
               </div>
             )}
@@ -379,6 +437,43 @@ const MarketCard = ({ marketId }: { marketId: number }) => {
           </div>
         )}
       </div>
+
+      {/* Market Details Dialog */}
+      <Dialog open={showDetails} onOpenChange={setShowDetails}>
+        <DialogContent className="bg-background/95 backdrop-blur-xl border-primary/20">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold">Market Details</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <p className="text-sm text-muted-foreground mb-1">Question</p>
+              <p className="font-semibold">{market.question}</p>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm text-muted-foreground mb-1">Creator</p>
+                <a 
+                  href={getExplorerLink(market.creator)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary hover:underline flex items-center gap-1"
+                >
+                  {shortenAddress(market.creator)}
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground mb-1">Close Time</p>
+                <p className="font-mono text-sm">{closeDate}</p>
+              </div>
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground mb-1">Market ID</p>
+              <p className="font-mono">#{marketId}</p>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
