@@ -578,7 +578,6 @@ const Index = () => {
         )}
       </section>
 
-      <PythPriceTicker />
       <section className="max-w-4xl mx-auto px-6 pb-24">
         <div className="text-center mb-8">
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/20 border border-primary/30 mb-4">
@@ -690,6 +689,7 @@ const Index = () => {
       </section>
 
       <section className="max-w-6xl mx-auto px-6 pb-16">
+        <PythPriceTicker />
         <LiveQuantumMarkets />
       </section>
 

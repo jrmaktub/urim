@@ -41,12 +41,12 @@ export default function PythPriceTicker() {
 
   if (isLoading) {
     return (
-      <div className="w-full max-w-2xl mx-auto mb-8 animate-fade-in">
-        <div className="rounded-[14px] border border-[rgba(180,150,255,0.35)] bg-[rgba(140,110,255,0.12)] p-[10px_24px] shadow-[0_0_12px_rgba(170,130,255,0.15)]">
-          <div className="flex flex-col items-center gap-2 text-center">
-            <div className="h-4 w-40 rounded bg-primary/10 animate-pulse" />
-            <div className="h-10 w-56 rounded-lg bg-primary/10 animate-pulse" />
-            <div className="h-3 w-32 rounded bg-primary/10 animate-pulse" />
+      <div className="mb-6 animate-fade-in">
+        <div className="inline-flex items-start gap-3 rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm px-4 py-3 shadow-sm">
+          <div className="h-2 w-2 rounded-full bg-primary/30 animate-pulse" />
+          <div className="space-y-1.5">
+            <div className="h-3 w-24 rounded bg-white/10 animate-pulse" />
+            <div className="h-6 w-32 rounded bg-white/10 animate-pulse" />
           </div>
         </div>
       </div>
@@ -54,27 +54,28 @@ export default function PythPriceTicker() {
   }
 
   return (
-    <div className="w-full max-w-2xl mx-auto mb-8 animate-fade-in">
-      <div className="rounded-[14px] border border-[rgba(180,150,255,0.35)] bg-[rgba(140,110,255,0.12)] shadow-[0_0_12px_rgba(170,130,255,0.15)] px-6 py-[10px]">
-        <div className="flex flex-col items-center gap-1.5 text-center">
+    <div className="mb-6 animate-fade-in">
+      <div className="inline-flex items-start gap-3 rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm px-4 py-3 shadow-[0_1px_3px_rgba(0,0,0,0.1)] hover:shadow-[0_2px_8px_rgba(0,0,0,0.15)] transition-shadow duration-300">
+        {/* Live indicator dot */}
+        <div className="relative pt-1.5">
+          <div className="h-2 w-2 rounded-full bg-green-400 animate-pulse" />
+          <div className="absolute inset-0 h-2 w-2 rounded-full bg-green-400/50 animate-ping" />
+        </div>
+        
+        {/* Price content */}
+        <div className="flex flex-col items-start gap-0.5">
           {/* Label */}
-          <span className="text-[0.9rem] font-normal uppercase tracking-[0.08em]" style={{ color: '#C8B7FF' }}>
+          <span className="text-[0.6875rem] font-medium uppercase tracking-wider text-foreground/50">
             ETH/USD — Pyth Oracle
           </span>
           
           {/* Price Display */}
           <span 
-            className="text-[clamp(2rem,4vw,3.6rem)] font-bold text-white transition-opacity duration-200"
-            style={{ 
-              opacity: priceChanged ? 0.7 : 1
-            }}
+            className={`text-[1.75rem] font-semibold leading-none text-foreground transition-all duration-300 ${
+              priceChanged ? 'opacity-70 scale-95' : 'opacity-100 scale-100'
+            }`}
           >
             ${ethPrice}
-          </span>
-          
-          {/* Update Status */}
-          <span className="text-[0.75rem] italic" style={{ color: '#a29cc7' }}>
-            updated in real time
           </span>
         </div>
       </div>
