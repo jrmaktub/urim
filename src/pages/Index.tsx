@@ -19,7 +19,7 @@ import { BridgeAndExecuteButton } from '@avail-project/nexus-widgets';
 import { supabase } from "@/integrations/supabase/client";
 import { optimismSepolia, baseSepolia } from 'wagmi/chains';
 import Bridge from '@/components/BridgeButton';
-import { useNotification, useTransactionPopup } from "@blockscout/app-sdk";
+import { useNotification } from "@blockscout/app-sdk";
 
 import LiveQuantumMarkets from "@/components/LiveQuantumMarkets";
 
@@ -43,9 +43,7 @@ const Index = () => {
   const { data: walletClient } = useWalletClient();
   const { toast } = useToast();
   const { writeContractAsync } = useWriteContract();
-  const { openTxToast } = useNotification();
-  const { openPopup } = useTransactionPopup();
-  
+  const { openTxToast } = useNotification();  
   const [question, setQuestion] = useState("");
   const [generating, setGenerating] = useState(false);
   const [scenarios, setScenarios] = useState<string[]>([]);
@@ -303,8 +301,6 @@ const Index = () => {
       } as any);
 
       openTxToast("84532", hash);
-      openPopup({
-        chainId: "84532"      });
 
       // Wait for the market to be created and get the ID
       setTimeout(() => {
@@ -364,8 +360,6 @@ const Index = () => {
       } as any);
 
       openTxToast("84532", hash);
-      openPopup({
-        chainId: "84532"      });
 
       // Wait a bit for the blockchain to update, then fetch new market ID
       setTimeout(() => {
@@ -419,9 +413,6 @@ const Index = () => {
       } as any);
 
       openTxToast("84532", hash);
-      openPopup({
-        chainId: "84532"
-      });
 
       setPythMarkets(prev => prev.map((m, i) => i === marketIndex ? { ...m, betAmount: '', betting: false } : m));
     } catch (error: any) {
@@ -503,8 +494,6 @@ const Index = () => {
       } as any);
 
       openTxToast("84532", hash);
-      openPopup({
-        chainId: "84532"      });
 
       setLiveQuantumMarkets(prev => prev.map((m, i) => {
         if (i === marketIndex) {

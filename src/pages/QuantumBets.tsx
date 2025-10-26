@@ -13,7 +13,7 @@ import { URIM_QUANTUM_MARKET_ADDRESS, USDC_ADDRESS } from "@/constants/contracts
 import UrimQuantumMarketABI from "@/contracts/UrimQuantumMarket.json";
 import ERC20ABI from "@/contracts/ERC20.json";
 import { parseUnits } from "viem";
-import { useNotification, useTransactionPopup } from "@blockscout/app-sdk";
+import { useNotification } from "@blockscout/app-sdk";
 
 
 export default function QuantumBets() {
@@ -28,7 +28,6 @@ export default function QuantumBets() {
   const [bettingIdx, setBettingIdx] = useState<number | null>(null);
   const [selectedScenario, setSelectedScenario] = useState<number | null>(null);
   const { openTxToast } = useNotification();
-  const { openPopup } = useTransactionPopup();
 
   // Fetch all market IDs
   const { data: marketIdsData, refetch: refetchMarkets } = useReadContract({
@@ -258,18 +257,6 @@ export default function QuantumBets() {
           <div>
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-bold">Your Bets</h2>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  // Open transaction popup to show all user's transactions
-                  openPopup({
-                    chainId: "84532", // Base Sepolia
-                    address: address,
-                  });
-                }}
-              >
-                View Transaction History
-              </Button>
             </div>
             <div className="grid md:grid-cols-2 gap-6">
               {marketIds.map((id) => (
@@ -291,7 +278,6 @@ function MarketCard({ marketId, address }: { marketId: bigint; address: `0x${str
   const [bettingScenario, setBettingScenario] = useState<number | null>(null);
   const [betAmount, setBetAmount] = useState("");
   const { openTxToast } = useNotification();
-  const { openPopup } = useTransactionPopup();
 
   const { data: marketInfo } = useReadContract({
     address: URIM_QUANTUM_MARKET_ADDRESS as `0x${string}`,
