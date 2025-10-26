@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useAccount, useWriteContract, useReadContract, useSwitchChain } from "wagmi";
+import { useAccount, useWriteContract, useReadContract, useSwitchChain, useWaitForTransactionReceipt } from "wagmi";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,6 +13,7 @@ import { parseUnits, formatUnits } from "viem";
 import { BridgeAndExecuteButton } from '@avail-project/nexus-widgets';
 import { optimismSepolia, baseSepolia } from 'wagmi/chains';
 import { useNotification } from "@blockscout/app-sdk";
+import { cn } from "@/lib/utils";
 
 type MarketData = {
   marketId: bigint;
@@ -27,14 +28,19 @@ type MarketData = {
   cancelled: boolean;
 };
 
+type MarketUIState = {
+  selected?: 'A' | 'B';
+  amount?: string;
+  pending?: boolean;
+};
+
 export default function LiveQuantumMarkets() {
   const { address, chain } = useAccount();
   const { toast } = useToast();
   const { writeContractAsync } = useWriteContract();
   const { openTxToast } = useNotification();
   const [markets, setMarkets] = useState<MarketData[]>([]);
-  const [betAmounts, setBetAmounts] = useState<Record<string, string>>({});
-  const [bettingMarkets, setBettingMarkets] = useState<Record<string, 'yes' | 'no' | null>>({});
+  const [ui, setUi] = useState<Record<number, MarketUIState>>({});
   const [bridgeMode, setBridgeMode] = useState<Record<string, boolean>>({});
 
   // Fetch all market IDs - always from Base Sepolia
@@ -73,109 +79,113 @@ export default function LiveQuantumMarkets() {
     fetchMarkets();
   }, [marketIds]);
 
-  const placeBet = async (marketId: bigint, isYes: boolean) => {
+  const setSelected = (id: number, val: 'A' | 'B') => 
+    setUi(prev => ({ ...prev, [id]: { ...prev[id], selected: val }}));
+  
+  const setAmount = (id: number, val: string) => 
+    setUi(prev => ({ ...prev, [id]: { ...prev[id], amount: val }}));
+  
+  const setPending = (id: number, val: boolean) => 
+    setUi(prev => ({ ...prev, [id]: { ...prev[id], pending: val }}));
+
+  const showErrorWithCopy = (title: string, body: string) => {
+    toast({
+      title: `❌ ${title}`,
+      description: (
+        <div className="space-y-2">
+          <div className="text-sm">{body}</div>
+          <button
+            className="text-xs underline opacity-80 hover:opacity-100"
+            onClick={() => {
+              navigator.clipboard.writeText(body);
+              toast({ title: "Error copied to clipboard" });
+            }}
+          >
+            📋 Copy error
+          </button>
+        </div>
+      ),
+      variant: "destructive",
+      duration: 9000,
+    });
+  };
+
+  const handleBet = async (marketId: number, isOptionA: boolean) => {
     if (!address) {
       toast({ title: "Connect Wallet", description: "Please connect your wallet first.", variant: "destructive" });
       return;
     }
 
-    // Check if on Base Sepolia for direct betting
     if (chain?.id !== baseSepolia.id) {
       toast({ 
         title: "Wrong Network", 
-        description: "Please switch to Base Sepolia to place bets directly.", 
+        description: "Please switch to Base Sepolia to place bets.", 
         variant: "destructive" 
       });
       return;
     }
 
-    const betAmount = betAmounts[marketId.toString()];
-    if (!betAmount || parseFloat(betAmount) <= 0) {
+    const amountStr = ui[marketId]?.amount ?? "";
+    if (!amountStr || parseFloat(amountStr) <= 0) {
       toast({ title: "Enter amount", description: "Please enter a valid bet amount.", variant: "destructive" });
       return;
     }
 
-    setBettingMarkets(prev => ({ ...prev, [marketId.toString()]: isYes ? 'yes' : 'no' }));
+    setPending(marketId, true);
 
     try {
-      const amountWei = parseUnits(betAmount, 6);
+      const amount = parseUnits(amountStr, 6);
 
-      toast({ 
-        title: "Step 1: Approving USDC...", 
-        description: "Please confirm the approval transaction in your wallet" 
-      });
+      // Check allowance
+      const allowanceResult = await fetch(
+        `https://base-sepolia.blockscout.com/api/v2/smart-contracts/${USDC_ADDRESS}/methods-read?is_custom_abi=false&method_id=allowance&args[]=${address}&args[]=${URIM_QUANTUM_MARKET_ADDRESS}`
+      ).then(r => r.json());
+      
+      const currentAllowance = BigInt(allowanceResult?.result?.output?.[0]?.value || 0);
 
-      // Approve USDC
-      await writeContractAsync({
-        address: USDC_ADDRESS as `0x${string}`,
-        abi: ERC20ABI.abi as any,
-        functionName: "approve",
-        args: [URIM_QUANTUM_MARKET_ADDRESS, amountWei],
-      } as any);
+      // Approve if needed
+      if (currentAllowance < amount) {
+        toast({ 
+          title: "Step 1: Approving USDC...", 
+          description: "Please confirm the approval transaction" 
+        });
+
+        const approveHash = await writeContractAsync({
+          address: USDC_ADDRESS as `0x${string}`,
+          abi: ERC20ABI.abi as any,
+          functionName: "approve",
+          args: [URIM_QUANTUM_MARKET_ADDRESS, amount],
+        } as any);
+
+        // Wait for approval
+        await new Promise((resolve) => setTimeout(resolve, 3000));
+      }
 
       toast({ 
         title: "Step 2: Placing bet...", 
-        description: `Betting ${betAmount} USDC on ${isYes ? 'YES' : 'NO'}. Confirm the transaction.` 
+        description: `Betting ${amountStr} USDC on ${isOptionA ? 'YES' : 'NO'}` 
       });
 
-      // Buy shares - isYes is passed as _isOptionA parameter
-      // true = OptionA (Yes), false = OptionB (No)
+      // Place bet
       const hash = await writeContractAsync({
         address: URIM_QUANTUM_MARKET_ADDRESS as `0x${string}`,
         abi: UrimQuantumMarketABI.abi as any,
         functionName: "buyShares",
-        args: [marketId, isYes, amountWei], // marketId, _isOptionA (boolean), _amount
+        args: [BigInt(marketId), isOptionA, amount],
         gas: BigInt(500_000),
       } as any);
 
-      // Show Blockscout toast
       openTxToast("84532", hash);
 
-      // Clear input and refetch
-      setBetAmounts(prev => ({ ...prev, [marketId.toString()]: '' }));
+      toast({ title: "✅ Bet placed!", description: "Transaction submitted successfully" });
+      
+      setAmount(marketId, "");
       await refetchMarketIds();
-    } catch (error: any) {
-      console.error("Bet error:", error);
-      
-      // Better error parsing
-      let errorMsg = "Transaction failed";
-      if (error?.shortMessage) {
-        errorMsg = error.shortMessage;
-      } else if (error?.message) {
-        // Extract readable error from message
-        if (error.message.includes("user rejected")) {
-          errorMsg = "Transaction rejected by user";
-        } else if (error.message.includes("insufficient funds")) {
-          errorMsg = "Insufficient funds for transaction";
-        } else if (error.message.includes("Market trading period has ended")) {
-          errorMsg = "Market trading period has ended";
-        } else if (error.message.includes("Amount too small")) {
-          errorMsg = "Bet amount is too small";
-        } else {
-          errorMsg = error.message;
-        }
-      }
-      
-      const fullError = JSON.stringify(error, null, 2);
-
-      toast({
-        title: "❌ Transaction failed",
-        description: errorMsg,
-        variant: "destructive",
-        action: (
-          <button
-            onClick={() => {
-              navigator.clipboard.writeText(fullError);
-              toast({ title: "Error copied to clipboard" });
-            }}
-            className="ml-2 px-3 py-1 text-xs bg-destructive/20 hover:bg-destructive/30 rounded"
-          >
-            📋 Copy
-          </button>
-        ),
-      });
+    } catch (err: any) {
+      const msg = err?.shortMessage || err?.message || "Transaction failed";
+      showErrorWithCopy("Bet failed", msg);
     } finally {
-      setBettingMarkets(prev => ({ ...prev, [marketId.toString()]: null }));
+      setPending(marketId, false);
     }
   };
 
@@ -195,12 +205,10 @@ export default function LiveQuantumMarkets() {
             <LiveMarketCard
               key={marketId.toString()}
               marketId={marketId}
-              betAmount={betAmounts[marketId.toString()] || ''}
-              onBetAmountChange={(value) => 
-                setBetAmounts(prev => ({ ...prev, [marketId.toString()]: value }))
-              }
-              onPlaceBet={placeBet}
-              bettingStatus={bettingMarkets[marketId.toString()]}
+              uiState={ui[Number(marketId)] || {}}
+              onSetSelected={(val) => setSelected(Number(marketId), val)}
+              onSetAmount={(val) => setAmount(Number(marketId), val)}
+              onHandleBet={handleBet}
               bridgeMode={bridgeMode[marketId.toString()] || false}
               onBridgeModeToggle={(value) =>
                 setBridgeMode(prev => ({ ...prev, [marketId.toString()]: value }))
@@ -215,18 +223,18 @@ export default function LiveQuantumMarkets() {
 
 function LiveMarketCard({ 
   marketId, 
-  betAmount, 
-  onBetAmountChange, 
-  onPlaceBet,
-  bettingStatus,
+  uiState,
+  onSetSelected,
+  onSetAmount,
+  onHandleBet,
   bridgeMode,
   onBridgeModeToggle
 }: { 
   marketId: bigint;
-  betAmount: string;
-  onBetAmountChange: (value: string) => void;
-  onPlaceBet: (marketId: bigint, isYes: boolean) => void;
-  bettingStatus: 'yes' | 'no' | null;
+  uiState: MarketUIState;
+  onSetSelected: (val: 'A' | 'B') => void;
+  onSetAmount: (val: string) => void;
+  onHandleBet: (marketId: number, isOptionA: boolean) => void;
   bridgeMode: boolean;
   onBridgeModeToggle: (value: boolean) => void;
 }) {
@@ -358,8 +366,28 @@ function LiveMarketCard({
         </div>
       )}
 
-      <div className="grid md:grid-cols-2 gap-3 mb-4">
-        <div className="p-4 rounded-lg border-2 border-primary/20 bg-background/50">
+      <div role="radiogroup" className="grid md:grid-cols-2 gap-3 mb-4">
+        {/* Option A - Yes */}
+        <div
+          role="radio"
+          aria-checked={uiState.selected === 'A'}
+          tabIndex={0}
+          onClick={() => !isResolved && onSetSelected('A')}
+          onKeyDown={(e) => {
+            if (!isResolved && (e.key === 'Enter' || e.key === ' ')) {
+              e.preventDefault();
+              onSetSelected('A');
+            }
+          }}
+          className={cn(
+            "min-h-[56px] p-4 rounded-xl border-2 transition-all pointer-events-auto cursor-pointer",
+            isResolved 
+              ? "border-primary/20 bg-background/50"
+              : uiState.selected === 'A' 
+                ? "ring-2 ring-primary/70 bg-white/5 border-primary/40" 
+                : "border-primary/20 bg-background/50 hover:bg-white/3 hover:border-primary/30"
+          )}
+        >
           <div className="flex items-center justify-between mb-2">
             <div className="text-sm font-medium flex items-center gap-2">
               <span className="text-lg">🔮</span>
@@ -374,7 +402,27 @@ function LiveMarketCard({
           </div>
         </div>
 
-        <div className="p-4 rounded-lg border-2 border-primary/20 bg-background/50">
+        {/* Option B - No */}
+        <div
+          role="radio"
+          aria-checked={uiState.selected === 'B'}
+          tabIndex={0}
+          onClick={() => !isResolved && onSetSelected('B')}
+          onKeyDown={(e) => {
+            if (!isResolved && (e.key === 'Enter' || e.key === ' ')) {
+              e.preventDefault();
+              onSetSelected('B');
+            }
+          }}
+          className={cn(
+            "min-h-[56px] p-4 rounded-xl border-2 transition-all pointer-events-auto cursor-pointer",
+            isResolved 
+              ? "border-primary/20 bg-background/50"
+              : uiState.selected === 'B' 
+                ? "ring-2 ring-primary/70 bg-white/5 border-primary/40" 
+                : "border-primary/20 bg-background/50 hover:bg-white/3 hover:border-primary/30"
+          )}
+        >
           <div className="flex items-center justify-between mb-2">
             <div className="text-sm font-medium flex items-center gap-2">
               <span className="text-lg">🪶</span>
@@ -395,38 +443,42 @@ function LiveMarketCard({
           {!bridgeMode ? (
             // Mode 1: Normal Betting
             <>
-              <div className="flex gap-2">
+              <div className="space-y-3">
                 <Input
-                  type="number"
+                  inputMode="decimal"
                   placeholder="Amount (USDC)"
-                  value={betAmount}
-                  onChange={(e) => onBetAmountChange(e.target.value)}
-                  className="flex-1 bg-background/50"
+                  value={uiState.amount ?? ""}
+                  onChange={(e) => onSetAmount(e.target.value)}
+                  className={cn(
+                    "w-full py-3 bg-background/50",
+                    uiState.selected ? "opacity-100" : "opacity-60"
+                  )}
                 />
+                
                 {!isOnBaseSepolia ? (
                   <Button
                     onClick={() => switchChain({ chainId: baseSepolia.id })}
-                    className="bg-gradient-to-r from-orange-500 to-orange-600 hover:opacity-90 whitespace-nowrap"
+                    className="w-full bg-gradient-to-r from-orange-500 to-orange-600 hover:opacity-90"
                   >
-                    Switch to Base
+                    Switch to Base Sepolia
                   </Button>
                 ) : (
-                  <>
+                  <div className="grid grid-cols-2 gap-2">
                     <Button
-                      onClick={() => onPlaceBet(marketId, true)}
-                      disabled={bettingStatus === 'yes' || bettingStatus === 'no'}
-                      className="bg-gradient-to-r from-primary to-primary-glow hover:opacity-90"
+                      disabled={uiState.pending}
+                      onClick={() => onHandleBet(Number(marketId), true)}
+                      className="min-h-[48px] bg-gradient-to-r from-primary to-primary-glow hover:opacity-90"
                     >
-                      {bettingStatus === 'yes' ? "Betting..." : "Bet Yes"}
+                      {uiState.pending ? "⏳ Processing..." : "Bet Yes"}
                     </Button>
                     <Button
-                      onClick={() => onPlaceBet(marketId, false)}
-                      disabled={bettingStatus === 'yes' || bettingStatus === 'no'}
-                      className="bg-gradient-to-r from-primary to-primary-glow hover:opacity-90"
+                      disabled={uiState.pending}
+                      onClick={() => onHandleBet(Number(marketId), false)}
+                      className="min-h-[48px] bg-gradient-to-r from-primary to-primary-glow hover:opacity-90"
                     >
-                      {bettingStatus === 'no' ? "Betting..." : "Bet No"}
+                      {uiState.pending ? "⏳ Processing..." : "Bet No"}
                     </Button>
-                  </>
+                  </div>
                 )}
               </div>
               
@@ -447,10 +499,10 @@ function LiveMarketCard({
             <>
               <div className="space-y-2">
                 <Input
-                  type="number"
+                  inputMode="decimal"
                   placeholder="Amount (USDC)"
-                  value={betAmount}
-                  onChange={(e) => onBetAmountChange(e.target.value)}
+                  value={uiState.amount ?? ""}
+                  onChange={(e) => onSetAmount(e.target.value)}
                   className="bg-background/50"
                 />
                 
@@ -459,6 +511,7 @@ function LiveMarketCard({
                     onClick={() => setBridgeChoice('yes')}
                     variant={bridgeChoice === 'yes' ? 'default' : 'outline'}
                     size="sm"
+                    className="min-h-[48px]"
                   >
                     🔮 Yes
                   </Button>
@@ -466,6 +519,7 @@ function LiveMarketCard({
                     onClick={() => setBridgeChoice('no')}
                     variant={bridgeChoice === 'no' ? 'default' : 'outline'}
                     size="sm"
+                    className="min-h-[48px]"
                   >
                     🪶 No
                   </Button>
@@ -524,13 +578,13 @@ function LiveMarketCard({
                         functionParams: [
                           marketId,
                           bridgeChoice === 'yes',
-                          parseUnits(betAmount || '1', 6)
+                          parseUnits(uiState.amount || '1', 6)
                         ]
                       })}
                       prefill={{
                         toChainId: baseSepolia.id,
                         token: 'USDC',
-                        amount: betAmount || '1'
+                        amount: uiState.amount || '1'
                       }}
                     >
                       {({ onClick, isLoading, disabled }) => (
@@ -539,12 +593,12 @@ function LiveMarketCard({
                             onClick();
                             toast({ 
                               title: "🌉 Bridging to Base...", 
-                              description: `${betAmount || '1'} USDC on ${bridgeChoice === 'yes' ? 'YES' : 'NO'}` 
+                              description: `${uiState.amount || '1'} USDC on ${bridgeChoice === 'yes' ? 'YES' : 'NO'}` 
                             });
                           }}
-                          disabled={isLoading || disabled || !betAmount}
+                          disabled={isLoading || disabled || !uiState.amount}
                           size="sm"
-                          className="w-full bg-gradient-to-r from-primary to-primary-glow hover:opacity-90"
+                          className="w-full min-h-[48px] bg-gradient-to-r from-primary to-primary-glow hover:opacity-90"
                         >
                           {isLoading ? '⏳ Processing...' : '🔄 Execute'}
                         </Button>
