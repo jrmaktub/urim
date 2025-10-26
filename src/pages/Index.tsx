@@ -513,66 +513,14 @@ const Index = () => {
         </div>
       </section>
 
-      {/* Active Quantum Markets Section */}
-      {activeMarkets.length > 0 && (
-        <section className="max-w-6xl mx-auto px-6 pb-16">
-          <h2 className="text-3xl font-bold mb-8 text-center bg-gradient-to-r from-primary via-purple-400 to-primary bg-clip-text text-transparent">
-            ✨ Active Quantum Markets
-          </h2>
-          
-          <div className="space-y-8">
-            {activeMarkets.map((market, marketIdx) => (
-              <div key={market.id} className="glass-card p-6">
-                <h3 className="text-xl font-semibold mb-6 text-foreground/90">
-                  {market.question}
-                </h3>
-                
-                <div className="grid md:grid-cols-2 gap-6">
-                  {market.outcomes.map((outcome, outcomeIdx) => (
-                    <div
-                      key={outcomeIdx}
-                      className="relative group/card"
-                    >
-                      <div className="absolute -inset-0.5 bg-gradient-to-br from-primary/40 to-purple-500/40 rounded-xl blur opacity-0 group-hover/card:opacity-100 transition-all duration-300" />
-                      
-                      <div className="relative bg-background/80 border border-primary/20 rounded-xl p-5 space-y-4">
-                        <div className="space-y-2">
-                          <div className="flex items-start justify-between gap-2">
-                            <p className="text-sm font-medium text-foreground/80 leading-relaxed flex-1">
-                              {outcome.description}
-                            </p>
-                            <span className="px-3 py-1 bg-primary/10 text-primary text-xs font-semibold rounded-full shrink-0">
-                              {outcome.probability}
-                            </span>
-                          </div>
-                        </div>
-                        
-                        <div className="space-y-3">
-                          <Input
-                            type="number"
-                            placeholder="Amount (USDC)"
-                            value={market.betAmounts[outcomeIdx]}
-                            onChange={(e) => updateBetAmount(marketIdx, outcomeIdx, e.target.value)}
-                            className="h-10 bg-background/50 border-primary/20 focus:border-primary/50"
-                          />
-                          
-                          <Button
-                            onClick={() => handlePlaceBet(marketIdx, outcomeIdx)}
-                            disabled={!market.betAmounts[outcomeIdx] || parseFloat(market.betAmounts[outcomeIdx]) <= 0}
-                            className="w-full bg-primary/90 hover:bg-primary text-primary-foreground shadow-[0_0_20px_rgba(124,58,237,0.2)] hover:shadow-[0_0_30px_rgba(124,58,237,0.4)] transition-all"
-                          >
-                            Bet
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
+      {/* Active Quantum Markets - Always visible, displays real blockchain markets */}
+      <section className="max-w-6xl mx-auto px-6 pb-16">
+        <h2 className="text-3xl font-bold mb-8 text-center bg-gradient-to-r from-primary via-purple-400 to-primary bg-clip-text text-transparent">
+          ✨ Active Quantum Markets
+        </h2>
+        
+        <LiveQuantumMarkets />
+      </section>
 
       <PythPriceTicker />
       <section className="max-w-4xl mx-auto px-6 pb-24">
