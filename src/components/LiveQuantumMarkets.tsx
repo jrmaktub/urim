@@ -182,7 +182,7 @@ export default function LiveQuantumMarkets() {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
-        <h2 className="text-2xl font-bold">✨ Live Quantum Markets</h2>
+        <h2 className="text-2xl font-bold">✨ Live Quantum Pyth Markets</h2>
       </div>
 
       <div className="grid gap-4">
