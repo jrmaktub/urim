@@ -30,32 +30,49 @@ serve(async (req) => {
         messages: [
           {
             role: "system",
-            content: `You are a quantum prediction AI for a prediction market platform. Generate exactly 2 clear, realistic, and human-like future scenarios for the given question.
+            content: `You are a quantum prediction AI for a prediction market platform. Generate exactly 3 clear, realistic, and human-like future scenarios for the given question.
 
-Each scenario should be:
-- Concise and contextual (one line)
-- Natural and plausible
-- Distinct outcomes (e.g., positive vs negative, or two different possibilities)
+Each scenario must include:
+- title: 2-6 words summarizing the outcome
+- desc: One short sentence (10-25 words) explaining why this might happen
+- prob: Integer 0-100 for estimated probability (total should sum to ~100)
 
 Respond ONLY with valid JSON (no markdown, no code blocks):
 {
-  "scenarios": [
-    {
-      "description": "Natural scenario description"
-    }
-  ]
+  "outcomeA": {
+    "title": "Short outcome title",
+    "desc": "Brief explanation of why this might happen.",
+    "prob": 45
+  },
+  "outcomeB": {
+    "title": "Alternative outcome",
+    "desc": "Different scenario explanation.",
+    "prob": 35
+  },
+  "outcomeC": {
+    "title": "Third possibility",
+    "desc": "Another distinct scenario.",
+    "prob": 20
+  }
 }
 
-Example for "Will ETH rise tomorrow?":
+Example for "Who will win the 2025 Honduras election?":
 {
-  "scenarios": [
-    {
-      "description": "ETH surges after bullish ETF approval"
-    },
-    {
-      "description": "ETH dips amid weak volume"
-    }
-  ]
+  "outcomeA": {
+    "title": "Rixi Moncada Wins",
+    "desc": "Strong backing from Libre party and rising popularity in rural departments.",
+    "prob": 45
+  },
+  "outcomeB": {
+    "title": "Salvador Nasralla Wins",
+    "desc": "Forms a strong alliance with opposition factions and consolidates urban voters.",
+    "prob": 35
+  },
+  "outcomeC": {
+    "title": "Other Candidate Wins",
+    "desc": "A surprise outsider consolidates youth and anti-establishment support.",
+    "prob": 20
+  }
 }`
           },
           {
