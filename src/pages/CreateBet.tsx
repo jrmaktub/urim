@@ -190,12 +190,12 @@ const CreateBet = () => {
                 onClick={() => {
                   toast({ 
                     title: "🪐 Bridge & Execute", 
-                    description: "Cross-chain bridging with Avail coming soon!" 
+                    description: "Cross-chain bridging coming soon!" 
                   });
                 }}
               >
                 <span className="mr-2">🪐</span>
-                Bridge & Execute with Avail
+                Bridge & Execute
                 <span className="ml-2 text-xs text-muted-foreground group-hover:text-primary transition-colors">
                   (Cross-chain in one click)
                 </span>

@@ -2,18 +2,18 @@ import { Sparkles, History } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import WalletButton from "./WalletButton";
 import { Button } from "./ui/button";
-import { useState } from 'react';
+// import { useState } from 'react';
 import { useAccount } from 'wagmi';
-import DeinitButton from '@/components/de-init-button';
-import { isInitialized } from '@/lib/nexus';
+// import DeinitButton from '@/components/de-init-button';
+// import { isInitialized } from '@/lib/nexus';
 import { useTransactionPopup } from "@blockscout/app-sdk";
 
 const Navigation = () => {
   const location = useLocation();
   const { isConnected, address } = useAccount();
   const { openPopup } = useTransactionPopup();
-  const [initialized, setInitialized] = useState(isInitialized());
-  const [balances, setBalances] = useState<any>(null);
+  // const [initialized, setInitialized] = useState(isInitialized());
+  // const [balances, setBalances] = useState<any>(null);
   
   const btn =
     'px-4 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-700 ' +

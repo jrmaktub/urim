@@ -14,7 +14,7 @@ import { URIM_QUANTUM_MARKET_ADDRESS, USDC_ADDRESS } from "@/constants/contracts
 import UrimQuantumMarketABI from "@/contracts/UrimQuantumMarket.json";
 import ERC20ABI from "@/contracts/ERC20.json";
 import { parseUnits, formatUnits } from "viem";
-import { BridgeAndExecuteButton } from '@avail-project/nexus-widgets';
+// import { BridgeAndExecuteButton } from '@avail-project/nexus-widgets';
 import { optimismSepolia, baseSepolia } from 'wagmi/chains';
 import { useNotification } from "@blockscout/app-sdk";
 import { cn } from "@/lib/utils";

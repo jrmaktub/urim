@@ -13,8 +13,8 @@ import QuantumMarketDetail from "./pages/QuantumMarketDetail";
 import EverythingMarketDetail from "./pages/EverythingMarketDetail";
 import NotFound from "./pages/NotFound";
 import { PythPriceTestnet } from "./pages/PythPrice";
-import { NexusProvider } from '@avail-project/nexus-widgets';
-import type { NexusNetwork } from '@avail-project/nexus-widgets';
+// import { NexusProvider } from '@avail-project/nexus-widgets';
+// import type { NexusNetwork } from '@avail-project/nexus-widgets';
 import '@rainbow-me/rainbowkit/styles.css';
 import {
   getDefaultConfig,
@@ -26,13 +26,13 @@ import {
   mainnet,
   optimismSepolia
 } from 'wagmi/chains';
-import { createContext, useContext, useMemo, useState } from 'react';
-import WalletBridge from './components/WalletBridge';
+// import { createContext, useContext, useMemo, useState } from 'react';
+// import WalletBridge from './components/WalletBridge';
 import { NotificationProvider, TransactionPopupProvider } from "@blockscout/app-sdk";
 
 
 const config = getDefaultConfig({
-  appName: 'Nexus SDK with RainbowKit',
+  appName: 'URIM Quantum Markets',
   projectId: 'f5d6f1be5b3a2781cb85a4547cc81384',
   chains: [mainnet, base, baseSepolia, optimismSepolia],
   ssr: false,
@@ -40,41 +40,31 @@ const config = getDefaultConfig({
 
 const queryClient = new QueryClient();
 
-interface Web3ContextValue {
-  network: NexusNetwork;
-  setNetwork: React.Dispatch<React.SetStateAction<NexusNetwork>>;
-}
+// interface Web3ContextValue {
+//   network: NexusNetwork;
+//   setNetwork: React.Dispatch<React.SetStateAction<NexusNetwork>>;
+// }
 
-const Web3Context = createContext<Web3ContextValue | null>(null);
+// const Web3Context = createContext<Web3ContextValue | null>(null);
 
-export function useWeb3Context() {
-  const context = useContext(Web3Context);
-  if (!context) {
-    throw new Error('useWeb3Context must be used within App');
-  }
-  return context;
-}
+// export function useWeb3Context() {
+//   const context = useContext(Web3Context);
+//   if (!context) {
+//     throw new Error('useWeb3Context must be used within App');
+//   }
+//   return context;
+// }
 
 const App = () => {
-  const [network, setNetwork] = useState<NexusNetwork>('testnet');
-  const value = useMemo(() => ({ network, setNetwork }), [network]);
+  // const [network, setNetwork] = useState<NexusNetwork>('testnet');
+  // const value = useMemo(() => ({ network, setNetwork }), [network]);
 
   return (
     <TransactionPopupProvider>
    <NotificationProvider>
-    <Web3Context.Provider value={value}>
       <WagmiProvider config={config}>
         <QueryClientProvider client={queryClient}>
           <RainbowKitProvider modalSize="compact">
-            <NexusProvider
-              config={{
-                debug: true,
-                network: network,
-              }}
-            >
-              {/* CRITICAL: This component sets the provider for Nexus */}
-              <WalletBridge />
-              
               <TooltipProvider>
                 <Toaster />
                 <Sonner />
@@ -92,11 +82,9 @@ const App = () => {
                   </Routes>
                 </BrowserRouter>
               </TooltipProvider>
-            </NexusProvider>
           </RainbowKitProvider>
         </QueryClientProvider>
       </WagmiProvider>
-    </Web3Context.Provider>
     </NotificationProvider>
     </TransactionPopupProvider>
   );
