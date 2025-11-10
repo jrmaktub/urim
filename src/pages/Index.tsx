@@ -23,8 +23,8 @@ import { optimismSepolia, baseSepolia } from 'wagmi/chains';
 import Bridge from '@/components/BridgeButton';
 import { useNotification } from "@blockscout/app-sdk";
 
-import LiveQuantumMarkets from "@/components/LiveQuantumMarkets";
 import ActiveQuantumMarkets from "@/components/ActiveQuantumMarkets";
+import QuantumBets from "@/components/QuantumBets";
 
 const ETH_USD_PRICE_FEED = "0xff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace";
 const connection = new EvmPriceServiceConnection("https://hermes.pyth.network");
@@ -448,74 +448,7 @@ const Index = () => {
           {/* Main Content - Quantum Bets (Left/Primary) */}
           <div className="w-full lg:w-[60%] flex-shrink-0">
             <section className="max-w-2xl mx-auto">
-              <div className="text-center mb-8">
-                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/20 border border-primary/30 mb-4">
-                  <Sparkles className="w-4 h-4 text-primary" />
-                  <span className="text-xs font-bold uppercase tracking-wider">AI-Powered</span>
-                </div>
-                <h2 className="text-4xl font-bold mb-3">🧠 Quantum Bets</h2>
-                <p className="text-muted-foreground text-lg">AI generates possible futures. You bet on outcomes.</p>
-              </div>
-
-        <div className="glass-card p-8 space-y-6">
-          <div className="space-y-3">
-            <label className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
-              Describe your scenario:
-            </label>
-            <Input 
-              placeholder="Will the Dodgers win the October 27 series?"
-              value={question}
-              onChange={(e) => setQuestion(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleGenerate()}
-              className="h-14 text-base bg-background/50"
-            />
-          </div>
-
-          <div className="space-y-3">
-            <label className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
-              Market Duration:
-            </label>
-            <Select value={duration} onValueChange={setDuration}>
-              <SelectTrigger className="h-14 text-base bg-background/50">
-                <SelectValue placeholder="Select duration" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="1">1 Day</SelectItem>
-                <SelectItem value="2">2 Days</SelectItem>
-                <SelectItem value="3">3 Days</SelectItem>
-                <SelectItem value="7">7 Days</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <Button 
-            onClick={handleGenerate} 
-            disabled={generating || !question.trim()}
-            className="w-full"
-            size="lg"
-          >
-            {generating ? (
-              <>
-                <Sparkles className="w-4 h-4 mr-2 animate-pulse" />
-                Generating Market...
-              </>
-            ) : (
-              <>
-                <Sparkles className="w-4 h-4 mr-2" />
-                Generate Quantum Market
-              </>
-            )}
-          </Button>
-        </div>
-
-        {/* Active Quantum Markets Section */}
-        <div className="mt-12">
-          <div className="text-center mb-8">
-            <h2 className="text-4xl font-bold mb-3">✨ Active Quantum Markets</h2>
-            <p className="text-muted-foreground text-lg">Markets created by users like you</p>
-          </div>
-          <ActiveQuantumMarkets key={refreshMarkets} />
-        </div>
+              <QuantumBets />
             </section>
           </div>
 
@@ -748,10 +681,9 @@ const Index = () => {
         </div>
       </section>
 
-      {/* Live Quantum Markets */}
+      {/* Active Quantum Markets */}
       <section className="max-w-6xl mx-auto px-6 pb-16">
-        <PythPriceTicker />
-        <LiveQuantumMarkets />
+        <ActiveQuantumMarkets key={refreshMarkets} />
       </section>
 
       <Footer />
