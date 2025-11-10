@@ -188,11 +188,11 @@ export default function QuantumBets() {
         <div className="space-y-6">
           {/* Question Input */}
           <div className="space-y-3">
-            <Label className="text-sm font-bold uppercase tracking-wider">
-              Describe your scenario:
+            <Label className="text-sm lowercase tracking-wide text-muted-foreground/80">
+              describe your scenario
             </Label>
             <Input
-              placeholder="Will Rixi Moncada win the Honduras 2025 election?"
+              placeholder="Type a real-world question. Example: Will Bitcoin surpass $100K this year?"
               value={question}
               onChange={(e) => setQuestion(e.target.value)}
               className="h-12"
