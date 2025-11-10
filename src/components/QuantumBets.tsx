@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Sparkles, Info } from "lucide-react";
+import { Sparkles } from "lucide-react";
 import { QUANTUM_BET_ADDRESS, USDC_ADDRESS } from "@/constants/contracts";
 import QuantumBetABI from "@/contracts/QuantumBet.json";
 import ERC20ABI from "@/contracts/ERC20.json";
@@ -231,16 +231,6 @@ export default function QuantumBets() {
             </div>
           </div>
 
-          {/* Platform Fee Notice */}
-          <div className="flex items-start gap-3 p-4 rounded-lg bg-primary/10 border border-primary/20">
-            <Info className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
-            <div className="text-sm">
-              <p className="font-semibold text-primary">Platform Fee: {PLATFORM_FEE} USDC</p>
-              <p className="text-muted-foreground text-xs mt-1">
-                A small fee helps sustain AI infrastructure and liquidity pools.
-              </p>
-            </div>
-          </div>
 
           {/* Generate Button */}
           {!aiOutcomes && (

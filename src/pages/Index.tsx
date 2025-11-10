@@ -14,8 +14,6 @@ import UrimMarketABI from "@/contracts/UrimMarket.json";
 import QuantumBetABI from "@/contracts/QuantumBet.json";
 import ERC20ABI from "@/contracts/ERC20.json";
 import { parseUnits } from "viem";
-import PythPriceTicker from "@/components/PythPriceTicker";
-import { EvmPriceServiceConnection } from "@pythnetwork/pyth-evm-js";
 import { initializeWithProvider, isInitialized, getUnifiedBalances } from "@/lib/nexus";
 import { BridgeAndExecuteButton } from '@avail-project/nexus-widgets';
 import { supabase } from "@/integrations/supabase/client";
@@ -26,8 +24,6 @@ import { useNotification } from "@blockscout/app-sdk";
 import ActiveQuantumMarkets from "@/components/ActiveQuantumMarkets";
 import QuantumBets from "@/components/QuantumBets";
 
-const ETH_USD_PRICE_FEED = "0xff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace";
-const connection = new EvmPriceServiceConnection("https://hermes.pyth.network");
 
 type ProcessedBalance = {
   symbol: string;
@@ -65,18 +61,6 @@ const Index = () => {
   const [expandedTokens, setExpandedTokens] = useState<Set<string>>(new Set());
   const [unifiedBalance, setUnifiedBalance] = useState<string>("0.00");
   
-  const [currentPrice, setCurrentPrice] = useState<number>(0);
-  const [pythMarkets, setPythMarkets] = useState<Array<{
-    id: string;
-    question: string;
-    threshold: number;
-    marketId: bigint | null;
-    selectedOutcome: 'yes' | 'no' | null;
-    betAmount: string;
-    creating: boolean;
-    betting: boolean;
-    bridging: boolean;
-  }>>([]);
 
   const isOnOptimismSepolia = chain?.id === optimismSepolia.id;
   const { quantumMarketIds, everythingMarketIds } = useAllMarkets();
@@ -118,10 +102,7 @@ const Index = () => {
       // Calculate unified balance in USD
       const totalUSD = rawBalances.reduce((sum: number, token: any) => {
         const balance = parseFloat(token.balance || "0");
-        if (token.symbol === 'ETH' || token.symbol === 'WETH') {
-          // Convert ETH to USD using current price
-          return sum + (balance * currentPrice);
-        } else if (token.symbol === 'USDC' || token.symbol === 'USDT' || token.symbol === 'DAI') {
+        if (token.symbol === 'USDC' || token.symbol === 'USDT' || token.symbol === 'DAI') {
           // Stablecoins are already in USD
           return sum + balance;
         } else {
@@ -169,57 +150,6 @@ const Index = () => {
     autoInitNexus();
   }, [isConnected, walletClient]);
 
-  useEffect(() => {
-    const fetchPrice = async () => {
-      try {
-        const priceFeeds = await connection.getLatestPriceFeeds([ETH_USD_PRICE_FEED]);
-        if (priceFeeds && priceFeeds.length > 0) {
-          const priceFeed = priceFeeds[0];
-          const price = priceFeed.getPriceUnchecked();
-          const formattedPrice = Number(price.price) * Math.pow(10, price.expo);
-          setCurrentPrice(formattedPrice);
-
-          // Initialize at least 2 Pyth markets on first price fetch
-          if (pythMarkets.length === 0 && formattedPrice > 0) {
-            const roundedPrice = Math.round(formattedPrice);
-            const aboveThreshold = roundedPrice + Math.round(formattedPrice * 0.02);
-            const belowThreshold = roundedPrice - Math.round(formattedPrice * 0.02);
-
-            setPythMarkets([
-              {
-                id: 'pyth-above',
-                question: `Will ETH close above $${aboveThreshold} tomorrow?`,
-                threshold: aboveThreshold,
-                marketId: null,
-                selectedOutcome: null,
-                betAmount: '',
-                creating: false,
-                betting: false,
-                bridging: false,
-              },
-              {
-                id: 'pyth-below',
-                question: `Will ETH close below $${belowThreshold} tomorrow?`,
-                threshold: belowThreshold,
-                marketId: null,
-                selectedOutcome: null,
-                betAmount: '',
-                creating: false,
-                betting: false,
-                bridging: false,
-              }
-            ]);
-          }
-        }
-      } catch (error) {
-        console.error("Error fetching price:", error);
-      }
-    };
-
-    fetchPrice();
-    const interval = setInterval(fetchPrice, 10000);
-    return () => clearInterval(interval);
-  }, [pythMarkets.length]);
 
   const handleInitNexus = async () => {
     if (!walletClient) {
@@ -304,129 +234,6 @@ const Index = () => {
     }
   };
 
-  // Handler to create UrimMarket for Pyth cards
-  const createPythMarket = async (marketIndex: number) => {
-    if (!address) {
-      toast({ title: "Connect Wallet", description: "Please connect your wallet first.", variant: "destructive" });
-      return;
-    }
-
-    const market = pythMarkets[marketIndex];
-    if (!market) return;
-
-    setPythMarkets(prev => prev.map((m, i) => i === marketIndex ? { ...m, creating: true } : m));
-
-    try {
-      toast({ title: "Creating Pyth Market...", description: "Confirm transaction in wallet" });
-
-      const duration = BigInt(24 * 60 * 60); // 24 hours
-      const priceFeedId = ETH_USD_PRICE_FEED as `0x${string}`;
-      // Convert threshold to Pyth price format (price * 10^8)
-      const targetPrice = BigInt(Math.round(market.threshold * 1e8));
-
-      const hash = await writeContractAsync({
-        address: URIM_QUANTUM_MARKET_ADDRESS as `0x${string}`,
-        abi: UrimQuantumMarketABI.abi as any,
-        functionName: "createMarket",
-        args: [market.question, "Yes", "No", duration, priceFeedId, targetPrice],
-        gas: BigInt(3_000_000),
-      } as any);
-
-      openTxToast("84532", hash);
-
-      // Wait a bit for the blockchain to update, then fetch new market ID
-      setTimeout(() => {
-        if (quantumMarketIds && quantumMarketIds.length > 0) {
-          const newMarketId = quantumMarketIds[quantumMarketIds.length - 1];
-          setPythMarkets(prev => prev.map((m, i) => 
-            i === marketIndex ? { ...m, marketId: newMarketId, creating: false } : m
-          ));
-        }
-      }, 2000);
-    } catch (error: any) {
-      console.error("Error creating Pyth market:", error);
-      toast({
-        title: "Transaction failed",
-        description: error.message || "Please try again",
-        variant: "destructive",
-      });
-      setPythMarkets(prev => prev.map((m, i) => i === marketIndex ? { ...m, creating: false } : m));
-    }
-  };
-
-  // Handler for primary Place Bet button (Pyth cards)
-  const handlePythPlaceBet = async (marketIndex: number) => {
-    const market = pythMarkets[marketIndex];
-    if (!address || !market.marketId || !market.selectedOutcome || !market.betAmount) {
-      toast({ title: "Missing Information", description: "Please select an outcome and enter bet amount.", variant: "destructive" });
-      return;
-    }
-
-    setPythMarkets(prev => prev.map((m, i) => i === marketIndex ? { ...m, betting: true } : m));
-
-    try {
-      const amountWei = parseUnits(market.betAmount, 6);
-      const outcomeIndex = market.selectedOutcome === 'yes' ? 0 : 1;
-
-      // Approve USDC
-      await writeContractAsync({
-        address: USDC_ADDRESS as `0x${string}`,
-        abi: ERC20ABI.abi as any,
-        functionName: "approve",
-        args: [URIM_QUANTUM_MARKET_ADDRESS, amountWei],
-      } as any);
-
-      // Place bet
-      const hash = await writeContractAsync({
-        address: URIM_QUANTUM_MARKET_ADDRESS as `0x${string}`,
-        abi: UrimQuantumMarketABI.abi as any,
-        functionName: "buyScenarioShares",
-        args: [market.marketId, BigInt(outcomeIndex), amountWei],
-        gas: BigInt(3_000_000),
-      } as any);
-
-      openTxToast("84532", hash);
-
-      setPythMarkets(prev => prev.map((m, i) => i === marketIndex ? { ...m, betAmount: '', betting: false } : m));
-    } catch (error: any) {
-      console.error("Error placing bet:", error);
-      toast({
-        title: "Transaction failed",
-        description: error.message || "Please try again",
-        variant: "destructive",
-      });
-      setPythMarkets(prev => prev.map((m, i) => i === marketIndex ? { ...m, betting: false } : m));
-    }
-  };
-
-  // Handler for secondary Bridge & Bet button (Pyth cards)
-  const handlePythBridgeAndBet = async (marketIndex: number) => {
-    const market = pythMarkets[marketIndex];
-    if (!address || !market.marketId || !market.selectedOutcome || !market.betAmount) {
-      toast({ title: "Missing Information", description: "Please select an outcome and enter bet amount.", variant: "destructive" });
-      return;
-    }
-
-    setPythMarkets(prev => prev.map((m, i) => i === marketIndex ? { ...m, bridging: true } : m));
-
-    try {
-      toast({ title: "🌉 Bridging with Avail...", description: "This may take a moment" });
-      
-      // For now, fall back to direct bet (bridge+execute integration to be added)
-      await handlePythPlaceBet(marketIndex);
-    } catch (error: any) {
-      console.error("Bridge failed:", error);
-      toast({
-        title: "Bridge failed",
-        description: "You can still place a bet directly.",
-        variant: "destructive",
-      });
-      setPythMarkets(prev => prev.map((m, i) => i === marketIndex ? { ...m, bridging: false } : m));
-    }
-  };
-
-
-  const threshold = Math.round(currentPrice + (currentPrice * 0.02));
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background via-background to-purple-950/10">
@@ -437,7 +244,7 @@ const Index = () => {
           URIM
         </h1>
         <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
-          Quantum prediction markets powered by AI and Pyth oracles
+          AI-powered quantum prediction markets on Base Sepolia
         </p>
       </section>
 
@@ -571,115 +378,6 @@ const Index = () => {
         </div>
       </div>
 
-      <section className="max-w-4xl mx-auto px-6 pb-24">
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/20 border border-primary/30 mb-4">
-            <Sparkles className="w-4 h-4 text-primary" />
-            <span className="text-xs font-bold uppercase tracking-wider">Oracle-Powered</span>
-          </div>
-          <h2 className="text-4xl font-bold mb-3">✦ Quantum Pyth</h2>
-          <p className="text-muted-foreground text-lg">AI-generated futures from live Pyth price feeds.</p>
-        </div>
-
-        <div className="grid md:grid-cols-2 gap-6">
-          {pythMarkets.map((market, marketIndex) => (
-            <div key={market.id} className="glass-card p-6">
-              <div className="text-lg font-semibold mb-4">{market.question}</div>
-              
-              {!market.marketId ? (
-                <Button 
-                  onClick={() => createPythMarket(marketIndex)}
-                  disabled={market.creating}
-                  className="w-full bg-gradient-to-r from-primary to-primary-glow"
-                >
-                  {market.creating ? "Creating Market..." : "Create Market"}
-                </Button>
-              ) : (
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-3">
-                    <Button 
-                      variant="outline" 
-                      className={`border-2 transition-all ${
-                        market.selectedOutcome === 'yes'
-                          ? 'border-green-500 bg-green-500/20' 
-                          : 'border-green-500/50 hover:bg-green-500/10'
-                      }`}
-                      onClick={() => setPythMarkets(prev => prev.map((m, i) => 
-                        i === marketIndex ? { ...m, selectedOutcome: 'yes' } : m
-                      ))}
-                    >
-                      Yes
-                    </Button>
-                    <Button 
-                      variant="outline"
-                      className={`border-2 transition-all ${
-                        market.selectedOutcome === 'no'
-                          ? 'border-red-500 bg-red-500/20' 
-                          : 'border-red-500/50 hover:bg-red-500/10'
-                      }`}
-                      onClick={() => setPythMarkets(prev => prev.map((m, i) => 
-                        i === marketIndex ? { ...m, selectedOutcome: 'no' } : m
-                      ))}
-                    >
-                      No
-                    </Button>
-                  </div>
-
-                  {market.selectedOutcome && (
-                    <div className="space-y-3 animate-fade-in">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-semibold">💰</span>
-                        <Input 
-                          type="number" 
-                          placeholder="0.1" 
-                          value={market.betAmount}
-                          onChange={(e) => setPythMarkets(prev => prev.map((m, i) => 
-                            i === marketIndex ? { ...m, betAmount: e.target.value } : m
-                          ))}
-                          className="flex-1 font-semibold"
-                          style={{
-                            background: '#171218',
-                            color: '#FFFFFF',
-                            border: '1px solid #5B3FB8',
-                          }}
-                          onFocus={(e) => e.target.style.borderColor = '#8B6DFF'}
-                          onBlur={(e) => e.target.style.borderColor = '#5B3FB8'}
-                        />
-                        <span className="text-sm font-bold" style={{ color: '#D9CCFF', opacity: 0.9 }}>USDC</span>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Button 
-                          onClick={() => handlePythPlaceBet(marketIndex)}
-                          disabled={market.betting || !market.betAmount || parseFloat(market.betAmount) <= 0}
-                          className="w-full bg-gradient-to-r from-primary to-primary-glow"
-                        >
-                          {market.betting ? "Placing..." : "Place Bet"}
-                        </Button>
-
-                        <Button 
-                          onClick={() => handlePythBridgeAndBet(marketIndex)}
-                          disabled={market.bridging || market.betting || !market.betAmount || parseFloat(market.betAmount) <= 0}
-                          variant="outline"
-                          className="w-full rounded-full"
-                          style={{
-                            border: '1px solid #8B6DFF',
-                            color: '#CDBBFF',
-                          }}
-                          onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(139,109,255,0.15)'}
-                          onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-                        >
-                          {market.bridging ? "Bridging..." : "Bridge & Bet with Avail"}
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      </section>
 
       {/* Active Quantum Markets */}
       <section className="max-w-6xl mx-auto px-6 pb-16">
