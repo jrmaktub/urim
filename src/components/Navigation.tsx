@@ -22,6 +22,7 @@ const Navigation = () => {
   const navLinks = [
     { name: "Quantum Bets", path: "/" },
     { name: "Everything Bets", path: "/everything-bets" },
+    { name: "Tournaments", path: "/tournaments" },
   ];
 
   const handleOpenTransactionHistory = () => {

@@ -13,6 +13,7 @@ import QuantumMarketDetail from "./pages/QuantumMarketDetail";
 import EverythingMarketDetail from "./pages/EverythingMarketDetail";
 import NotFound from "./pages/NotFound";
 import { PythPriceTestnet } from "./pages/PythPrice";
+import Tournaments from "./pages/Tournaments";
 // import { NexusProvider } from '@avail-project/nexus-widgets';
 // import type { NexusNetwork } from '@avail-project/nexus-widgets';
 import '@rainbow-me/rainbowkit/styles.css';
@@ -73,11 +74,12 @@ const App = () => {
                     <Route path="/" element={<Index />} />
                     <Route path="/quantum-bets" element={<QuantumBets />} />
                     <Route path="/everything-bets" element={<EverythingBets />} />
+                    <Route path="/tournaments" element={<Tournaments />} />
                     <Route path="/create-bet" element={<CreateBet />} />
                     <Route path="/market/:address" element={<MarketDetail />} />
                     <Route path="/quantum-market/:id" element={<QuantumMarketDetail />} />
                     <Route path="/everything-market/:id" element={<EverythingMarketDetail />} />
-            <Route path="/PythPrice" element={<PythPriceTestnet />} />
+                    <Route path="/PythPrice" element={<PythPriceTestnet />} />
                     <Route path="*" element={<NotFound />} />
                   </Routes>
                 </BrowserRouter>
