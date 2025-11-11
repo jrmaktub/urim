@@ -39,9 +39,9 @@ function PlayerCard({ p, delay = 0 }: { p: Player; delay?: number }) {
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay, duration: 0.4 }}
       whileHover={{ scale: 1.03, y: -2 }}
-      className="group rounded-xl border border-white/10 bg-white/3 backdrop-blur-sm p-4 flex items-center justify-between shadow-[0_0_0_1px_rgba(255,255,255,0.04)] hover:border-purple-400/30 hover:shadow-[0_0_16px_rgba(168,85,247,0.15)] transition-all duration-300 w-full max-w-[240px]"
+      className="group rounded-xl border border-white/10 bg-white/3 backdrop-blur-sm p-4 flex items-center justify-between shadow-[0_0_0_1px_rgba(255,255,255,0.04)] hover:border-purple-400/30 hover:shadow-[0_0_16px_rgba(168,85,247,0.15)] transition-all duration-300 w-[200px]"
     >
-      <div>
+      <div className="flex-1">
         <div className="text-[15px] font-medium tracking-tight">{p.name}</div>
         <div className="text-xs text-white/60">{p.odds.toFixed(1)}x</div>
       </div>
@@ -56,7 +56,7 @@ function WinnerCard() {
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ delay: 1, duration: 0.5 }}
-      className="rounded-2xl border border-purple-300/30 bg-white/5 backdrop-blur-sm p-8 shadow-[0_0_32px_rgba(168,85,247,0.25)] relative overflow-hidden w-full max-w-[280px]"
+      className="rounded-2xl border border-purple-300/30 bg-white/5 backdrop-blur-sm p-8 shadow-[0_0_32px_rgba(168,85,247,0.25)] relative overflow-hidden w-[280px]"
     >
       <motion.div
         className="absolute inset-0 bg-gradient-to-br from-purple-500/10 to-transparent"
@@ -72,101 +72,108 @@ function WinnerCard() {
   );
 }
 
-function VerticalConnector({ fromCount, toCount, delay = 0 }: { fromCount: number; toCount: number; delay?: number }) {
-  const height = 80;
-  const spacing = fromCount === 4 ? 120 : 240;
+function VerticalConnector({ type, delay = 0 }: { type: 'semifinals-to-final' | 'final-to-winner'; delay?: number }) {
+  const height = 60;
   
   return (
-    <motion.svg
-      className="w-full"
-      height={height}
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ delay, duration: 0.6 }}
-    >
-      <defs>
-        <linearGradient id={`verticalGradient-${delay}`} x1="0%" y1="0%" x2="0%" y2="100%">
-          <stop offset="0%" stopColor="rgba(168, 85, 247, 0.1)" />
-          <stop offset="50%" stopColor="rgba(168, 85, 247, 0.3)" />
-          <stop offset="100%" stopColor="rgba(168, 85, 247, 0.1)" />
-        </linearGradient>
-        <filter id={`glow-${delay}`}>
-          <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
-          <feMerge>
-            <feMergeNode in="coloredBlur"/>
-            <feMergeNode in="SourceGraphic"/>
-          </feMerge>
-        </filter>
-      </defs>
-      
-      {fromCount === 4 && toCount === 2 && (
-        <>
-          {/* Left pair to left finalist */}
-          <motion.path
-            d={`M ${spacing * 0.5} 0 L ${spacing * 0.5} ${height * 0.3} Q ${spacing * 0.5} ${height * 0.5} ${spacing * 0.75} ${height * 0.5} L ${spacing * 1.25} ${height * 0.5} Q ${spacing * 1.5} ${height * 0.5} ${spacing * 1.5} ${height * 0.7} L ${spacing * 1.5} ${height}`}
-            stroke={`url(#verticalGradient-${delay})`}
-            strokeWidth="1.5"
-            fill="none"
-            filter={`url(#glow-${delay})`}
-            animate={{ opacity: [0.4, 0.8, 0.4] }}
-            transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-          />
-          <motion.path
-            d={`M ${spacing * 1.5} 0 L ${spacing * 1.5} ${height * 0.3} Q ${spacing * 1.5} ${height * 0.5} ${spacing * 1.25} ${height * 0.5} L ${spacing * 0.75} ${height * 0.5} Q ${spacing * 0.5} ${height * 0.5} ${spacing * 0.5} ${height * 0.7} L ${spacing * 0.5} ${height}`}
-            stroke={`url(#verticalGradient-${delay})`}
-            strokeWidth="1.5"
-            fill="none"
-            filter={`url(#glow-${delay})`}
-            animate={{ opacity: [0.4, 0.8, 0.4] }}
-            transition={{ duration: 3, repeat: Infinity, ease: "easeInOut", delay: 0.5 }}
-          />
-          {/* Right pair to right finalist */}
-          <motion.path
-            d={`M ${spacing * 2.5} 0 L ${spacing * 2.5} ${height * 0.3} Q ${spacing * 2.5} ${height * 0.5} ${spacing * 2.75} ${height * 0.5} L ${spacing * 3.25} ${height * 0.5} Q ${spacing * 3.5} ${height * 0.5} ${spacing * 3.5} ${height * 0.7} L ${spacing * 3.5} ${height}`}
-            stroke={`url(#verticalGradient-${delay})`}
-            strokeWidth="1.5"
-            fill="none"
-            filter={`url(#glow-${delay})`}
-            animate={{ opacity: [0.4, 0.8, 0.4] }}
-            transition={{ duration: 3, repeat: Infinity, ease: "easeInOut", delay: 1 }}
-          />
-          <motion.path
-            d={`M ${spacing * 3.5} 0 L ${spacing * 3.5} ${height * 0.3} Q ${spacing * 3.5} ${height * 0.5} ${spacing * 3.25} ${height * 0.5} L ${spacing * 2.75} ${height * 0.5} Q ${spacing * 2.5} ${height * 0.5} ${spacing * 2.5} ${height * 0.7} L ${spacing * 2.5} ${height}`}
-            stroke={`url(#verticalGradient-${delay})`}
-            strokeWidth="1.5"
-            fill="none"
-            filter={`url(#glow-${delay})`}
-            animate={{ opacity: [0.4, 0.8, 0.4] }}
-            transition={{ duration: 3, repeat: Infinity, ease: "easeInOut", delay: 1.5 }}
-          />
-        </>
-      )}
-      
-      {fromCount === 2 && toCount === 1 && (
-        <>
-          {/* Left finalist to winner */}
-          <motion.path
-            d={`M ${spacing * 1.5} 0 L ${spacing * 1.5} ${height * 0.3} Q ${spacing * 1.5} ${height * 0.5} ${spacing * 1.75} ${height * 0.5} L ${spacing * 2.25} ${height * 0.5} Q ${spacing * 2.5} ${height * 0.5} ${spacing * 2.5} ${height * 0.7} L ${spacing * 2.5} ${height}`}
-            stroke={`url(#verticalGradient-${delay})`}
-            strokeWidth="1.5"
-            fill="none"
-            filter={`url(#glow-${delay})`}
-            animate={{ opacity: [0.4, 0.8, 0.4] }}
-            transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-          />
-          {/* Right finalist to winner */}
-          <motion.path
-            d={`M ${spacing * 3.5} 0 L ${spacing * 3.5} ${height * 0.3} Q ${spacing * 3.5} ${height * 0.5} ${spacing * 3.25} ${height * 0.5} L ${spacing * 2.75} ${height * 0.5} Q ${spacing * 2.5} ${height * 0.5} ${spacing * 2.5} ${height * 0.7} L ${spacing * 2.5} ${height}`}
-            stroke={`url(#verticalGradient-${delay})`}
-            strokeWidth="1.5"
-            fill="none"
-            filter={`url(#glow-${delay})`}
-            animate={{ opacity: [0.4, 0.8, 0.4] }}
-            transition={{ duration: 3, repeat: Infinity, ease: "easeInOut", delay: 0.5 }}
-          />
-        </>
-      )}
-    </motion.svg>
+    <div className="relative w-full flex justify-center" style={{ height: `${height}px` }}>
+      <svg
+        className="absolute"
+        width="600"
+        height={height}
+        style={{ left: '50%', transform: 'translateX(-50%)' }}
+      >
+        <defs>
+          <linearGradient id={`vGrad-${type}`} x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stopColor="rgba(168, 85, 247, 0.2)" />
+            <stop offset="50%" stopColor="rgba(168, 85, 247, 0.4)" />
+            <stop offset="100%" stopColor="rgba(168, 85, 247, 0.2)" />
+          </linearGradient>
+          <filter id={`glow-${type}`}>
+            <feGaussianBlur stdDeviation="1.5" result="coloredBlur"/>
+            <feMerge>
+              <feMergeNode in="coloredBlur"/>
+              <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+          </filter>
+        </defs>
+        
+        {type === 'semifinals-to-final' && (
+          <>
+            {/* Left semifinal pair to left finalist */}
+            <motion.path
+              d={`M 150 0 L 150 15 Q 150 20 155 20 L 195 20 Q 200 20 200 25 L 200 ${height}`}
+              stroke={`url(#vGrad-${type})`}
+              strokeWidth="1.5"
+              fill="none"
+              filter={`url(#glow-${type})`}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: [0.5, 0.9, 0.5] }}
+              transition={{ delay, duration: 3, repeat: Infinity, ease: "easeInOut" }}
+            />
+            <motion.path
+              d={`M 250 0 L 250 15 Q 250 20 245 20 L 205 20 Q 200 20 200 25 L 200 ${height}`}
+              stroke={`url(#vGrad-${type})`}
+              strokeWidth="1.5"
+              fill="none"
+              filter={`url(#glow-${type})`}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: [0.5, 0.9, 0.5] }}
+              transition={{ delay: delay + 0.3, duration: 3, repeat: Infinity, ease: "easeInOut" }}
+            />
+            
+            {/* Right semifinal pair to right finalist */}
+            <motion.path
+              d={`M 350 0 L 350 15 Q 350 20 355 20 L 395 20 Q 400 20 400 25 L 400 ${height}`}
+              stroke={`url(#vGrad-${type})`}
+              strokeWidth="1.5"
+              fill="none"
+              filter={`url(#glow-${type})`}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: [0.5, 0.9, 0.5] }}
+              transition={{ delay: delay + 0.6, duration: 3, repeat: Infinity, ease: "easeInOut" }}
+            />
+            <motion.path
+              d={`M 450 0 L 450 15 Q 450 20 445 20 L 405 20 Q 400 20 400 25 L 400 ${height}`}
+              stroke={`url(#vGrad-${type})`}
+              strokeWidth="1.5"
+              fill="none"
+              filter={`url(#glow-${type})`}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: [0.5, 0.9, 0.5] }}
+              transition={{ delay: delay + 0.9, duration: 3, repeat: Infinity, ease: "easeInOut" }}
+            />
+          </>
+        )}
+        
+        {type === 'final-to-winner' && (
+          <>
+            {/* Left finalist to winner */}
+            <motion.path
+              d={`M 200 0 L 200 15 Q 200 20 210 20 L 290 20 Q 300 20 300 25 L 300 ${height}`}
+              stroke={`url(#vGrad-${type})`}
+              strokeWidth="1.5"
+              fill="none"
+              filter={`url(#glow-${type})`}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: [0.5, 0.9, 0.5] }}
+              transition={{ delay, duration: 3, repeat: Infinity, ease: "easeInOut" }}
+            />
+            {/* Right finalist to winner */}
+            <motion.path
+              d={`M 400 0 L 400 15 Q 400 20 390 20 L 310 20 Q 300 20 300 25 L 300 ${height}`}
+              stroke={`url(#vGrad-${type})`}
+              strokeWidth="1.5"
+              fill="none"
+              filter={`url(#glow-${type})`}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: [0.5, 0.9, 0.5] }}
+              transition={{ delay: delay + 0.3, duration: 3, repeat: Infinity, ease: "easeInOut" }}
+            />
+          </>
+        )}
+      </svg>
+    </div>
   );
 }
 
@@ -217,41 +224,39 @@ export default function TournamentsPage() {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
-            className="mb-12 text-center"
+            className="mb-16 text-center"
           >
             <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">Padel Cup 2025</h1>
             <p className="text-sm text-muted-foreground mt-1">live brackets • real odds</p>
           </motion.header>
 
-          {/* Vertical Tournament Tree */}
-          <div className="flex flex-col items-center gap-0">
+          {/* Vertical Tournament Tree - Perfectly Centered */}
+          <div className="flex flex-col items-center">
             
-            {/* Winner (Top) */}
-            <div className="flex justify-center mb-4">
+            {/* Champion Card (Top) */}
+            <div className="flex justify-center mb-6">
               <WinnerCard />
             </div>
 
-            {/* Connector: Final to Winner */}
-            <VerticalConnector fromCount={2} toCount={1} delay={0.8} />
+            {/* Connector: Final → Champion */}
+            <VerticalConnector type="final-to-winner" delay={0.8} />
 
-            {/* Final */}
-            <div className="flex justify-center gap-8 sm:gap-32 mb-4">
-              <div className="text-center">
-                <div className="text-xs uppercase tracking-wider text-muted-foreground/70 mb-3">Final</div>
+            {/* Final Round */}
+            <div className="flex flex-col items-center gap-4 mb-6">
+              <h2 className="text-xs uppercase tracking-wider text-muted-foreground/70">Final</h2>
+              <div className="flex gap-12 justify-center">
                 <PlayerCard p={finalists[0]} delay={0.6} />
+                <PlayerCard p={finalists[1]} delay={0.65} />
               </div>
-              <PlayerCard p={finalists[1]} delay={0.65} />
             </div>
 
-            {/* Connector: Semifinals to Final */}
-            <VerticalConnector fromCount={4} toCount={2} delay={0.4} />
+            {/* Connector: Semifinals → Final */}
+            <VerticalConnector type="semifinals-to-final" delay={0.4} />
 
-            {/* Semifinals */}
-            <div className="flex justify-center gap-4 sm:gap-8 flex-wrap max-w-4xl">
-              <div className="text-center sm:text-left">
-                <div className="text-xs uppercase tracking-wider text-muted-foreground/70 mb-3">Semifinals</div>
-              </div>
-              <div className="w-full flex justify-center gap-4 sm:gap-8 flex-wrap">
+            {/* Semifinals Round */}
+            <div className="flex flex-col items-center gap-4">
+              <h2 className="text-xs uppercase tracking-wider text-muted-foreground/70">Semifinals</h2>
+              <div className="flex gap-12 justify-center">
                 {semifinalists.map((p, idx) => (
                   <PlayerCard key={p.id} p={p} delay={0.1 + idx * 0.1} />
                 ))}
