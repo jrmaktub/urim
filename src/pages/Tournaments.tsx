@@ -100,7 +100,7 @@ export default function TournamentsPage() {
             className="mb-8"
           >
             <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">Padel Cup 2025</h1>
-            <p className="text-sm text-muted-foreground mt-1">live brackets • real odds • elegant betting</p>
+            <p className="text-sm text-muted-foreground mt-1">live brackets • real odds</p>
           </motion.header>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 relative">
