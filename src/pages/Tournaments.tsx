@@ -19,7 +19,7 @@ function BetButton({ onClick }: { onClick: () => void }) {
   return (
     <button
       onClick={onClick}
-      className="px-3 py-1.5 rounded-xl text-sm bg-white/5 hover:bg-white/10 border border-white/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+      className="px-3 py-1.5 md:px-3 md:py-1.5 rounded-lg md:rounded-xl text-xs md:text-sm uppercase md:normal-case tracking-wide md:tracking-normal bg-white/5 hover:bg-white/10 border border-white/10 transition-all duration-300 hover:shadow-[0_0_12px_rgba(168,85,247,0.3)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
     >
       Bet Now
     </button>
@@ -39,14 +39,34 @@ function PlayerCard({ p, delay = 0 }: { p: Player; delay?: number }) {
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay, duration: 0.4 }}
       whileHover={{ scale: 1.03, y: -2 }}
-      className="group rounded-xl border border-white/10 bg-white/3 backdrop-blur-sm p-4 flex items-center justify-between shadow-[0_0_0_1px_rgba(255,255,255,0.04)] hover:border-purple-400/30 hover:shadow-[0_0_16px_rgba(168,85,247,0.15)] transition-all duration-300 w-[85%] sm:w-[200px] max-w-[200px]"
+      className="group rounded-xl border border-white/10 bg-white/3 backdrop-blur-sm p-3 md:p-4 flex items-center justify-between shadow-[0_0_0_1px_rgba(255,255,255,0.04)] hover:border-purple-400/30 hover:shadow-[0_0_16px_rgba(168,85,247,0.15)] transition-all duration-300 w-full md:w-[200px]"
     >
       <div className="flex-1">
-        <div className="text-[15px] font-medium tracking-tight">{p.name}</div>
-        <div className="text-xs text-white/60">{p.odds.toFixed(1)}x</div>
+        <div className="text-[14px] md:text-[15px] font-medium tracking-tight">{p.name}</div>
+        <div className="text-sm md:text-xs text-purple-300/90 font-medium shadow-[0_0_8px_rgba(168,85,247,0.2)]">{p.odds.toFixed(1)}x</div>
       </div>
       <BetButton onClick={() => console.log(`Bet on ${p.name} at ${p.odds}x`)} />
     </motion.div>
+  );
+}
+
+function MatchPair({ players, delay = 0 }: { players: [Player, Player]; delay?: number }) {
+  return (
+    <div className="md:hidden w-full max-w-md">
+      <div className="flex gap-3 items-center justify-center">
+        <PlayerCard p={players[0]} delay={delay} />
+        <div className="text-white/30 font-bold text-sm">VS</div>
+        <PlayerCard p={players[1]} delay={delay + 0.05} />
+      </div>
+    </div>
+  );
+}
+
+function MobileMatchConnector() {
+  return (
+    <div className="md:hidden flex justify-center my-2">
+      <div className="w-px h-6 bg-gradient-to-b from-purple-400/40 via-purple-400/60 to-purple-400/40 shadow-[0_0_8px_rgba(168,85,247,0.3)]" />
+    </div>
   );
 }
 
@@ -212,7 +232,7 @@ export default function TournamentsPage() {
     <div className="min-h-screen bg-background">
       <Navigation />
       
-      <div className="relative min-h-[calc(100vh-80px)] px-4 sm:px-6 lg:px-10 py-10 pt-24 text-foreground">
+      <div className="relative min-h-[calc(100vh-80px)] px-4 sm:px-6 lg:px-10 py-10 pt-8 md:pt-24 text-foreground">
         {/* Background gradient */}
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(60%_60%_at_50%_0%,rgba(139,92,246,0.12),transparent_60%)]" />
         
@@ -244,7 +264,10 @@ export default function TournamentsPage() {
             {/* Final Round */}
             <div className="flex flex-col items-center gap-4 mb-6">
               <h2 className="text-xs uppercase tracking-wider text-muted-foreground/70">Final</h2>
-              <div className="flex flex-col md:flex-row gap-4 md:gap-12 justify-center items-center">
+              {/* Mobile: Paired Layout */}
+              <MatchPair players={[finalists[0], finalists[1]]} delay={0.6} />
+              {/* Desktop: Side by Side */}
+              <div className="hidden md:flex gap-12 justify-center items-center">
                 <PlayerCard p={finalists[0]} delay={0.6} />
                 <PlayerCard p={finalists[1]} delay={0.65} />
               </div>
@@ -256,7 +279,14 @@ export default function TournamentsPage() {
             {/* Semifinals Round */}
             <div className="flex flex-col items-center gap-4">
               <h2 className="text-xs uppercase tracking-wider text-muted-foreground/70">Semifinals</h2>
-              <div className="flex flex-col md:flex-row gap-4 md:gap-12 justify-center items-center">
+              {/* Mobile: Paired Layout with Connectors */}
+              <div className="md:hidden flex flex-col gap-y-3 w-full items-center">
+                <MatchPair players={[semifinalists[0], semifinalists[1]]} delay={0.1} />
+                <MobileMatchConnector />
+                <MatchPair players={[semifinalists[2], semifinalists[3]]} delay={0.2} />
+              </div>
+              {/* Desktop: All Side by Side */}
+              <div className="hidden md:flex gap-12 justify-center items-center">
                 {semifinalists.map((p, idx) => (
                   <PlayerCard key={p.id} p={p} delay={0.1 + idx * 0.1} />
                 ))}
