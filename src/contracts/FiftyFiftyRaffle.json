@@ -1,0 +1,158 @@
+[
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_usdcToken",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "_urimToken",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "_vrfCoordinator",
+        "type": "address"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "_keyHash",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "uint64",
+        "name": "_subscriptionId",
+        "type": "uint64"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "constructor"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "roundId",
+        "type": "uint256"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "winner",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "usdcPayout",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "urimPayout",
+        "type": "uint256"
+      }
+    ],
+    "name": "WinnerSelected",
+    "type": "event"
+  },
+  {
+    "inputs": [],
+    "name": "buyTicketWithUSDC",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "buyTicketWithURIM",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "getCurrentRoundInfo",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "roundId",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "totalUSDC",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "totalURIM",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "timeLeft",
+        "type": "uint256"
+      },
+      {
+        "internalType": "bool",
+        "name": "isOpen",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "roundId",
+        "type": "uint256"
+      }
+    ],
+    "name": "getRoundResult",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "winner",
+        "type": "address"
+      },
+      {
+        "internalType": "uint256",
+        "name": "usdcPayout",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "urimPayout",
+        "type": "uint256"
+      },
+      {
+        "internalType": "bool",
+        "name": "completed",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "currentRoundId",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  }
+]
