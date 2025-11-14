@@ -47,6 +47,8 @@ contract FiftyFiftyRaffle is VRFConsumerBaseV2Plus, ReentrancyGuard {
     event TicketPurchased(address indexed player, uint256 indexed roundId);
     event DrawInitiated(uint256 indexed roundId, uint256 requestId);
     event WinnerSelected(uint256 indexed roundId, address indexed winner, uint256 payoutUSDC, uint256 payoutURIM);
+    event EmergencyWithdraw(address token, uint256 amount);
+    event ManualWinnerSelected(uint256 indexed roundId, address indexed winner);
 
     constructor(uint256 subscriptionId) VRFConsumerBaseV2Plus(0x5C210eF41CD1a72de73bF76eC39637bB0d3d7BEE) {
         s_subscriptionId = subscriptionId;
@@ -102,7 +104,11 @@ contract FiftyFiftyRaffle is VRFConsumerBaseV2Plus, ReentrancyGuard {
         uint256 roundId = vrfRequestToRound[requestId];
         require(roundId > 0, "Invalid request");
         
-        uint256 winnerIndex = randomWords[0] % currentRoundPlayers.length;
+        _selectWinner(randomWords[0]);
+    }
+
+    function _selectWinner(uint256 randomNumber) internal {
+        uint256 winnerIndex = randomNumber % currentRoundPlayers.length;
         address winner = currentRoundPlayers[winnerIndex];
         
         uint256 totalUSDC = currentRoundTotalUSDC;
@@ -123,7 +129,7 @@ contract FiftyFiftyRaffle is VRFConsumerBaseV2Plus, ReentrancyGuard {
             URIM.safeTransfer(owner(), projectURIM);
         }
         
-        roundResults[roundId] = RoundResult({
+        roundResults[currentRoundId] = RoundResult({
             winner: winner,
             totalPotUSDC: totalUSDC,
             totalPotURIM: totalURIM,
@@ -132,10 +138,71 @@ contract FiftyFiftyRaffle is VRFConsumerBaseV2Plus, ReentrancyGuard {
             timestamp: block.timestamp
         });
         
-        emit WinnerSelected(roundId, winner, winnerUSDC, winnerURIM);
+        emit WinnerSelected(currentRoundId, winner, winnerUSDC, winnerURIM);
         
         _startNewRound();
     }
+
+    // ========== EMERGENCY FUNCTIONS ==========
+
+    /**
+     * @notice EMERGENCY: Manually pick winner if VRF fails
+     * @dev Uses block hash for randomness - not as secure as VRF but works in emergency
+     */
+    function emergencySelectWinner() external onlyOwner {
+        require(roundState == RoundState.DRAWING, "Not in drawing state");
+        require(currentRoundPlayers.length > 0, "No players");
+        
+        // Use blockhash as randomness source (less secure but works)
+        uint256 randomNumber = uint256(keccak256(abi.encodePacked(
+            block.timestamp,
+            block.prevrandao,
+            currentRoundPlayers.length
+        )));
+        
+        _selectWinner(randomNumber);
+        emit ManualWinnerSelected(currentRoundId, roundResults[currentRoundId].winner);
+    }
+
+    /**
+     * @notice EMERGENCY: Withdraw all USDC
+     */
+    function emergencyWithdrawUSDC() external onlyOwner {
+        uint256 balance = USDC.balanceOf(address(this));
+        require(balance > 0, "No USDC");
+        USDC.safeTransfer(owner(), balance);
+        emit EmergencyWithdraw(address(USDC), balance);
+    }
+
+    /**
+     * @notice EMERGENCY: Withdraw all URIM
+     */
+    function emergencyWithdrawURIM() external onlyOwner {
+        uint256 balance = URIM.balanceOf(address(this));
+        require(balance > 0, "No URIM");
+        URIM.safeTransfer(owner(), balance);
+        emit EmergencyWithdraw(address(URIM), balance);
+    }
+
+    /**
+     * @notice EMERGENCY: Withdraw any ERC20 token
+     */
+    function emergencyWithdrawToken(address token) external onlyOwner {
+        require(token != address(0), "Invalid token");
+        uint256 balance = IERC20(token).balanceOf(address(this));
+        require(balance > 0, "No tokens");
+        IERC20(token).safeTransfer(owner(), balance);
+        emit EmergencyWithdraw(token, balance);
+    }
+
+    /**
+     * @notice EMERGENCY: Reset state if stuck in DRAWING
+     */
+    function emergencyResetState() external onlyOwner {
+        roundState = RoundState.OPEN;
+    }
+
+    // ========== REGULAR FUNCTIONS ==========
 
     function _startNewRound() internal {
         currentRoundId++;
@@ -159,5 +226,9 @@ contract FiftyFiftyRaffle is VRFConsumerBaseV2Plus, ReentrancyGuard {
 
     function getCurrentPlayers() external view returns (address[] memory) {
         return currentRoundPlayers;
+    }
+
+    function getContractBalances() external view returns (uint256 usdcBalance, uint256 urimBalance) {
+        return (USDC.balanceOf(address(this)), URIM.balanceOf(address(this)));
     }
 }
