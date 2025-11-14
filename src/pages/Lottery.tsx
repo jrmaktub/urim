@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { Copy, ExternalLink, Sparkles } from "lucide-react";
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
@@ -15,6 +15,8 @@ import { baseSepolia } from "wagmi/chains";
 const Lottery = () => {
   const { address, isConnected, chain } = useAccount();
   const [timeLeft, setTimeLeft] = useState(0);
+  const [showUSDCParticles, setShowUSDCParticles] = useState(false);
+  const [showURIMParticles, setShowURIMParticles] = useState(false);
 
   // Read current round info
   const { data: roundInfo, refetch: refetchRoundInfo } = useReadContract({
@@ -137,27 +139,104 @@ const Lottery = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background relative overflow-hidden">
+      {/* Quantum Sparkle Grid Background */}
+      <div className="absolute inset-0 pointer-events-none opacity-[0.03]">
+        <div className="absolute inset-0" style={{
+          backgroundImage: `radial-gradient(circle, hsl(var(--primary)) 1px, transparent 1px)`,
+          backgroundSize: '40px 40px',
+        }}>
+          {Array.from({ length: 50 }).map((_, i) => (
+            <motion.div
+              key={i}
+              className="absolute w-0.5 h-0.5 bg-primary rounded-full"
+              style={{
+                left: `${Math.random() * 100}%`,
+                top: `${Math.random() * 100}%`,
+              }}
+              animate={{
+                opacity: [0, 0.6, 0],
+              }}
+              transition={{
+                duration: 3 + Math.random() * 4,
+                repeat: Infinity,
+                delay: Math.random() * 5,
+                ease: "easeInOut",
+              }}
+            />
+          ))}
+        </div>
+      </div>
+      
       <Navigation />
       
-      <main className="pt-24 pb-16 px-6">
+      <main className="pt-24 pb-16 px-6 relative z-10">
         <div className="max-w-7xl mx-auto">
           {/* Hero Section */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="text-center mb-16"
+            className="text-center mb-16 relative"
           >
+            {/* Quantum Orbit Effect */}
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <motion.div
+                className="absolute w-64 h-64"
+                animate={{ rotate: 360 }}
+                transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+              >
+                <motion.div
+                  className="absolute w-3 h-3 rounded-full blur-md"
+                  style={{
+                    background: "hsl(var(--primary))",
+                    opacity: 0.06,
+                    top: "10%",
+                    left: "50%",
+                  }}
+                />
+              </motion.div>
+              <motion.div
+                className="absolute w-80 h-80"
+                animate={{ rotate: -360 }}
+                transition={{ duration: 25, repeat: Infinity, ease: "linear" }}
+              >
+                <motion.div
+                  className="absolute w-2.5 h-2.5 rounded-full blur-md"
+                  style={{
+                    background: "#ec6bf0",
+                    opacity: 0.05,
+                    top: "15%",
+                    left: "50%",
+                  }}
+                />
+              </motion.div>
+              <motion.div
+                className="absolute w-72 h-72"
+                animate={{ rotate: 360 }}
+                transition={{ duration: 30, repeat: Infinity, ease: "linear" }}
+              >
+                <motion.div
+                  className="absolute w-3.5 h-3.5 rounded-full blur-lg"
+                  style={{
+                    background: "#a78bfa",
+                    opacity: 0.07,
+                    top: "20%",
+                    left: "50%",
+                  }}
+                />
+              </motion.div>
+            </div>
+
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 mb-6">
               <Sparkles className="w-4 h-4 text-primary" />
               <span className="text-xs text-primary font-medium tracking-wide">
                 Powered by Chainlink VRF • Base Sepolia
               </span>
             </div>
-            <h1 className="text-5xl md:text-6xl font-bold tracking-tight mb-4">
+            <h1 className="text-5xl md:text-6xl font-bold tracking-tight mb-4 relative z-10">
               Quantum 50/50 Lottery
             </h1>
-            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+            <p className="text-lg text-muted-foreground max-w-2xl mx-auto relative z-10">
               Enter a provably fair, quantum-themed 50/50 draw. One winner, half the pot.
             </p>
           </motion.div>
@@ -171,8 +250,19 @@ const Lottery = () => {
               transition={{ delay: 0.1 }}
               className="relative"
             >
-              {/* Quantum Effect Background */}
-              <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-primary/20 via-primary/5 to-transparent opacity-50 blur-2xl" />
+              {/* Quantum Effect Background with Pulsing Halo */}
+              <motion.div 
+                className="absolute inset-0 rounded-3xl bg-gradient-to-br from-primary/20 via-primary/5 to-transparent blur-2xl"
+                animate={{ 
+                  opacity: [0.08, 0.1, 0.08],
+                  scale: [1, 1.07, 1]
+                }}
+                transition={{
+                  duration: 6,
+                  repeat: Infinity,
+                  ease: "easeInOut"
+                }}
+              />
               <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 bg-primary/30 rounded-full blur-3xl animate-pulse" />
               
               <div className="relative bg-card/80 backdrop-blur-xl border border-border/50 rounded-3xl p-8 shadow-2xl">
@@ -217,21 +307,77 @@ const Lottery = () => {
                 </div>
 
                 <div className="space-y-3">
-                  <Button
-                    onClick={handleBuyWithUSDC}
-                    disabled={!isConnected || !isOpen || isUSDCLoading}
-                    className="w-full h-12 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-lg transition-all hover:shadow-lg hover:shadow-primary/20"
-                  >
-                    {isUSDCLoading ? "Processing..." : "Buy Ticket with USDC"}
-                  </Button>
-                  <Button
-                    onClick={handleBuyWithURIM}
-                    disabled={!isConnected || !isOpen || isURIMLoading}
-                    variant="outline"
-                    className="w-full h-12 border-primary/30 hover:bg-primary/10 font-semibold rounded-lg transition-all"
-                  >
-                    {isURIMLoading ? "Processing..." : "Buy Ticket with URIM"}
-                  </Button>
+                  <div className="relative">
+                    <Button
+                      onClick={handleBuyWithUSDC}
+                      disabled={!isConnected || !isOpen || isUSDCLoading}
+                      onMouseEnter={() => setShowUSDCParticles(true)}
+                      onMouseLeave={() => setShowUSDCParticles(false)}
+                      className="w-full h-12 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-lg transition-all hover:shadow-lg hover:shadow-primary/20"
+                    >
+                      {isUSDCLoading ? "Processing..." : "Buy Ticket with USDC"}
+                    </Button>
+                    <AnimatePresence>
+                      {showUSDCParticles && (
+                        <>
+                          {Array.from({ length: 8 }).map((_, i) => (
+                            <motion.div
+                              key={i}
+                              className="absolute w-1 h-1 rounded-full bg-primary pointer-events-none"
+                              style={{
+                                left: "50%",
+                                top: "50%",
+                              }}
+                              initial={{ opacity: 0.4, x: 0, y: 0 }}
+                              animate={{
+                                opacity: 0,
+                                x: Math.cos((i / 8) * Math.PI * 2) * 40,
+                                y: Math.sin((i / 8) * Math.PI * 2) * 40,
+                              }}
+                              exit={{ opacity: 0 }}
+                              transition={{ duration: 0.5, ease: "easeOut" }}
+                            />
+                          ))}
+                        </>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                  <div className="relative">
+                    <Button
+                      onClick={handleBuyWithURIM}
+                      disabled={!isConnected || !isOpen || isURIMLoading}
+                      onMouseEnter={() => setShowURIMParticles(true)}
+                      onMouseLeave={() => setShowURIMParticles(false)}
+                      variant="outline"
+                      className="w-full h-12 border-primary/30 hover:bg-primary/10 font-semibold rounded-lg transition-all"
+                    >
+                      {isURIMLoading ? "Processing..." : "Buy Ticket with URIM"}
+                    </Button>
+                    <AnimatePresence>
+                      {showURIMParticles && (
+                        <>
+                          {Array.from({ length: 8 }).map((_, i) => (
+                            <motion.div
+                              key={i}
+                              className="absolute w-1 h-1 rounded-full bg-primary pointer-events-none"
+                              style={{
+                                left: "50%",
+                                top: "50%",
+                              }}
+                              initial={{ opacity: 0.4, x: 0, y: 0 }}
+                              animate={{
+                                opacity: 0,
+                                x: Math.cos((i / 8) * Math.PI * 2) * 40,
+                                y: Math.sin((i / 8) * Math.PI * 2) * 40,
+                              }}
+                              exit={{ opacity: 0 }}
+                              transition={{ duration: 0.5, ease: "easeOut" }}
+                            />
+                          ))}
+                        </>
+                      )}
+                    </AnimatePresence>
+                  </div>
                 </div>
               </div>
             </motion.div>
