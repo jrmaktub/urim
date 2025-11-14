@@ -14,7 +14,6 @@ import ERC20ABI from "@/contracts/ERC20.json";
 import {
   URIM_CONTRACT_ADDRESS,
   USDC_ADDRESS,
-  PYTH_ADDRESS,
   ENTROPY_ADDRESS,
   SEPOLIA_CHAIN_ID
 } from "@/constants/contracts";
@@ -114,7 +113,7 @@ const CreateMatch = () => {
         player2Address,
         USDC_ADDRESS,
         ENTROPY_ADDRESS,
-        PYTH_ADDRESS,
+        "0x0000000000000000000000000000000000000000", // Pyth removed
         stake,
         eventTitle,
         deadline

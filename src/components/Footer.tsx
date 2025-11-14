@@ -22,10 +22,6 @@ const Footer = () => {
           {/* Sponsor Integration Section */}
           <div className="flex flex-col md:flex-row items-center gap-6 text-sm">
             <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary/5 border border-primary/20 hover:border-primary/40 transition-all group">
-              <TrendingUp className="w-4 h-4 text-primary group-hover:scale-110 transition-transform" />
-              <span className="text-muted-foreground">Powered by <span className="text-primary font-semibold">Pyth Network</span></span>
-            </div>
-            <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary/5 border border-primary/20 hover:border-primary/40 transition-all group">
               <Shield className="w-4 h-4 text-primary group-hover:scale-110 transition-transform animate-glow" />
               <span className="text-muted-foreground">Blockchain Infrastructure by <span className="text-primary font-semibold">Base</span></span>
             </div>
@@ -47,7 +43,7 @@ const Footer = () => {
                   rel="noopener noreferrer"
                   className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
                 >
-                  <span>Pyth Quantum Market</span>
+                  <span>Quantum Market</span>
                   <ExternalLink className="w-3 h-3" />
                 </a>
                 <a
@@ -66,7 +62,7 @@ const Footer = () => {
           {/* About Section */}
           <div className="text-center max-w-2xl space-y-3">
             <p className="text-xs text-muted-foreground/80 leading-relaxed">
-              Urim is an AI-powered quantum prediction market built on Base, with live oracle data from Pyth Network, and transparent blockchain exploration via Blockscout.
+              Urim is an AI-powered quantum prediction market built on Base, with transparent blockchain exploration via Blockscout.
             </p>
           </div>
 
@@ -76,7 +72,7 @@ const Footer = () => {
               © 2025 Urim — Built with AI & Blockchain
             </p>
             <p className="text-xs text-muted-foreground/60">
-              Powered by Pyth Network | Blockscout | Base Sepolia
+              Blockchain Infrastructure by Base | Explorer by Blockscout
             </p>
           </div>
         </div>
