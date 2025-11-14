@@ -141,26 +141,27 @@ const Lottery = () => {
   return (
     <div className="min-h-screen bg-background relative overflow-hidden">
       {/* Quantum Sparkle Grid Background */}
-      <div className="absolute inset-0 pointer-events-none opacity-[0.03]">
+      <div className="absolute inset-0 pointer-events-none opacity-[0.15]">
         <div className="absolute inset-0" style={{
-          backgroundImage: `radial-gradient(circle, hsl(var(--primary)) 1px, transparent 1px)`,
-          backgroundSize: '40px 40px',
+          backgroundImage: `radial-gradient(circle, hsl(var(--primary)) 2px, transparent 2px)`,
+          backgroundSize: '50px 50px',
         }}>
-          {Array.from({ length: 50 }).map((_, i) => (
+          {Array.from({ length: 80 }).map((_, i) => (
             <motion.div
               key={i}
-              className="absolute w-0.5 h-0.5 bg-primary rounded-full"
+              className="absolute w-1 h-1 bg-primary rounded-full blur-sm"
               style={{
                 left: `${Math.random() * 100}%`,
                 top: `${Math.random() * 100}%`,
               }}
               animate={{
-                opacity: [0, 0.6, 0],
+                opacity: [0, 0.8, 0],
+                scale: [0.8, 1.2, 0.8],
               }}
               transition={{
-                duration: 3 + Math.random() * 4,
+                duration: 2 + Math.random() * 3,
                 repeat: Infinity,
-                delay: Math.random() * 5,
+                delay: Math.random() * 3,
                 ease: "easeInOut",
               }}
             />
@@ -186,10 +187,10 @@ const Lottery = () => {
                 transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
               >
                 <motion.div
-                  className="absolute w-3 h-3 rounded-full blur-md"
+                  className="absolute w-4 h-4 rounded-full blur-lg"
                   style={{
                     background: "hsl(var(--primary))",
-                    opacity: 0.06,
+                    opacity: 0.3,
                     top: "10%",
                     left: "50%",
                   }}
@@ -201,10 +202,10 @@ const Lottery = () => {
                 transition={{ duration: 25, repeat: Infinity, ease: "linear" }}
               >
                 <motion.div
-                  className="absolute w-2.5 h-2.5 rounded-full blur-md"
+                  className="absolute w-3 h-3 rounded-full blur-lg"
                   style={{
                     background: "#ec6bf0",
-                    opacity: 0.05,
+                    opacity: 0.25,
                     top: "15%",
                     left: "50%",
                   }}
@@ -216,10 +217,10 @@ const Lottery = () => {
                 transition={{ duration: 30, repeat: Infinity, ease: "linear" }}
               >
                 <motion.div
-                  className="absolute w-3.5 h-3.5 rounded-full blur-lg"
+                  className="absolute w-4 h-4 rounded-full blur-xl"
                   style={{
                     background: "#a78bfa",
-                    opacity: 0.07,
+                    opacity: 0.35,
                     top: "20%",
                     left: "50%",
                   }}
@@ -252,10 +253,10 @@ const Lottery = () => {
             >
               {/* Quantum Effect Background with Pulsing Halo */}
               <motion.div 
-                className="absolute inset-0 rounded-3xl bg-gradient-to-br from-primary/20 via-primary/5 to-transparent blur-2xl"
+                className="absolute inset-0 rounded-3xl bg-gradient-to-br from-primary/30 via-primary/10 to-transparent blur-3xl"
                 animate={{ 
-                  opacity: [0.08, 0.1, 0.08],
-                  scale: [1, 1.07, 1]
+                  opacity: [0.3, 0.5, 0.3],
+                  scale: [1, 1.1, 1]
                 }}
                 transition={{
                   duration: 6,
@@ -263,7 +264,7 @@ const Lottery = () => {
                   ease: "easeInOut"
                 }}
               />
-              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 bg-primary/30 rounded-full blur-3xl animate-pulse" />
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 bg-primary/40 rounded-full blur-3xl animate-pulse" />
               
               <div className="relative bg-card/80 backdrop-blur-xl border border-border/50 rounded-3xl p-8 shadow-2xl">
                 <div className="flex items-center justify-between mb-6">
@@ -320,22 +321,23 @@ const Lottery = () => {
                     <AnimatePresence>
                       {showUSDCParticles && (
                         <>
-                          {Array.from({ length: 8 }).map((_, i) => (
+                          {Array.from({ length: 12 }).map((_, i) => (
                             <motion.div
                               key={i}
-                              className="absolute w-1 h-1 rounded-full bg-primary pointer-events-none"
+                              className="absolute w-2 h-2 rounded-full bg-primary blur-sm pointer-events-none"
                               style={{
                                 left: "50%",
                                 top: "50%",
                               }}
-                              initial={{ opacity: 0.4, x: 0, y: 0 }}
+                              initial={{ opacity: 0.8, x: 0, y: 0, scale: 1 }}
                               animate={{
                                 opacity: 0,
-                                x: Math.cos((i / 8) * Math.PI * 2) * 40,
-                                y: Math.sin((i / 8) * Math.PI * 2) * 40,
+                                x: Math.cos((i / 12) * Math.PI * 2) * 60,
+                                y: Math.sin((i / 12) * Math.PI * 2) * 60,
+                                scale: 0.5,
                               }}
                               exit={{ opacity: 0 }}
-                              transition={{ duration: 0.5, ease: "easeOut" }}
+                              transition={{ duration: 0.6, ease: "easeOut" }}
                             />
                           ))}
                         </>
@@ -356,22 +358,23 @@ const Lottery = () => {
                     <AnimatePresence>
                       {showURIMParticles && (
                         <>
-                          {Array.from({ length: 8 }).map((_, i) => (
+                          {Array.from({ length: 12 }).map((_, i) => (
                             <motion.div
                               key={i}
-                              className="absolute w-1 h-1 rounded-full bg-primary pointer-events-none"
+                              className="absolute w-2 h-2 rounded-full bg-primary blur-sm pointer-events-none"
                               style={{
                                 left: "50%",
                                 top: "50%",
                               }}
-                              initial={{ opacity: 0.4, x: 0, y: 0 }}
+                              initial={{ opacity: 0.8, x: 0, y: 0, scale: 1 }}
                               animate={{
                                 opacity: 0,
-                                x: Math.cos((i / 8) * Math.PI * 2) * 40,
-                                y: Math.sin((i / 8) * Math.PI * 2) * 40,
+                                x: Math.cos((i / 12) * Math.PI * 2) * 60,
+                                y: Math.sin((i / 12) * Math.PI * 2) * 60,
+                                scale: 0.5,
                               }}
                               exit={{ opacity: 0 }}
-                              transition={{ duration: 0.5, ease: "easeOut" }}
+                              transition={{ duration: 0.6, ease: "easeOut" }}
                             />
                           ))}
                         </>
