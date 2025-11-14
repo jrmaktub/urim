@@ -179,50 +179,56 @@ const Lottery = () => {
             animate={{ opacity: 1, y: 0 }}
             className="text-center mb-16 relative"
           >
-            {/* Quantum Orbit Effect */}
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            {/* Quantum Orbit Effect - More Visible */}
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none overflow-visible">
+              {/* Particle 1 - Purple */}
               <motion.div
-                className="absolute w-64 h-64"
+                className="absolute w-96 h-96"
                 animate={{ rotate: 360 }}
                 transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
               >
                 <motion.div
-                  className="absolute w-4 h-4 rounded-full blur-lg"
+                  className="absolute w-6 h-6 rounded-full blur-md"
                   style={{
-                    background: "hsl(var(--primary))",
-                    opacity: 0.3,
+                    background: "linear-gradient(135deg, #a78bfa, #c084fc)",
+                    opacity: 0.8,
                     top: "10%",
                     left: "50%",
+                    boxShadow: "0 0 20px #a78bfa",
                   }}
                 />
               </motion.div>
+              {/* Particle 2 - Pink */}
               <motion.div
-                className="absolute w-80 h-80"
+                className="absolute w-[28rem] h-[28rem]"
                 animate={{ rotate: -360 }}
                 transition={{ duration: 25, repeat: Infinity, ease: "linear" }}
               >
                 <motion.div
-                  className="absolute w-3 h-3 rounded-full blur-lg"
+                  className="absolute w-5 h-5 rounded-full blur-md"
                   style={{
-                    background: "#ec6bf0",
-                    opacity: 0.25,
+                    background: "linear-gradient(135deg, #ec6bf0, #f472b6)",
+                    opacity: 0.7,
                     top: "15%",
                     left: "50%",
+                    boxShadow: "0 0 15px #ec6bf0",
                   }}
                 />
               </motion.div>
+              {/* Particle 3 - Light Purple */}
               <motion.div
-                className="absolute w-72 h-72"
+                className="absolute w-80 h-80"
                 animate={{ rotate: 360 }}
                 transition={{ duration: 30, repeat: Infinity, ease: "linear" }}
               >
                 <motion.div
-                  className="absolute w-4 h-4 rounded-full blur-xl"
+                  className="absolute w-4 h-4 rounded-full blur-sm"
                   style={{
-                    background: "#a78bfa",
-                    opacity: 0.35,
+                    background: "linear-gradient(135deg, #c084fc, #e879f9)",
+                    opacity: 0.9,
                     top: "20%",
                     left: "50%",
+                    boxShadow: "0 0 12px #c084fc",
                   }}
                 />
               </motion.div>
@@ -251,20 +257,40 @@ const Lottery = () => {
               transition={{ delay: 0.1 }}
               className="relative"
             >
-              {/* Quantum Effect Background with Pulsing Halo */}
+              {/* Enhanced Pulsing Halo Glow */}
               <motion.div 
-                className="absolute inset-0 rounded-3xl bg-gradient-to-br from-primary/30 via-primary/10 to-transparent blur-3xl"
+                className="absolute inset-0 rounded-3xl blur-3xl"
+                style={{
+                  background: "radial-gradient(circle, rgba(167, 139, 250, 0.4), rgba(236, 107, 240, 0.3), transparent)"
+                }}
                 animate={{ 
-                  opacity: [0.3, 0.5, 0.3],
-                  scale: [1, 1.1, 1]
+                  opacity: [0.5, 0.8, 0.5],
+                  scale: [1, 1.15, 1]
                 }}
                 transition={{
-                  duration: 6,
+                  duration: 5,
                   repeat: Infinity,
                   ease: "easeInOut"
                 }}
               />
-              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 bg-primary/40 rounded-full blur-3xl animate-pulse" />
+              {/* Secondary glow layer */}
+              <motion.div 
+                className="absolute inset-0 rounded-3xl blur-2xl"
+                style={{
+                  background: "radial-gradient(circle, rgba(192, 132, 252, 0.3), transparent)"
+                }}
+                animate={{ 
+                  opacity: [0.4, 0.7, 0.4],
+                  scale: [1.05, 1.2, 1.05]
+                }}
+                transition={{
+                  duration: 7,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                  delay: 0.5
+                }}
+              />
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-primary/50 rounded-full blur-3xl animate-pulse" />
               
               <div className="relative bg-card/80 backdrop-blur-xl border border-border/50 rounded-3xl p-8 shadow-2xl">
                 <div className="flex items-center justify-between mb-6">
