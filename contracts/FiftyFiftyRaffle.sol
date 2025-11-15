@@ -18,8 +18,8 @@ contract FiftyFiftyRaffle is VRFConsumerBaseV2Plus, ReentrancyGuard {
     uint16 public requestConfirmations = 3;
     uint32 public numWords = 1;
     
-    uint256 public constant TICKET_PRICE_USDC = 1e6; // $1
-    uint256 public constant ROUND_DURATION = 24 hours;
+    uint256 public constant TICKET_PRICE_USDC = 1e6;
+    uint256 public constant ROUND_DURATION = 12 minutes;
     
     uint256 public currentRoundId;
     uint256 public currentRoundEndTime;
