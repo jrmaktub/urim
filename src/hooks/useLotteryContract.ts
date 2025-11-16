@@ -125,7 +125,7 @@ export const useLotteryContract = () => {
       buyTicket({
         address: FIFTY_FIFTY_RAFFLE_ADDRESS as `0x${string}`,
         abi: FiftyFiftyRaffleABI as unknown as Abi,
-        functionName: "buyTicketWithUSDC",
+        functionName: "buyTicket",
         account: address,
         chain: base,
       });
