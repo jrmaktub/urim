@@ -45,10 +45,11 @@ export const useLotteryContract = () => {
     address: USDC_ADDRESS,
     abi: ERC20ABI as unknown as Abi,
     functionName: "allowance",
-    args: [address, FIFTY_FIFTY_RAFFLE_ADDRESS],
+    args: address ? [address, FIFTY_FIFTY_RAFFLE_ADDRESS] : undefined,
     chainId: BASE_MAINNET_CHAIN_ID,
     query: {
-      refetchInterval: 10000, // Auto-refresh every 10 seconds
+      enabled: isConnected && chain?.id === BASE_MAINNET_CHAIN_ID,
+      refetchInterval: 10000,
     },
   });
 
@@ -84,12 +85,22 @@ export const useLotteryContract = () => {
       return;
     }
 
-    if (!isCorrectNetwork) {
+    // Force Base Mainnet
+    if (chain?.id !== BASE_MAINNET_CHAIN_ID) {
       toast({ 
-        title: "Switching to Base Mainnet...",
+        title: "Switch to Base to buy tickets",
+        description: "Switching network...",
         className: "bg-primary/20 border-primary"
       });
-      switchChain({ chainId: base.id });
+      try {
+        await switchChain({ chainId: BASE_MAINNET_CHAIN_ID });
+      } catch (error) {
+        toast({
+          title: "Network switch failed",
+          description: "Please manually switch to Base Mainnet",
+          variant: "destructive"
+        });
+      }
       return;
     }
 
@@ -115,6 +126,7 @@ export const useLotteryContract = () => {
           args: [FIFTY_FIFTY_RAFFLE_ADDRESS, TICKET_PRICE],
           account: address,
           chain: base,
+          chainId: BASE_MAINNET_CHAIN_ID,
         });
         
         return;
@@ -128,6 +140,7 @@ export const useLotteryContract = () => {
         functionName: "buyTicket",
         account: address,
         chain: base,
+        chainId: BASE_MAINNET_CHAIN_ID,
       });
       
     } catch (error: any) {
