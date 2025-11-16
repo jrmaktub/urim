@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt, useWatchContractEvent } from "wagmi";
+import { useState, useEffect } from "react";
+import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt, useWatchContractEvent, useSwitchChain } from "wagmi";
 import { toast } from "@/hooks/use-toast";
 import { formatUnits, type Abi } from "viem";
 import { base } from "wagmi/chains";
@@ -13,6 +13,7 @@ const TICKET_PRICE = BigInt(1_000_000); // 1 USDC (6 decimals)
 
 export const useLotteryContract = () => {
   const { address, isConnected, chain } = useAccount();
+  const { switchChain } = useSwitchChain();
   const [isApproving, setIsApproving] = useState(false);
 
   // Read current round info
@@ -77,6 +78,7 @@ export const useLotteryContract = () => {
     if (!isConnected) {
       toast({ 
         title: "Please connect your wallet",
+        description: "Connect your wallet to purchase tickets",
         variant: "destructive" 
       });
       return;
@@ -84,16 +86,17 @@ export const useLotteryContract = () => {
 
     if (!isCorrectNetwork) {
       toast({ 
-        title: "Please switch to Base to buy tickets.",
-        variant: "destructive",
+        title: "Switching to Base Mainnet...",
         className: "bg-primary/20 border-primary"
       });
+      switchChain({ chainId: base.id });
       return;
     }
 
     if (!isOpen) {
       toast({ 
         title: "Round is not open", 
+        description: "Please wait for the next round to start",
         variant: "destructive" 
       });
       return;
@@ -103,7 +106,7 @@ export const useLotteryContract = () => {
       // Check if approval is needed
       if (!hasAllowance) {
         setIsApproving(true);
-        toast({ title: "Approving USDC..." });
+        toast({ title: "Approving USDC...", description: "Please confirm the transaction in your wallet" });
         
         approveUSDC({
           address: USDC_ADDRESS,
@@ -118,6 +121,7 @@ export const useLotteryContract = () => {
       }
 
       // Buy ticket
+      toast({ title: "Buying ticket...", description: "Please confirm the transaction in your wallet" });
       buyTicket({
         address: FIFTY_FIFTY_RAFFLE_ADDRESS as `0x${string}`,
         abi: FiftyFiftyRaffleABI as unknown as Abi,
@@ -137,20 +141,29 @@ export const useLotteryContract = () => {
   };
 
   // Handle approval success
-  if (isApprovalSuccess && isApproving) {
-    setIsApproving(false);
-    refetchAllowance();
-    toast({ title: "USDC approved! Click again to buy ticket." });
-  }
+  useEffect(() => {
+    if (isApprovalSuccess && isApproving) {
+      setIsApproving(false);
+      refetchAllowance();
+      toast({ 
+        title: "USDC approved!", 
+        description: "Click 'Buy Ticket' again to complete your purchase" 
+      });
+    }
+  }, [isApprovalSuccess, isApproving, refetchAllowance]);
 
   // Handle buy success
-  if (isBuySuccess && !isApproving) {
-    toast({ title: "Ticket purchased! You're in the round 🎟️" });
-    setTimeout(() => {
+  useEffect(() => {
+    if (isBuySuccess && !isApproving) {
+      toast({ 
+        title: "🎟️ Ticket purchased successfully!",
+        description: "Good luck in the draw!"
+      });
+      // Immediately refetch round info
       refetchRoundInfo();
       refetchAllowance();
-    }, 2000);
-  }
+    }
+  }, [isBuySuccess, isApproving, refetchRoundInfo, refetchAllowance]);
 
   return {
     roundId,
