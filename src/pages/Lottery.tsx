@@ -4,54 +4,31 @@ import { Copy, ExternalLink, Sparkles } from "lucide-react";
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
-import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
+import { useAccount, useSwitchChain, useReadContract } from "wagmi";
 import { toast } from "@/hooks/use-toast";
-import FiftyFiftyRaffleABI from "@/contracts/FiftyFiftyRaffle.json";
 import { FIFTY_FIFTY_RAFFLE_ADDRESS } from "@/constants/lottery";
-import { BASE_SEPOLIA_CHAIN_ID } from "@/constants/contracts";
-import { formatUnits } from "viem";
-import { baseSepolia } from "wagmi/chains";
+import { useLotteryContract } from "@/hooks/useLotteryContract";
+import { base } from "wagmi/chains";
+import FiftyFiftyRaffleABI from "@/contracts/FiftyFiftyRaffle.json";
 
 const Lottery = () => {
-  const { address, isConnected, chain } = useAccount();
+  const { isConnected } = useAccount();
+  const { switchChain } = useSwitchChain();
   const [timeLeft, setTimeLeft] = useState(0);
   const [showUSDCParticles, setShowUSDCParticles] = useState(false);
   const [showURIMParticles, setShowURIMParticles] = useState(false);
 
-  // Read current round info
-  const { data: roundInfo, refetch: refetchRoundInfo } = useReadContract({
-    address: FIFTY_FIFTY_RAFFLE_ADDRESS as `0x${string}`,
-    abi: FiftyFiftyRaffleABI,
-    functionName: "getCurrentRoundInfo",
-    chainId: BASE_SEPOLIA_CHAIN_ID,
-  });
-
-  // Read current round ID
-  const { data: currentRoundId } = useReadContract({
-    address: FIFTY_FIFTY_RAFFLE_ADDRESS as `0x${string}`,
-    abi: FiftyFiftyRaffleABI,
-    functionName: "currentRoundId",
-    chainId: BASE_SEPOLIA_CHAIN_ID,
-  });
-
-  // Buy ticket with USDC
-  const { writeContract: buyWithUSDC, data: usdcHash } = useWriteContract();
-  const { isLoading: isUSDCLoading } = useWaitForTransactionReceipt({
-    hash: usdcHash,
-  });
-
-  // Buy ticket with URIM
-  const { writeContract: buyWithURIM, data: urimHash } = useWriteContract();
-  const { isLoading: isURIMLoading } = useWaitForTransactionReceipt({
-    hash: urimHash,
-  });
-
-  // Parse round info
-  const roundId = roundInfo ? Number(roundInfo[0]) : 0;
-  const totalUSDC = roundInfo ? formatUnits(roundInfo[1] as bigint, 6) : "0";
-  const totalURIM = roundInfo ? formatUnits(roundInfo[2] as bigint, 6) : "0";
-  const roundTimeLeft = roundInfo ? Number(roundInfo[3]) : 0;
-  const isOpen = roundInfo ? roundInfo[4] : false;
+  const {
+    roundId,
+    totalUSDC,
+    totalURIM,
+    roundTimeLeft,
+    isOpen,
+    isCorrectNetwork,
+    handleBuyTicket,
+    refetchRoundInfo,
+    isLoading,
+  } = useLotteryContract();
 
   // Update countdown
   useEffect(() => {
@@ -61,6 +38,14 @@ const Lottery = () => {
     }, 1000);
     return () => clearInterval(interval);
   }, [roundTimeLeft]);
+
+  // Auto-refresh every 10 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      refetchRoundInfo();
+    }, 10000);
+    return () => clearInterval(interval);
+  }, [refetchRoundInfo]);
 
   // Format time
   const formatTime = (seconds: number) => {
@@ -75,62 +60,8 @@ const Lottery = () => {
     return `${secs}s`;
   };
 
-  const handleBuyWithUSDC = async () => {
-    if (!isConnected) {
-      toast({ title: "Please connect your wallet", variant: "destructive" });
-      return;
-    }
-    if (chain?.id !== BASE_SEPOLIA_CHAIN_ID) {
-      toast({ title: "Please switch to Base Sepolia", variant: "destructive" });
-      return;
-    }
-    if (!isOpen) {
-      toast({ title: "Round is not open", variant: "destructive" });
-      return;
-    }
-
-    try {
-      buyWithUSDC({
-        address: FIFTY_FIFTY_RAFFLE_ADDRESS as `0x${string}`,
-        abi: FiftyFiftyRaffleABI,
-        functionName: "buyTicketWithUSDC",
-        account: address,
-        chain: baseSepolia,
-      });
-      toast({ title: "Transaction submitted!" });
-      setTimeout(() => refetchRoundInfo(), 2000);
-    } catch (error: any) {
-      toast({ title: "Transaction failed", description: error.message, variant: "destructive" });
-    }
-  };
-
-  const handleBuyWithURIM = async () => {
-    if (!isConnected) {
-      toast({ title: "Please connect your wallet", variant: "destructive" });
-      return;
-    }
-    if (chain?.id !== BASE_SEPOLIA_CHAIN_ID) {
-      toast({ title: "Please switch to Base Sepolia", variant: "destructive" });
-      return;
-    }
-    if (!isOpen) {
-      toast({ title: "Round is not open", variant: "destructive" });
-      return;
-    }
-
-    try {
-      buyWithURIM({
-        address: FIFTY_FIFTY_RAFFLE_ADDRESS as `0x${string}`,
-        abi: FiftyFiftyRaffleABI,
-        functionName: "buyTicketWithURIM",
-        account: address,
-        chain: baseSepolia,
-      });
-      toast({ title: "Transaction submitted!" });
-      setTimeout(() => refetchRoundInfo(), 2000);
-    } catch (error: any) {
-      toast({ title: "Transaction failed", description: error.message, variant: "destructive" });
-    }
+  const handleSwitchToBase = () => {
+    switchChain({ chainId: base.id });
   };
 
   const copyAddress = () => {
@@ -336,13 +267,15 @@ const Lottery = () => {
                 <div className="space-y-3">
                   <div className="relative">
                     <Button
-                      onClick={handleBuyWithUSDC}
-                      disabled={!isConnected || !isOpen || isUSDCLoading}
-                      onMouseEnter={() => setShowUSDCParticles(true)}
-                      onMouseLeave={() => setShowUSDCParticles(false)}
+                      onClick={() => {
+                        setShowUSDCParticles(true);
+                        handleBuyTicket();
+                        setTimeout(() => setShowUSDCParticles(false), 1000);
+                      }}
+                      disabled={!isConnected || !isOpen || isLoading || !isCorrectNetwork}
                       className="w-full h-12 bg-secondary hover:bg-secondary/90 text-secondary-foreground font-semibold rounded-lg transition-all hover:shadow-lg hover:shadow-secondary/20"
                     >
-                      {isUSDCLoading ? "Processing..." : "Buy Ticket with USDC"}
+                      {isLoading ? "Processing..." : "Buy Ticket with USDC"}
                     </Button>
                     <AnimatePresence>
                       {showUSDCParticles && (
@@ -372,39 +305,11 @@ const Lottery = () => {
                   </div>
                   <div className="relative">
                     <Button
-                      onClick={handleBuyWithURIM}
-                      disabled={!isConnected || !isOpen || isURIMLoading}
-                      onMouseEnter={() => setShowURIMParticles(true)}
-                      onMouseLeave={() => setShowURIMParticles(false)}
-                      className="w-full h-12 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-lg transition-all hover:shadow-lg hover:shadow-primary/20"
+                      disabled={true}
+                      className="w-full h-12 bg-primary/50 hover:bg-primary/50 text-primary-foreground font-semibold rounded-lg transition-all opacity-50 cursor-not-allowed"
                     >
-                      {isURIMLoading ? "Processing..." : "Buy Ticket with URIM"}
+                      Coming Soon - URIM
                     </Button>
-                    <AnimatePresence>
-                      {showURIMParticles && (
-                        <>
-                          {Array.from({ length: 12 }).map((_, i) => (
-                            <motion.div
-                              key={i}
-                              className="absolute w-2 h-2 rounded-full bg-primary blur-sm pointer-events-none"
-                              style={{
-                                left: "50%",
-                                top: "50%",
-                              }}
-                              initial={{ opacity: 0.8, x: 0, y: 0, scale: 1 }}
-                              animate={{
-                                opacity: 0,
-                                x: Math.cos((i / 12) * Math.PI * 2) * 60,
-                                y: Math.sin((i / 12) * Math.PI * 2) * 60,
-                                scale: 0.5,
-                              }}
-                              exit={{ opacity: 0 }}
-                              transition={{ duration: 0.6, ease: "easeOut" }}
-                            />
-                          ))}
-                        </>
-                      )}
-                    </AnimatePresence>
                   </div>
                 </div>
               </div>
@@ -505,9 +410,9 @@ const Lottery = () => {
           >
             <h3 className="text-lg font-semibold mb-4">Recent Winners</h3>
             <div className="flex gap-3 overflow-x-auto pb-2">
-              {currentRoundId && Number(currentRoundId) > 0 ? (
-                Array.from({ length: Math.min(3, Number(currentRoundId)) }, (_, i) => {
-                  const roundNum = Number(currentRoundId) - i - 1;
+              {roundId && roundId > 0 ? (
+                Array.from({ length: Math.min(3, roundId) }, (_, i) => {
+                  const roundNum = roundId - i - 1;
                   return (
                     <RecentWinnerPill key={roundNum} roundId={roundNum} />
                   );
@@ -529,28 +434,37 @@ const Lottery = () => {
 const RecentWinnerPill = ({ roundId }: { roundId: number }) => {
   const { data: roundResult } = useReadContract({
     address: FIFTY_FIFTY_RAFFLE_ADDRESS as `0x${string}`,
-    abi: FiftyFiftyRaffleABI,
+    abi: FiftyFiftyRaffleABI as unknown as any,
     functionName: "getRoundResult",
     args: [BigInt(roundId)],
-    chainId: BASE_SEPOLIA_CHAIN_ID,
+    chainId: 8453, // Base mainnet
   });
 
   if (!roundResult || !roundResult[3]) return null; // Not completed
 
   const winner = roundResult[0] as string;
-  const usdcPayout = formatUnits(roundResult[1] as bigint, 6);
-  const urimPayout = formatUnits(roundResult[2] as bigint, 6);
+  const usdcPayout = (parseFloat(roundResult[1].toString()) / 1e6).toFixed(2);
+  const urimPayout = (parseFloat(roundResult[2].toString()) / 1e6).toFixed(2);
 
   return (
-    <div className="flex-shrink-0 px-4 py-2 bg-secondary/40 border border-border/30 rounded-full">
-      <span className="text-xs text-muted-foreground">
-        Round #{roundId} • Winner:{" "}
-        <span className="font-mono text-foreground">
-          {winner.slice(0, 6)}...{winner.slice(-4)}
-        </span>{" "}
-        • Payout: {parseFloat(usdcPayout).toFixed(0)} USDC + {parseFloat(urimPayout).toFixed(0)} URIM
-      </span>
-    </div>
+    <motion.div
+      initial={{ opacity: 0, x: -20 }}
+      animate={{ opacity: 1, x: 0 }}
+      className="flex-shrink-0 bg-card border border-border rounded-lg p-3 min-w-[200px]"
+    >
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-xs text-muted-foreground">Round #{roundId}</span>
+        <Sparkles className="w-3 h-3 text-primary" />
+      </div>
+      <p className="text-xs font-mono text-foreground/80 mb-2">
+        {winner.slice(0, 6)}...{winner.slice(-4)}
+      </p>
+      <div className="flex gap-2 text-xs">
+        <span className="text-primary font-semibold">{usdcPayout} USDC</span>
+        <span className="text-muted-foreground">+</span>
+        <span className="text-secondary font-semibold">{urimPayout} URIM</span>
+      </div>
+    </motion.div>
   );
 };
 
