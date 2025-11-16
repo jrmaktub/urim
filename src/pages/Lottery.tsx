@@ -265,7 +265,7 @@ const Lottery = () => {
                         handleBuyTicket();
                         setTimeout(() => setShowUSDCParticles(false), 1000);
                       }}
-                      disabled={!isConnected || !isOpen || isLoading || !isCorrectNetwork}
+                      disabled={!isConnected || isLoading || !isCorrectNetwork}
                       className="w-full h-12 bg-secondary hover:bg-secondary/90 text-secondary-foreground font-semibold rounded-lg transition-all hover:shadow-lg hover:shadow-secondary/20"
                     >
                       {isLoading ? "Processing..." : "Buy Ticket with USDC"}
