@@ -39,13 +39,6 @@ const Lottery = () => {
     return () => clearInterval(interval);
   }, [roundTimeLeft]);
 
-  // Auto-refresh every 10 seconds
-  useEffect(() => {
-    const interval = setInterval(() => {
-      refetchRoundInfo();
-    }, 10000);
-    return () => clearInterval(interval);
-  }, [refetchRoundInfo]);
 
   // Format time
   const formatTime = (seconds: number) => {

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
+import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt, useWatchContractEvent } from "wagmi";
 import { toast } from "@/hooks/use-toast";
 import { formatUnits, type Abi } from "viem";
 import { base } from "wagmi/chains";
@@ -21,6 +21,22 @@ export const useLotteryContract = () => {
     abi: FiftyFiftyRaffleABI as unknown as Abi,
     functionName: "getCurrentRoundInfo",
     chainId: BASE_MAINNET_CHAIN_ID,
+    query: {
+      refetchInterval: 10000, // Auto-refresh every 10 seconds
+    },
+  });
+
+  // Watch for TicketPurchased events to instantly update UI
+  useWatchContractEvent({
+    address: FIFTY_FIFTY_RAFFLE_ADDRESS as `0x${string}`,
+    abi: FiftyFiftyRaffleABI as unknown as Abi,
+    eventName: "TicketPurchased",
+    chainId: BASE_MAINNET_CHAIN_ID,
+    onLogs: () => {
+      // Instantly refetch round info when a ticket is purchased
+      refetchRoundInfo();
+      refetchAllowance();
+    },
   });
 
   // Read USDC allowance
@@ -30,6 +46,9 @@ export const useLotteryContract = () => {
     functionName: "allowance",
     args: [address, FIFTY_FIFTY_RAFFLE_ADDRESS],
     chainId: BASE_MAINNET_CHAIN_ID,
+    query: {
+      refetchInterval: 10000, // Auto-refresh every 10 seconds
+    },
   });
 
   // Approve USDC
