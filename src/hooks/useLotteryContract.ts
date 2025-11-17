@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt, useWatchContractEvent, useSwitchChain } from "wagmi";
 import { toast } from "@/hooks/use-toast";
-import { formatUnits, type Abi, maxUint256 } from "viem";
+import { formatUnits, type Abi } from "viem";
 import { base } from "wagmi/chains";
 import { useConnectModal } from "@rainbow-me/rainbowkit";
 import FiftyFiftyRaffleABI from "@/contracts/FiftyFiftyRaffle.json";
@@ -136,7 +136,7 @@ export const useLotteryContract = () => {
           address: USDC_ADDRESS,
           abi: (ERC20ABI as { abi: Abi }).abi,
           functionName: "approve",
-          args: [FIFTY_FIFTY_RAFFLE_ADDRESS, maxUint256],
+          args: [FIFTY_FIFTY_RAFFLE_ADDRESS, TICKET_PRICE],
           account: address,
           chain: base,
           chainId: BASE_MAINNET_CHAIN_ID,
