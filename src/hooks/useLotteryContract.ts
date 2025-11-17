@@ -80,13 +80,17 @@ export const useLotteryContract = () => {
   const hasAllowance = allowance && (allowance as bigint) >= TICKET_PRICE;
 
   const handleBuyTicket = async () => {
+    console.log("🎫 Buy Ticket clicked");
+    
     if (!isConnected) {
+      console.log("❌ Not connected, opening wallet modal");
       openConnectModal?.();
       return;
     }
 
     // Force Base Mainnet
     if (chain?.id !== BASE_MAINNET_CHAIN_ID) {
+      console.log(`⚠️ Wrong network: ${chain?.id}, switching to Base (${BASE_MAINNET_CHAIN_ID})`);
       toast({ 
         title: "Switch to Base to buy tickets",
         description: "Switching network...",
@@ -94,7 +98,12 @@ export const useLotteryContract = () => {
       });
       try {
         await switchChain({ chainId: BASE_MAINNET_CHAIN_ID });
+        console.log("✅ Network switched to Base");
+        // Wait for wagmi hooks to update
+        await new Promise(resolve => setTimeout(resolve, 500));
+        console.log("✅ Waited for chain state update");
       } catch (error) {
+        console.log("❌ Network switch failed", error);
         toast({
           title: "Network switch failed",
           description: "Please manually switch to Base Mainnet",
@@ -102,11 +111,11 @@ export const useLotteryContract = () => {
         });
         return;
       }
-      // continue after successful switch
     }
 
     if (!isOpen) {
       const stateText = roundState === 1 ? "drawing" : roundState === 2 ? "finished" : "not open";
+      console.log(`❌ Round is ${stateText}`);
       toast({ 
         title: `Round is ${stateText}`, 
         description: "Please wait for the next round to start",
@@ -116,10 +125,17 @@ export const useLotteryContract = () => {
     }
 
     try {
+      // Refetch allowance to get latest value
+      const { data: currentAllowance } = await refetchAllowance();
+      const hasCurrentAllowance = currentAllowance && (currentAllowance as bigint) >= TICKET_PRICE;
+      
+      console.log("💰 Current allowance:", currentAllowance?.toString(), "| Required:", TICKET_PRICE.toString(), "| Has allowance:", hasCurrentAllowance);
+
       // Check if approval is needed
-      if (!hasAllowance) {
+      if (!hasCurrentAllowance) {
         setIsApproving(true);
-        toast({ title: "Approving USDC...", description: "Please confirm the transaction in your wallet" });
+        console.log("📝 Starting USDC approval...");
+        toast({ title: "Approve USDC...", description: "Please confirm the transaction in your wallet" });
         
         approveUSDC({
           address: USDC_ADDRESS,
@@ -134,7 +150,8 @@ export const useLotteryContract = () => {
         return;
       }
 
-      // Buy ticket
+      // Buy ticket directly if already approved
+      console.log("🎟️ Already approved, buying ticket...");
       toast({ title: "Buying ticket...", description: "Please confirm the transaction in your wallet" });
       buyTicket({
         address: FIFTY_FIFTY_RAFFLE_ADDRESS as `0x${string}`,
@@ -146,6 +163,7 @@ export const useLotteryContract = () => {
       });
       
     } catch (error: any) {
+      console.log("❌ Transaction failed:", error);
       toast({ 
         title: "Transaction failed", 
         description: error.message, 
@@ -157,29 +175,43 @@ export const useLotteryContract = () => {
 
   // Handle approval success - automatically buy ticket
   useEffect(() => {
-    if (isApprovalSuccess && isApproving) {
-      setIsApproving(false);
-      refetchAllowance();
-      toast({ 
-        title: "USDC approved!", 
-        description: "Buying ticket now..." 
-      });
-      
-      // Automatically proceed to buy ticket
-      buyTicket({
-        address: FIFTY_FIFTY_RAFFLE_ADDRESS as `0x${string}`,
-        abi: FiftyFiftyRaffleABI as unknown as Abi,
-        functionName: "buyTicket",
-        account: address,
-        chain: base,
-        chainId: BASE_MAINNET_CHAIN_ID,
-      });
-    }
-  }, [isApprovalSuccess, isApproving, refetchAllowance, address]);
+    const autoBuyAfterApproval = async () => {
+      if (isApprovalSuccess && isApproving) {
+        console.log("✅ Approval confirmed! Hash:", approveHash);
+        setIsApproving(false);
+        
+        // Wait for allowance to update
+        console.log("🔄 Refetching allowance...");
+        await refetchAllowance();
+        
+        // Small delay to ensure state is updated
+        await new Promise(resolve => setTimeout(resolve, 300));
+        
+        toast({ 
+          title: "USDC approved!", 
+          description: "Buying ticket now..." 
+        });
+        
+        console.log("🎟️ Auto-buying ticket after approval...");
+        // Automatically proceed to buy ticket
+        buyTicket({
+          address: FIFTY_FIFTY_RAFFLE_ADDRESS as `0x${string}`,
+          abi: FiftyFiftyRaffleABI as unknown as Abi,
+          functionName: "buyTicket",
+          account: address,
+          chain: base,
+          chainId: BASE_MAINNET_CHAIN_ID,
+        });
+      }
+    };
+    
+    autoBuyAfterApproval();
+  }, [isApprovalSuccess, isApproving, refetchAllowance, address, buyTicket, approveHash]);
 
   // Handle buy success
   useEffect(() => {
     if (isBuySuccess && !isApproving) {
+      console.log("✅ Ticket purchase confirmed! Hash:", buyHash);
       toast({ 
         title: "🎟️ Ticket purchased successfully!",
         description: "Good luck in the draw!"
@@ -188,7 +220,7 @@ export const useLotteryContract = () => {
       refetchRoundInfo();
       refetchAllowance();
     }
-  }, [isBuySuccess, isApproving, refetchRoundInfo, refetchAllowance]);
+  }, [isBuySuccess, isApproving, refetchRoundInfo, refetchAllowance, buyHash]);
 
   return {
     roundId,
