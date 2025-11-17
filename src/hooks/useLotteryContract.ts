@@ -55,17 +55,10 @@ export const useLotteryContract = () => {
     },
   });
 
-  // Approve USDC
-  const { writeContract: approveUSDC, data: approveHash } = useWriteContract();
-  const { isLoading: isApprovalLoading, isSuccess: isApprovalSuccess } = useWaitForTransactionReceipt({
-    hash: approveHash,
-  });
-
-  // Buy ticket
-  const { writeContract: buyTicket, data: buyHash } = useWriteContract();
-  const { isLoading: isBuyLoading, isSuccess: isBuySuccess } = useWaitForTransactionReceipt({
-    hash: buyHash,
-  });
+  // Approve and buy with writeContractAsync for better flow control
+  const { writeContractAsync: approveUSDC } = useWriteContract();
+  const { writeContractAsync: buyTicket } = useWriteContract();
+  const [isProcessing, setIsProcessing] = useState(false);
 
   // Parse round info
   // getCurrentRoundInfo returns: roundId, endTime, totalPlayers, totalUSDC, timeLeft, state
@@ -105,7 +98,6 @@ export const useLotteryContract = () => {
       try {
         await switchChain({ chainId: BASE_MAINNET_CHAIN_ID });
         console.log("✅ Network switched to Base");
-        // Wait for wagmi hooks to update
         await new Promise(resolve => setTimeout(resolve, 500));
         console.log("✅ Waited for chain state update");
       } catch (error) {
@@ -119,20 +111,20 @@ export const useLotteryContract = () => {
       }
     }
 
+    setIsProcessing(true);
 
     try {
-      // Refetch allowance to get latest value (approval allowed regardless of round state)
+      // Check current allowance
       const { data: currentAllowance } = await refetchAllowance();
       const hasCurrentAllowance = currentAllowance && (currentAllowance as bigint) >= TICKET_PRICE;
       console.log("💰 Current allowance:", currentAllowance?.toString(), "| Required:", TICKET_PRICE.toString(), "| Has allowance:", hasCurrentAllowance);
 
-      // If no allowance, trigger approval flow and exit (we'll auto-continue after approval if round is open)
+      // If allowance < 1 USDC, approve exactly 1 USDC
       if (!hasCurrentAllowance) {
-        setIsApproving(true);
-        console.log("📝 Starting USDC approval...");
-        toast({ title: "Approve USDC...", description: "Please confirm the transaction in your wallet" });
+        console.log("📝 Approving exactly 1 USDC...");
+        toast({ title: "Approve USDC", description: "Please confirm the approval in your wallet" });
 
-        approveUSDC({
+        const approveHash = await approveUSDC({
           address: USDC_ADDRESS,
           abi: (ERC20ABI as { abi: Abi }).abi,
           functionName: "approve",
@@ -141,24 +133,19 @@ export const useLotteryContract = () => {
           chain: base,
           chainId: BASE_MAINNET_CHAIN_ID,
         });
-        return;
+
+        console.log("✅ Approval confirmed:", approveHash);
+        toast({ title: "USDC approved!", description: "Now buying ticket..." });
+        
+        // Wait a bit for allowance to update
+        await new Promise(resolve => setTimeout(resolve, 500));
       }
 
-      // If allowance is sufficient but round isn't open, inform user and exit
-      if (!isOpen) {
-        const stateText = roundState === 1 ? "drawing" : roundState === 2 ? "finished" : "not open";
-        console.log(`ℹ️ Approved but round is ${stateText}`);
-        toast({
-          title: `Round is ${stateText}`,
-          description: "USDC already approved. You'll be able to buy as soon as the next round opens.",
-        });
-        return;
-      }
-
-      // Buy ticket directly if already approved and round open
-      console.log("🎟️ Already approved, buying ticket...");
-      toast({ title: "Buying ticket...", description: "Please confirm the transaction in your wallet" });
-      buyTicket({
+      // Buy ticket (either already had allowance, or just approved)
+      console.log("🎟️ Buying ticket...");
+      toast({ title: "Buying ticket", description: "Please confirm the transaction in your wallet" });
+      
+      const buyHash = await buyTicket({
         address: FIFTY_FIFTY_RAFFLE_ADDRESS as `0x${string}`,
         abi: FiftyFiftyRaffleABI as unknown as Abi,
         functionName: "buyTicket",
@@ -167,74 +154,28 @@ export const useLotteryContract = () => {
         chainId: BASE_MAINNET_CHAIN_ID,
       });
 
+      console.log("✅ Ticket purchased:", buyHash);
+      toast({ 
+        title: "🎟️ Ticket purchased!",
+        description: "Good luck in the draw!"
+      });
+
+      // Refetch data
+      refetchRoundInfo();
+      refetchAllowance();
+
     } catch (error: any) {
       console.log("❌ Transaction failed:", error);
       toast({
         title: "Transaction failed",
-        description: error.message,
+        description: error.message || "Please try again",
         variant: "destructive"
       });
-      setIsApproving(false);
+    } finally {
+      setIsProcessing(false);
     }
   };
 
-  // Handle approval success - automatically buy ticket
-  useEffect(() => {
-    const autoBuyAfterApproval = async () => {
-      if (isApprovalSuccess && isApproving) {
-        console.log("✅ Approval confirmed! Hash:", approveHash);
-        setIsApproving(false);
-        
-        // Wait for allowance to update
-        console.log("🔄 Refetching allowance...");
-        await refetchAllowance();
-        
-        // Small delay to ensure state is updated
-        await new Promise(resolve => setTimeout(resolve, 300));
-
-        if (!isOpen) {
-          console.log("ℹ️ Approval done, but round not open. Skipping auto-buy.");
-          toast({
-            title: "USDC approved!",
-            description: "Round is closed. You can buy as soon as the next round opens.",
-          });
-          return;
-        }
-        
-        toast({ 
-          title: "USDC approved!", 
-          description: "Buying ticket now..." 
-        });
-        
-        console.log("🎟️ Auto-buying ticket after approval...");
-        // Automatically proceed to buy ticket
-        buyTicket({
-          address: FIFTY_FIFTY_RAFFLE_ADDRESS as `0x${string}`,
-          abi: FiftyFiftyRaffleABI as unknown as Abi,
-          functionName: "buyTicket",
-          account: address,
-          chain: base,
-          chainId: BASE_MAINNET_CHAIN_ID,
-        });
-      }
-    };
-    
-    autoBuyAfterApproval();
-  }, [isApprovalSuccess, isApproving, refetchAllowance, address, buyTicket, approveHash]);
-
-  // Handle buy success
-  useEffect(() => {
-    if (isBuySuccess && !isApproving) {
-      console.log("✅ Ticket purchase confirmed! Hash:", buyHash);
-      toast({ 
-        title: "🎟️ Ticket purchased successfully!",
-        description: "Good luck in the draw!"
-      });
-      // Immediately refetch round info
-      refetchRoundInfo();
-      refetchAllowance();
-    }
-  }, [isBuySuccess, isApproving, refetchRoundInfo, refetchAllowance, buyHash]);
 
   return {
     roundId,
@@ -248,6 +189,6 @@ export const useLotteryContract = () => {
     handleBuyTicket,
     refetchRoundInfo,
     refetchAllowance,
-    isLoading: isApprovalLoading || isBuyLoading || isApproving,
+    isLoading: isProcessing,
   };
 };
