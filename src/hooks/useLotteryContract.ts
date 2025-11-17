@@ -66,11 +66,13 @@ export const useLotteryContract = () => {
   });
 
   // Parse round info
+  // getCurrentRoundInfo returns: roundId, endTime, totalPlayers, totalUSDC, timeLeft, state
   const roundId = roundInfo ? Number(roundInfo[0]) : 0;
-  const totalUSDC = roundInfo ? formatUnits(roundInfo[1] as bigint, 6) : "0";
-  const totalURIM = roundInfo ? formatUnits(roundInfo[2] as bigint, 6) : "0";
-  const roundTimeLeft = roundInfo ? Number(roundInfo[3]) : 0;
-  const isOpen = roundInfo ? roundInfo[4] : false;
+  const totalPlayers = roundInfo ? Number(roundInfo[2]) : 0;
+  const totalUSDC = roundInfo ? formatUnits(roundInfo[3] as bigint, 6) : "0";
+  const roundTimeLeft = roundInfo ? Number(roundInfo[4]) : 0;
+  const roundState = roundInfo ? Number(roundInfo[5]) : 0; // 0=OPEN, 1=DRAWING, 2=FINISHED
+  const isOpen = roundState === 0;
 
   const isCorrectNetwork = chain?.id === BASE_MAINNET_CHAIN_ID;
   const hasAllowance = allowance && (allowance as bigint) >= TICKET_PRICE;
@@ -105,10 +107,11 @@ export const useLotteryContract = () => {
     }
 
     if (!isOpen) {
+      const stateText = roundState === 1 ? "drawing" : roundState === 2 ? "finished" : "not open";
       toast({ 
-        title: "Round is not open", 
+        title: `Round is ${stateText}`, 
         description: "Please wait for the next round to start",
-        variant: "destructive" 
+        variant: "destructive"
       });
       return;
     }
@@ -181,13 +184,15 @@ export const useLotteryContract = () => {
   return {
     roundId,
     totalUSDC,
-    totalURIM,
+    totalPlayers,
     roundTimeLeft,
     isOpen,
+    roundState,
     isCorrectNetwork,
     hasAllowance,
     handleBuyTicket,
     refetchRoundInfo,
+    refetchAllowance,
     isLoading: isApprovalLoading || isBuyLoading || isApproving,
   };
 };
