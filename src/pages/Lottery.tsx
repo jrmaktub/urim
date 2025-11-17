@@ -21,12 +21,11 @@ const Lottery = () => {
   const {
     roundId,
     totalUSDC,
-    totalURIM,
+    totalPlayers,
     roundTimeLeft,
     isOpen,
-    isCorrectNetwork,
+    roundState,
     handleBuyTicket,
-    refetchRoundInfo,
     isLoading,
   } = useLotteryContract();
 
@@ -244,15 +243,17 @@ const Lottery = () => {
                       <p className="text-2xl font-bold">
                         {parseFloat(totalUSDC).toFixed(2)} <span className="text-lg text-muted-foreground">USDC</span>
                       </p>
-                      <p className="text-xl font-semibold text-primary/80">
-                        {parseFloat(totalURIM) > 0 ? parseFloat(totalURIM).toFixed(2) : "1,250.00"} <span className="text-sm text-muted-foreground">URIM</span>
-                      </p>
                     </div>
                   </div>
                   
                   <div className="h-px bg-border/50" />
                   
-                  <p className="text-xs text-muted-foreground">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">Players</span>
+                    <span className="text-xl font-semibold">{totalPlayers}</span>
+                  </div>
+                  
+                  <p className="text-xs text-muted-foreground mt-4">
                     Winner receives 50% of the pot. The other 50% funds URIM development.
                   </p>
                 </div>
@@ -433,11 +434,15 @@ const RecentWinnerPill = ({ roundId }: { roundId: number }) => {
     chainId: 8453, // Base mainnet
   });
 
-  if (!roundResult || !roundResult[3]) return null; // Not completed
+  if (!roundResult) return null;
 
-  const winner = roundResult[0] as string;
-  const usdcPayout = (parseFloat(roundResult[1].toString()) / 1e6).toFixed(2);
-  const urimPayout = (parseFloat(roundResult[2].toString()) / 1e6).toFixed(2);
+  // RoundResult struct: { winner, totalPotUSDC, winnerPayoutUSDC, timestamp }
+  const result = roundResult as { winner: string; totalPotUSDC: bigint; winnerPayoutUSDC: bigint; timestamp: bigint };
+  const winner = result.winner;
+  const winnerPayout = (parseFloat(result.winnerPayoutUSDC.toString()) / 1e6).toFixed(2);
+  
+  // If winner is zero address, round hasn't completed
+  if (winner === "0x0000000000000000000000000000000000000000") return null;
 
   return (
     <motion.div
@@ -452,10 +457,8 @@ const RecentWinnerPill = ({ roundId }: { roundId: number }) => {
       <p className="text-xs font-mono text-foreground/80 mb-2">
         {winner.slice(0, 6)}...{winner.slice(-4)}
       </p>
-      <div className="flex gap-2 text-xs">
-        <span className="text-primary font-semibold">{usdcPayout} USDC</span>
-        <span className="text-muted-foreground">+</span>
-        <span className="text-secondary font-semibold">{urimPayout} URIM</span>
+      <div className="text-xs">
+        <span className="text-primary font-semibold">{winnerPayout} USDC</span>
       </div>
     </motion.div>
   );
