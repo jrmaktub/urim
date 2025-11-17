@@ -45,7 +45,7 @@ export const useLotteryContract = () => {
   // Read USDC allowance
   const { data: allowance, refetch: refetchAllowance } = useReadContract({
     address: USDC_ADDRESS,
-    abi: ERC20ABI as unknown as Abi,
+    abi: (ERC20ABI as { abi: Abi }).abi,
     functionName: "allowance",
     args: address ? [address, FIFTY_FIFTY_RAFFLE_ADDRESS] : undefined,
     chainId: BASE_MAINNET_CHAIN_ID,
@@ -119,16 +119,6 @@ export const useLotteryContract = () => {
       }
     }
 
-    if (!isOpen) {
-      const stateText = roundState === 1 ? "drawing" : roundState === 2 ? "finished" : "not open";
-      console.log(`❌ Round is ${stateText}`);
-      toast({ 
-        title: `Round is ${stateText}`, 
-        description: "Please wait for the next round to start",
-        variant: "destructive"
-      });
-      return;
-    }
 
     try {
       // Refetch allowance to get latest value (approval allowed regardless of round state)
@@ -144,7 +134,7 @@ export const useLotteryContract = () => {
 
         approveUSDC({
           address: USDC_ADDRESS,
-          abi: ERC20ABI as unknown as Abi,
+          abi: (ERC20ABI as { abi: Abi }).abi,
           functionName: "approve",
           args: [FIFTY_FIFTY_RAFFLE_ADDRESS, maxUint256],
           account: address,
