@@ -88,6 +88,12 @@ export const useLotteryContract = () => {
       return;
     }
 
+    if (!address) {
+      console.log("❌ No address yet, prompting connect modal again");
+      openConnectModal?.();
+      return;
+    }
+
     // Force Base Mainnet
     if (chain?.id !== BASE_MAINNET_CHAIN_ID) {
       console.log(`⚠️ Wrong network: ${chain?.id}, switching to Base (${BASE_MAINNET_CHAIN_ID})`);
