@@ -1,19 +1,21 @@
 import { useState, useEffect } from "react";
 import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt, useWatchContractEvent, useSwitchChain } from "wagmi";
 import { toast } from "@/hooks/use-toast";
-import { formatUnits, type Abi } from "viem";
+import { formatUnits, type Abi, maxUint256 } from "viem";
 import { base } from "wagmi/chains";
+import { useConnectModal } from "@rainbow-me/rainbowkit";
 import FiftyFiftyRaffleABI from "@/contracts/FiftyFiftyRaffle.json";
 import ERC20ABI from "@/contracts/ERC20.json";
 import { FIFTY_FIFTY_RAFFLE_ADDRESS } from "@/constants/lottery";
 
 const BASE_MAINNET_CHAIN_ID = 8453;
 const USDC_ADDRESS = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913" as `0x${string}`;
-const TICKET_PRICE = BigInt(1_000_000); // 1 USDC (6 decimals)
+const TICKET_PRICE = BigInt(5_000_000); // 5 USDC (6 decimals)
 
 export const useLotteryContract = () => {
   const { address, isConnected, chain } = useAccount();
   const { switchChain } = useSwitchChain();
+  const { openConnectModal } = useConnectModal();
   const [isApproving, setIsApproving] = useState(false);
 
   // Read current round info
@@ -79,11 +81,7 @@ export const useLotteryContract = () => {
 
   const handleBuyTicket = async () => {
     if (!isConnected) {
-      toast({ 
-        title: "Please connect your wallet",
-        description: "Connect your wallet to purchase tickets",
-        variant: "destructive" 
-      });
+      openConnectModal?.();
       return;
     }
 
@@ -102,8 +100,9 @@ export const useLotteryContract = () => {
           description: "Please manually switch to Base Mainnet",
           variant: "destructive"
         });
+        return;
       }
-      return;
+      // continue after successful switch
     }
 
     if (!isOpen) {
@@ -126,7 +125,7 @@ export const useLotteryContract = () => {
           address: USDC_ADDRESS,
           abi: ERC20ABI as unknown as Abi,
           functionName: "approve",
-          args: [FIFTY_FIFTY_RAFFLE_ADDRESS, TICKET_PRICE],
+          args: [FIFTY_FIFTY_RAFFLE_ADDRESS, maxUint256],
           account: address,
           chain: base,
           chainId: BASE_MAINNET_CHAIN_ID,
