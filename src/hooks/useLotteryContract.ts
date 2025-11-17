@@ -125,18 +125,17 @@ export const useLotteryContract = () => {
     }
 
     try {
-      // Refetch allowance to get latest value
+      // Refetch allowance to get latest value (approval allowed regardless of round state)
       const { data: currentAllowance } = await refetchAllowance();
       const hasCurrentAllowance = currentAllowance && (currentAllowance as bigint) >= TICKET_PRICE;
-      
       console.log("💰 Current allowance:", currentAllowance?.toString(), "| Required:", TICKET_PRICE.toString(), "| Has allowance:", hasCurrentAllowance);
 
-      // Check if approval is needed
+      // If no allowance, trigger approval flow and exit (we'll auto-continue after approval if round is open)
       if (!hasCurrentAllowance) {
         setIsApproving(true);
         console.log("📝 Starting USDC approval...");
         toast({ title: "Approve USDC...", description: "Please confirm the transaction in your wallet" });
-        
+
         approveUSDC({
           address: USDC_ADDRESS,
           abi: ERC20ABI as unknown as Abi,
@@ -146,11 +145,21 @@ export const useLotteryContract = () => {
           chain: base,
           chainId: BASE_MAINNET_CHAIN_ID,
         });
-        
         return;
       }
 
-      // Buy ticket directly if already approved
+      // If allowance is sufficient but round isn't open, inform user and exit
+      if (!isOpen) {
+        const stateText = roundState === 1 ? "drawing" : roundState === 2 ? "finished" : "not open";
+        console.log(`ℹ️ Approved but round is ${stateText}`);
+        toast({
+          title: `Round is ${stateText}`,
+          description: "USDC already approved. You'll be able to buy as soon as the next round opens.",
+        });
+        return;
+      }
+
+      // Buy ticket directly if already approved and round open
       console.log("🎟️ Already approved, buying ticket...");
       toast({ title: "Buying ticket...", description: "Please confirm the transaction in your wallet" });
       buyTicket({
@@ -161,13 +170,13 @@ export const useLotteryContract = () => {
         chain: base,
         chainId: BASE_MAINNET_CHAIN_ID,
       });
-      
+
     } catch (error: any) {
       console.log("❌ Transaction failed:", error);
-      toast({ 
-        title: "Transaction failed", 
-        description: error.message, 
-        variant: "destructive" 
+      toast({
+        title: "Transaction failed",
+        description: error.message,
+        variant: "destructive"
       });
       setIsApproving(false);
     }
@@ -186,6 +195,15 @@ export const useLotteryContract = () => {
         
         // Small delay to ensure state is updated
         await new Promise(resolve => setTimeout(resolve, 300));
+
+        if (!isOpen) {
+          console.log("ℹ️ Approval done, but round not open. Skipping auto-buy.");
+          toast({
+            title: "USDC approved!",
+            description: "Round is closed. You can buy as soon as the next round opens.",
+          });
+          return;
+        }
         
         toast({ 
           title: "USDC approved!", 
