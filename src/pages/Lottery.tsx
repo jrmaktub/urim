@@ -324,7 +324,7 @@ const Lottery = () => {
                     <span className="text-xs font-bold text-primary">1</span>
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    Each ticket costs <span className="font-semibold text-foreground">$5</span> (1 ticket = 1 entry into the current round).
+                    Each ticket costs <span className="font-semibold text-foreground">$1</span> (1 ticket = 1 entry into the current round).
                   </p>
                 </div>
                 <div className="flex gap-3">
