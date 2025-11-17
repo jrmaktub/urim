@@ -156,17 +156,27 @@ export const useLotteryContract = () => {
     }
   };
 
-  // Handle approval success
+  // Handle approval success - automatically buy ticket
   useEffect(() => {
     if (isApprovalSuccess && isApproving) {
       setIsApproving(false);
       refetchAllowance();
       toast({ 
         title: "USDC approved!", 
-        description: "Click 'Buy Ticket' again to complete your purchase" 
+        description: "Buying ticket now..." 
+      });
+      
+      // Automatically proceed to buy ticket
+      buyTicket({
+        address: FIFTY_FIFTY_RAFFLE_ADDRESS as `0x${string}`,
+        abi: FiftyFiftyRaffleABI as unknown as Abi,
+        functionName: "buyTicket",
+        account: address,
+        chain: base,
+        chainId: BASE_MAINNET_CHAIN_ID,
       });
     }
-  }, [isApprovalSuccess, isApproving, refetchAllowance]);
+  }, [isApprovalSuccess, isApproving, refetchAllowance, address]);
 
   // Handle buy success
   useEffect(() => {
