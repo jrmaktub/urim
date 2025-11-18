@@ -1,0 +1,24 @@
+{
+  "accountAssociation": {
+    "header": "",
+    "payload": "",
+    "signature": ""
+  },
+  "baseBuilder": {
+    "ownerAddress": "0x791C77ef827eEe7aa8cAB3A12254F50538935fe0"
+  },
+  "miniapp": {
+    "version": "1",
+    "name": "Urim",
+    "homeUrl": "https://urim.live",
+    "iconUrl": "https://urim.live/icon.png",
+    "splashImageUrl": "https://urim.live/splash.png",
+    "splashBackgroundColor": "#141414",
+    "subtitle": "Predict and earn",
+    "description": "Predict the quantum reality markets",
+    "heroImageUrl": "https://urim.live/hero.png",
+    "tagline": "Predict Quantum Futures",
+    "primaryCategory": "finance",
+    "tags": ["defi", "prediction", "base"]
+  }
+}
