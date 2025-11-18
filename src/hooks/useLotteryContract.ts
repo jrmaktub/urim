@@ -143,7 +143,7 @@ export const useLotteryContract = () => {
 
       // Step 2: If insufficient allowance, approve USDC
       if (!hasCurrentAllowance) {
-        console.log("📝 Approving 50 USDC (for multiple tickets)...");
+        console.log("📝 Approving 5 USDC for ticket purchase...");
         toast({ 
           title: "Step 1 of 2: Approve USDC", 
           description: "Please confirm the approval in your wallet",
@@ -155,7 +155,7 @@ export const useLotteryContract = () => {
             address: USDC_ADDRESS,
             abi: (ERC20ABI as { abi: Abi }).abi,
             functionName: "approve",
-            args: [FIFTY_FIFTY_RAFFLE_ADDRESS, BigInt(50_000_000)], // Approve 50 USDC for multiple tickets
+            args: [FIFTY_FIFTY_RAFFLE_ADDRESS, BigInt(5_000_000)], // Approve 5 USDC (exact ticket price)
             account: address,
             chain: base,
             chainId: BASE_MAINNET_CHAIN_ID,
