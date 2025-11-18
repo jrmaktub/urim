@@ -94,13 +94,13 @@ const Lottery = () => {
       
       <Navigation />
       
-      <main className="pt-20 pb-12 px-4 md:px-6 relative z-10">
+      <main className="pt-24 sm:pt-20 pb-12 px-4 md:px-6 relative z-10">
         <div className="max-w-7xl mx-auto">
           {/* Hero Section */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="text-center mb-16 relative"
+            className="text-center mb-12 sm:mb-16 relative"
           >
             {/* Quantum Orbit Effect - More Visible */}
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none overflow-visible">
@@ -163,7 +163,7 @@ const Lottery = () => {
                 Powered by Chainlink VRF • Base Sepolia
               </span>
             </div>
-            <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-3 md:mb-4 relative z-10 px-2">
+            <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-3 md:mb-4 relative z-10 px-2 leading-tight">
               Quantum 50/50 Lottery
             </h1>
             <p className="text-sm sm:text-base md:text-lg text-muted-foreground max-w-2xl mx-auto relative z-10 px-4">
