@@ -324,7 +324,7 @@ const Lottery = () => {
                     <span className="text-xs font-bold text-primary">1</span>
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    Each ticket costs <span className="font-semibold text-foreground">$1</span> (1 ticket = 1 entry into the current round).
+                    Each ticket costs <span className="font-semibold text-foreground">$5</span> (1 ticket = 1 entry into the current round).
                   </p>
                 </div>
                 <div className="flex gap-3">
@@ -379,7 +379,7 @@ const Lottery = () => {
                       <Copy className="w-3.5 h-3.5" />
                     </button>
                     <a
-                      href={`https://base-sepolia.blockscout.com/address/${FIFTY_FIFTY_RAFFLE_ADDRESS}`}
+                      href="https://basescan.org/address/0xFC448fF766bC5d4d01cF0d15cb20f5aA2400A3DA"
                       target="_blank"
                       rel="noopener noreferrer"
                       className="p-1.5 hover:bg-secondary rounded transition-colors"
