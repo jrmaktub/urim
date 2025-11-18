@@ -10,7 +10,7 @@ import { FIFTY_FIFTY_RAFFLE_ADDRESS } from "@/constants/lottery";
 
 const BASE_MAINNET_CHAIN_ID = 8453;
 const USDC_ADDRESS = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913" as `0x${string}`;
-const TICKET_PRICE = BigInt(1_000_000); // 1 USDC (6 decimals)
+const TICKET_PRICE = BigInt(5_000_000); // 5 USDC (6 decimals)
 
 export const useLotteryContract = () => {
   const { address, isConnected, chain } = useAccount();
