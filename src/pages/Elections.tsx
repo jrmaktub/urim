@@ -150,124 +150,126 @@ const Elections = () => {
             {/* Candidate Cards */}
             <div className="space-y-4 animate-fade-up">
               {candidates.map((candidate, index) => (
-                <div
-                  key={candidate.id}
-                  onClick={() => setSelectedCandidate(candidate)}
-                  className={`glass-card p-6 hover:border-primary/50 transition-all cursor-pointer ${
-                    selectedCandidate.id === candidate.id ? "border-primary" : ""
-                  }`}
-                  style={{ animationDelay: `${index * 100}ms` }}
-                >
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                    <div className="flex items-center gap-4 flex-1">
-                      <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary/20 to-secondary overflow-hidden border-2 border-primary/30">
-                        <img
-                          src={candidate.image}
-                          alt={candidate.name}
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
-                      <div className="flex-1">
-                        <h3 className="text-xl font-semibold text-foreground mb-1">
-                          {candidate.name}
-                        </h3>
-                        <div className="flex items-center gap-4 text-sm">
-                          <div className="flex items-center gap-1 text-muted-foreground">
-                            <TrendingUp className="w-4 h-4" />
-                            <span className="text-primary font-bold text-lg">{candidate.percentage}%</span>
+                <div key={candidate.id} style={{ animationDelay: `${index * 100}ms` }}>
+                  <div
+                    onClick={() => setSelectedCandidate(candidate)}
+                    className={`glass-card p-6 hover:border-primary/50 transition-all cursor-pointer ${
+                      selectedCandidate.id === candidate.id ? "border-primary" : ""
+                    }`}
+                  >
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                      <div className="flex items-center gap-4 flex-1">
+                        <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary/20 to-secondary overflow-hidden border-2 border-primary/30">
+                          <img
+                            src={candidate.image}
+                            alt={candidate.name}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                        <div className="flex-1">
+                          <h3 className="text-xl font-semibold text-foreground mb-1">
+                            {candidate.name}
+                          </h3>
+                          <div className="flex items-center gap-4 text-sm">
+                            <div className="flex items-center gap-1 text-muted-foreground">
+                              <TrendingUp className="w-4 h-4" />
+                              <span className="text-primary font-bold text-lg">{candidate.percentage}%</span>
+                            </div>
+                            <div className="flex items-center gap-1 text-muted-foreground">
+                              <Users className="w-4 h-4" />
+                              <span>{candidate.volume}</span>
+                            </div>
                           </div>
-                          <div className="flex items-center gap-1 text-muted-foreground">
-                            <Users className="w-4 h-4" />
-                            <span>{candidate.volume}</span>
+                        </div>
+                      </div>
+                      <div className="flex gap-2 w-full sm:w-auto">
+                        <Button
+                          onClick={() => {
+                            setSelectedCandidate(candidate);
+                            setTradeType("YES");
+                          }}
+                          className="flex-1 sm:flex-none bg-green-600 hover:bg-green-700 text-white border-0"
+                        >
+                          Buy YES
+                        </Button>
+                        <Button
+                          onClick={() => {
+                            setSelectedCandidate(candidate);
+                            setTradeType("NO");
+                          }}
+                          className="flex-1 sm:flex-none bg-red-600 hover:bg-red-700 text-white border-0"
+                        >
+                          Buy NO
+                        </Button>
+                      </div>
+                    </div>
+                    {/* Percentage bar */}
+                    <div className="mt-4 h-2 bg-muted rounded-full overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all duration-1000"
+                        style={{
+                          width: `${candidate.percentage}%`,
+                          backgroundColor: candidate.color,
+                        }}
+                      />
+                    </div>
+                  </div>
+                  
+                  {/* Order Book - Shows under selected candidate */}
+                  {selectedCandidate.id === candidate.id && (
+                    <div className="glass-card p-6 mt-4">
+                      <h2 className="text-2xl font-bold text-foreground mb-6">
+                        Order Book - {selectedCandidate.name}
+                      </h2>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {/* YES Orders */}
+                        <div>
+                          <h3 className="text-lg font-semibold text-green-500 mb-4">YES Orders</h3>
+                          <div className="space-y-2">
+                            <div className="grid grid-cols-3 gap-2 text-xs font-semibold text-muted-foreground mb-2">
+                              <div>Price</div>
+                              <div className="text-right">Shares</div>
+                              <div className="text-right">Total</div>
+                            </div>
+                            {yesOrders.map((order, idx) => (
+                              <div
+                                key={idx}
+                                className="grid grid-cols-3 gap-2 text-sm bg-green-500/5 hover:bg-green-500/10 p-2 rounded-lg transition-colors"
+                              >
+                                <div className="text-green-500 font-medium">{order.price}</div>
+                                <div className="text-right text-foreground">{order.shares}</div>
+                                <div className="text-right text-muted-foreground">{order.total}</div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* NO Orders */}
+                        <div>
+                          <h3 className="text-lg font-semibold text-red-500 mb-4">NO Orders</h3>
+                          <div className="space-y-2">
+                            <div className="grid grid-cols-3 gap-2 text-xs font-semibold text-muted-foreground mb-2">
+                              <div>Price</div>
+                              <div className="text-right">Shares</div>
+                              <div className="text-right">Total</div>
+                            </div>
+                            {noOrders.map((order, idx) => (
+                              <div
+                                key={idx}
+                                className="grid grid-cols-3 gap-2 text-sm bg-red-500/5 hover:bg-red-500/10 p-2 rounded-lg transition-colors"
+                              >
+                                <div className="text-red-500 font-medium">{order.price}</div>
+                                <div className="text-right text-foreground">{order.shares}</div>
+                                <div className="text-right text-muted-foreground">{order.total}</div>
+                              </div>
+                            ))}
                           </div>
                         </div>
                       </div>
                     </div>
-                    <div className="flex gap-2 w-full sm:w-auto">
-                      <Button
-                        onClick={() => {
-                          setSelectedCandidate(candidate);
-                          setTradeType("YES");
-                        }}
-                        className="flex-1 sm:flex-none bg-green-600 hover:bg-green-700 text-white border-0"
-                      >
-                        Buy YES
-                      </Button>
-                      <Button
-                        onClick={() => {
-                          setSelectedCandidate(candidate);
-                          setTradeType("NO");
-                        }}
-                        className="flex-1 sm:flex-none bg-red-600 hover:bg-red-700 text-white border-0"
-                      >
-                        Buy NO
-                      </Button>
-                    </div>
-                  </div>
-                  {/* Percentage bar */}
-                  <div className="mt-4 h-2 bg-muted rounded-full overflow-hidden">
-                    <div
-                      className="h-full rounded-full transition-all duration-1000"
-                      style={{
-                        width: `${candidate.percentage}%`,
-                        backgroundColor: candidate.color,
-                      }}
-                    />
-                  </div>
+                  )}
                 </div>
               ))}
-            </div>
-
-            {/* Order Book */}
-            <div className="glass-card p-6">
-              <h2 className="text-2xl font-bold text-foreground mb-6">
-                Order Book - {selectedCandidate.name}
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* YES Orders */}
-                <div>
-                  <h3 className="text-lg font-semibold text-green-500 mb-4">YES Orders</h3>
-                  <div className="space-y-2">
-                    <div className="grid grid-cols-3 gap-2 text-xs font-semibold text-muted-foreground mb-2">
-                      <div>Price</div>
-                      <div className="text-right">Shares</div>
-                      <div className="text-right">Total</div>
-                    </div>
-                    {yesOrders.map((order, idx) => (
-                      <div
-                        key={idx}
-                        className="grid grid-cols-3 gap-2 text-sm bg-green-500/5 hover:bg-green-500/10 p-2 rounded-lg transition-colors"
-                      >
-                        <div className="text-green-500 font-medium">{order.price}</div>
-                        <div className="text-right text-foreground">{order.shares}</div>
-                        <div className="text-right text-muted-foreground">{order.total}</div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* NO Orders */}
-                <div>
-                  <h3 className="text-lg font-semibold text-red-500 mb-4">NO Orders</h3>
-                  <div className="space-y-2">
-                    <div className="grid grid-cols-3 gap-2 text-xs font-semibold text-muted-foreground mb-2">
-                      <div>Price</div>
-                      <div className="text-right">Shares</div>
-                      <div className="text-right">Total</div>
-                    </div>
-                    {noOrders.map((order, idx) => (
-                      <div
-                        key={idx}
-                        className="grid grid-cols-3 gap-2 text-sm bg-red-500/5 hover:bg-red-500/10 p-2 rounded-lg transition-colors"
-                      >
-                        <div className="text-red-500 font-medium">{order.price}</div>
-                        <div className="text-right text-foreground">{order.shares}</div>
-                        <div className="text-right text-muted-foreground">{order.total}</div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
             </div>
 
             {/* Rules Summary */}
