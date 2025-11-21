@@ -3,8 +3,7 @@ import Navigation from "@/components/Navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { ChevronDown, ExternalLink, TrendingUp, Users, Clock } from "lucide-react";
+import { ExternalLink, TrendingUp, Users, Clock } from "lucide-react";
 
 // Placeholder candidate data
 const candidates = [
@@ -52,7 +51,6 @@ const Elections = () => {
   const [selectedCandidate, setSelectedCandidate] = useState(candidates[0]);
   const [tradeAmount, setTradeAmount] = useState("");
   const [tradeType, setTradeType] = useState<"YES" | "NO">("YES");
-  const [rulesOpen, setRulesOpen] = useState(false);
 
   return (
     <div className="min-h-screen bg-background">
@@ -73,12 +71,87 @@ const Elections = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-8">
+            {/* Graph Section */}
+            <div className="glass-card p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-foreground">Price Chart</h2>
+                <Tabs value={timeRange} onValueChange={setTimeRange}>
+                  <TabsList className="bg-secondary/40">
+                    {["1H", "6H", "1D", "1W", "1M", "ALL"].map((range) => (
+                      <TabsTrigger
+                        key={range}
+                        value={range}
+                        className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                      >
+                        {range}
+                      </TabsTrigger>
+                    ))}
+                  </TabsList>
+                </Tabs>
+              </div>
+              
+              {/* Placeholder Graph */}
+              <div className="relative h-64 sm:h-80 bg-card/50 rounded-xl border border-border/50 overflow-hidden">
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <svg className="w-full h-full" viewBox="0 0 800 300">
+                    {/* Grid lines */}
+                    {[0, 1, 2, 3, 4].map((i) => (
+                      <line
+                        key={i}
+                        x1="0"
+                        y1={i * 60 + 30}
+                        x2="800"
+                        y2={i * 60 + 30}
+                        stroke="hsl(var(--border))"
+                        strokeWidth="1"
+                        opacity="0.3"
+                      />
+                    ))}
+                    
+                    {/* Selected candidate line */}
+                    {(() => {
+                      const points = Array.from({ length: 20 }, (_, i) => {
+                        const x = (i * 800) / 19;
+                        const baseY = 150 - (selectedCandidate.percentage - 32) * 3;
+                        const variance = Math.sin(i * 0.5) * 20;
+                        return `${x},${baseY + variance}`;
+                      }).join(" ");
+                      
+                      return (
+                        <polyline
+                          points={points}
+                          fill="none"
+                          stroke={selectedCandidate.color}
+                          strokeWidth="3"
+                          className="animate-fade-in"
+                        />
+                      );
+                    })()}
+                  </svg>
+                </div>
+                
+                {/* Legend */}
+                <div className="absolute bottom-4 left-4 flex flex-wrap gap-3">
+                  <div className="flex items-center gap-2 bg-background/80 backdrop-blur-sm px-3 py-1.5 rounded-full border border-border/50">
+                    <div
+                      className="w-3 h-3 rounded-full"
+                      style={{ backgroundColor: selectedCandidate.color }}
+                    />
+                    <span className="text-xs font-medium text-foreground">{selectedCandidate.name}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             {/* Candidate Cards */}
             <div className="space-y-4 animate-fade-up">
               {candidates.map((candidate, index) => (
                 <div
                   key={candidate.id}
-                  className="glass-card p-6 hover:border-primary/50 transition-all"
+                  onClick={() => setSelectedCandidate(candidate)}
+                  className={`glass-card p-6 hover:border-primary/50 transition-all cursor-pointer ${
+                    selectedCandidate.id === candidate.id ? "border-primary" : ""
+                  }`}
                   style={{ animationDelay: `${index * 100}ms` }}
                 >
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -141,85 +214,11 @@ const Elections = () => {
               ))}
             </div>
 
-            {/* Graph Section */}
-            <div className="glass-card p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold text-foreground">Price Chart</h2>
-                <Tabs value={timeRange} onValueChange={setTimeRange}>
-                  <TabsList className="bg-secondary/40">
-                    {["1H", "6H", "1D", "1W", "1M", "ALL"].map((range) => (
-                      <TabsTrigger
-                        key={range}
-                        value={range}
-                        className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
-                      >
-                        {range}
-                      </TabsTrigger>
-                    ))}
-                  </TabsList>
-                </Tabs>
-              </div>
-              
-              {/* Placeholder Graph */}
-              <div className="relative h-64 sm:h-80 bg-card/50 rounded-xl border border-border/50 overflow-hidden">
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <svg className="w-full h-full" viewBox="0 0 800 300">
-                    {/* Grid lines */}
-                    {[0, 1, 2, 3, 4].map((i) => (
-                      <line
-                        key={i}
-                        x1="0"
-                        y1={i * 60 + 30}
-                        x2="800"
-                        y2={i * 60 + 30}
-                        stroke="hsl(var(--border))"
-                        strokeWidth="1"
-                        opacity="0.3"
-                      />
-                    ))}
-                    
-                    {/* Candidate lines */}
-                    {candidates.map((candidate, idx) => {
-                      const points = Array.from({ length: 20 }, (_, i) => {
-                        const x = (i * 800) / 19;
-                        const baseY = 150 - (candidate.percentage - 32) * 3;
-                        const variance = Math.sin(i * 0.5 + idx) * 20;
-                        return `${x},${baseY + variance}`;
-                      }).join(" ");
-                      
-                      return (
-                        <polyline
-                          key={candidate.id}
-                          points={points}
-                          fill="none"
-                          stroke={candidate.color}
-                          strokeWidth="3"
-                          className="animate-fade-in"
-                          style={{ animationDelay: `${idx * 200}ms` }}
-                        />
-                      );
-                    })}
-                  </svg>
-                </div>
-                
-                {/* Legend */}
-                <div className="absolute bottom-4 left-4 flex flex-wrap gap-3">
-                  {candidates.map((candidate) => (
-                    <div key={candidate.id} className="flex items-center gap-2 bg-background/80 backdrop-blur-sm px-3 py-1.5 rounded-full border border-border/50">
-                      <div
-                        className="w-3 h-3 rounded-full"
-                        style={{ backgroundColor: candidate.color }}
-                      />
-                      <span className="text-xs font-medium text-foreground">{candidate.name}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-
             {/* Order Book */}
             <div className="glass-card p-6">
-              <h2 className="text-2xl font-bold text-foreground mb-6">Order Book</h2>
+              <h2 className="text-2xl font-bold text-foreground mb-6">
+                Order Book - {selectedCandidate.name}
+              </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* YES Orders */}
                 <div>
@@ -268,44 +267,36 @@ const Elections = () => {
             </div>
 
             {/* Rules Summary */}
-            <Collapsible open={rulesOpen} onOpenChange={setRulesOpen}>
-              <CollapsibleTrigger asChild>
-                <button className="w-full glass-card p-6 hover:border-primary/50 transition-all text-left">
-                  <div className="flex items-center justify-between">
-                    <h2 className="text-2xl font-bold text-foreground">Rules Summary</h2>
-                    <ChevronDown
-                      className={`w-5 h-5 text-muted-foreground transition-transform ${
-                        rulesOpen ? "rotate-180" : ""
-                      }`}
-                    />
-                  </div>
-                </button>
-              </CollapsibleTrigger>
-              <CollapsibleContent>
-                <div className="glass-card p-6 mt-4 space-y-4">
-                  <p className="text-foreground leading-relaxed">
-                    If Salvador Nasralla is elected President of Honduras in 2025, the market resolves to YES.
-                  </p>
-                  <div>
-                    <p className="text-sm font-semibold text-muted-foreground mb-2">Sources used for resolution:</p>
-                    <p className="text-sm text-foreground">
-                      New York Times, AP, Reuters, Politico, Semafor, Washington Post,
-                      Wall Street Journal, ABC, CBS, CNN, Fox News, MSNBC.
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap gap-3 pt-2">
-                    <Button variant="outline" size="sm" className="gap-2">
-                      View full rules
-                      <ExternalLink className="w-4 h-4" />
-                    </Button>
-                    <Button variant="outline" size="sm" className="gap-2">
-                      Help center
-                      <ExternalLink className="w-4 h-4" />
-                    </Button>
-                  </div>
+            <div className="glass-card p-6 space-y-4">
+              <h2 className="text-2xl font-bold text-foreground">Rules Summary</h2>
+              <div className="space-y-4">
+                <p className="text-foreground leading-relaxed">
+                  Presidential elections in Honduras are scheduled for November 30, 2025.
+                </p>
+                <p className="text-foreground leading-relaxed">
+                  This market resolves according to which listed candidate is publicly confirmed as the winner.
+                </p>
+                <p className="text-foreground leading-relaxed">
+                  If the winner is not known by December 31, 2026 at 11:59 PM ET, the market resolves to 'Other'.
+                </p>
+                <p className="text-foreground leading-relaxed">
+                  Winner determination is based on a consensus of credible reporting sources, including Reuters, AP News, BBC, CNN, NYT, and the official announcement from the Honduran National Electoral Council (CNE).
+                </p>
+                <p className="text-foreground leading-relaxed">
+                  If there is conflict or ambiguity, resolution is based on the majority consensus of these sources.
+                </p>
+                <div className="flex flex-wrap gap-3 pt-2">
+                  <Button variant="outline" size="sm" className="gap-2">
+                    View full rules
+                    <ExternalLink className="w-4 h-4" />
+                  </Button>
+                  <Button variant="outline" size="sm" className="gap-2">
+                    Help center
+                    <ExternalLink className="w-4 h-4" />
+                  </Button>
                 </div>
-              </CollapsibleContent>
-            </Collapsible>
+              </div>
+            </div>
 
             {/* Timeline */}
             <div className="glass-card p-6">
@@ -321,8 +312,8 @@ const Elections = () => {
                       <Clock className="w-5 h-5 text-primary" />
                     </div>
                     <div>
-                      <p className="text-sm text-muted-foreground">Market Open</p>
-                      <p className="font-semibold text-foreground">Apr 1, 2025 – 10:00 AM EDT</p>
+                      <p className="text-sm text-muted-foreground">Market Opens</p>
+                      <p className="font-semibold text-foreground">November 24, 2025</p>
                     </div>
                   </div>
                   
@@ -332,7 +323,7 @@ const Elections = () => {
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">Market Closes</p>
-                      <p className="font-semibold text-foreground">After outcome occurs</p>
+                      <p className="font-semibold text-foreground">After the winner is publicly confirmed</p>
                     </div>
                   </div>
                   
@@ -342,7 +333,7 @@ const Elections = () => {
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">Projected Payout</p>
-                      <p className="font-semibold text-foreground">30 minutes after closing</p>
+                      <p className="font-semibold text-foreground">30 minutes after market closes</p>
                     </div>
                   </div>
                 </div>
