@@ -17,11 +17,11 @@ const candidates = [
   },
   {
     id: 2,
-    name: "Xiomara Castro",
+    name: "Rixi Ramona Moncada",
     image: "/placeholder.svg",
     percentage: 32,
     volume: "$89,210",
-    color: "hsl(200 85% 68%)",
+    color: "hsl(0 100% 50%)",
   },
   {
     id: 3,
@@ -29,7 +29,7 @@ const candidates = [
     image: "/placeholder.svg",
     percentage: 24,
     volume: "$62,890",
-    color: "hsl(340 85% 68%)",
+    color: "#0073CF",
   },
 ];
 
