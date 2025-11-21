@@ -17,7 +17,7 @@ const candidates = [
   },
   {
     id: 2,
-    name: "Rixi Ramona Moncada",
+    name: "Rixi Moncada",
     image: "/placeholder.svg",
     percentage: 32,
     volume: "$89,210",
