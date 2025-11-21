@@ -108,37 +108,41 @@ const Elections = () => {
                       />
                     ))}
                     
-                    {/* Selected candidate line */}
-                    {(() => {
+                    {/* All candidate lines */}
+                    {candidates.map((candidate, idx) => {
                       const points = Array.from({ length: 20 }, (_, i) => {
                         const x = (i * 800) / 19;
-                        const baseY = 150 - (selectedCandidate.percentage - 32) * 3;
-                        const variance = Math.sin(i * 0.5) * 20;
+                        const baseY = 150 - (candidate.percentage - 32) * 3;
+                        const variance = Math.sin(i * 0.5 + idx) * 20;
                         return `${x},${baseY + variance}`;
                       }).join(" ");
                       
                       return (
                         <polyline
+                          key={candidate.id}
                           points={points}
                           fill="none"
-                          stroke={selectedCandidate.color}
+                          stroke={candidate.color}
                           strokeWidth="3"
                           className="animate-fade-in"
+                          style={{ animationDelay: `${idx * 200}ms` }}
                         />
                       );
-                    })()}
+                    })}
                   </svg>
                 </div>
                 
                 {/* Legend */}
                 <div className="absolute bottom-4 left-4 flex flex-wrap gap-3">
-                  <div className="flex items-center gap-2 bg-background/80 backdrop-blur-sm px-3 py-1.5 rounded-full border border-border/50">
-                    <div
-                      className="w-3 h-3 rounded-full"
-                      style={{ backgroundColor: selectedCandidate.color }}
-                    />
-                    <span className="text-xs font-medium text-foreground">{selectedCandidate.name}</span>
-                  </div>
+                  {candidates.map((candidate) => (
+                    <div key={candidate.id} className="flex items-center gap-2 bg-background/80 backdrop-blur-sm px-3 py-1.5 rounded-full border border-border/50">
+                      <div
+                        className="w-3 h-3 rounded-full"
+                        style={{ backgroundColor: candidate.color }}
+                      />
+                      <span className="text-xs font-medium text-foreground">{candidate.name}</span>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
@@ -274,16 +278,13 @@ const Elections = () => {
                   Presidential elections in Honduras are scheduled for November 30, 2025.
                 </p>
                 <p className="text-foreground leading-relaxed">
-                  This market resolves according to which listed candidate is publicly confirmed as the winner.
+                  This market resolves according to the candidate who is publicly confirmed as the winner.
                 </p>
                 <p className="text-foreground leading-relaxed">
-                  If the winner is not known by December 31, 2026 at 11:59 PM ET, the market resolves to 'Other'.
+                  If no winner is known by December 31, 2026 at 11:59 PM ET, the market resolves to 'Other'.
                 </p>
                 <p className="text-foreground leading-relaxed">
-                  Winner determination is based on a consensus of credible reporting sources, including Reuters, AP News, BBC, CNN, NYT, and the official announcement from the Honduran National Electoral Council (CNE).
-                </p>
-                <p className="text-foreground leading-relaxed">
-                  If there is conflict or ambiguity, resolution is based on the majority consensus of these sources.
+                  Winner determination is based on a consensus of credible reporting and the official announcement from the Honduran National Electoral Council (CNE). If major sources disagree temporarily, resolution will wait until a clear public consensus emerges.
                 </p>
                 <div className="flex flex-wrap gap-3 pt-2">
                   <Button variant="outline" size="sm" className="gap-2">
@@ -323,7 +324,8 @@ const Elections = () => {
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">Market Closes</p>
-                      <p className="font-semibold text-foreground">After the winner is publicly confirmed</p>
+                      <p className="font-semibold text-foreground">November 30, 2025 at 10:00 PM Honduras time</p>
+                      <p className="text-xs text-muted-foreground mt-1">Winner may not be immediately declared. Payout happens once a winner is publicly confirmed.</p>
                     </div>
                   </div>
                   
@@ -332,18 +334,22 @@ const Elections = () => {
                       <TrendingUp className="w-5 h-5 text-muted-foreground" />
                     </div>
                     <div>
-                      <p className="text-sm text-muted-foreground">Projected Payout</p>
-                      <p className="font-semibold text-foreground">30 minutes after market closes</p>
+                      <p className="text-sm text-muted-foreground">Payout</p>
+                      <p className="font-semibold text-foreground">Once winner is publicly confirmed</p>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* UMA Resolver */}
-            <div className="flex justify-center">
+            {/* Resolver / Verification Link */}
+            <div className="glass-card p-6">
+              <h2 className="text-2xl font-bold text-foreground mb-4">Resolver / Verification</h2>
+              <p className="text-muted-foreground mb-4">
+                Market resolution is verified through decentralized oracle consensus.
+              </p>
               <Button variant="outline" className="gap-2 border-primary/30 hover:border-primary/50">
-                View UMA Oracle Resolver
+                View Oracle Resolver
                 <ExternalLink className="w-4 h-4" />
               </Button>
             </div>
