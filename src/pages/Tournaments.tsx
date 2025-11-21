@@ -1,18 +1,30 @@
-import React from "react";
+import React, { useState } from "react";
 import { motion } from "framer-motion";
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
+import { toast } from "sonner";
 
-const semifinalists = [
-  { id: "S1", name: "Vega", odds: 3.4 },
-  { id: "S2", name: "Ramos", odds: 2.8 },
-  { id: "S3", name: "Luna", odds: 4.1 },
-  { id: "S4", name: "Ortega", odds: 3.7 },
+interface Player {
+  id: string;
+  name: string;
+  pool: number;
+}
+
+const calculateOdds = (pool: number, totalPool: number) => {
+  if (pool === 0) return 99.9;
+  return Math.max(1.1, totalPool / pool);
+};
+
+const INITIAL_SEMIFINALISTS: Player[] = [
+  { id: "S1", name: "Vega", pool: 1000 },
+  { id: "S2", name: "Ramos", pool: 1200 },
+  { id: "S3", name: "Luna", pool: 800 },
+  { id: "S4", name: "Ortega", pool: 900 },
 ];
 
-const finalists = [
-  { id: "F1", name: "Condor", odds: 6.9 },
-  { id: "F2", name: "Pecho", odds: 4.2 },
+const INITIAL_FINALISTS: Player[] = [
+  { id: "F1", name: "Condor", pool: 500 },
+  { id: "F2", name: "Pecho", pool: 800 },
 ];
 
 function BetButton({ onClick }: { onClick: () => void }) {
@@ -26,13 +38,16 @@ function BetButton({ onClick }: { onClick: () => void }) {
   );
 }
 
-interface Player {
-  id: string;
-  name: string;
-  odds: number;
+interface PlayerCardProps {
+  p: Player;
+  totalPool: number;
+  delay?: number;
+  onBet: (playerId: string) => void;
 }
 
-function PlayerCard({ p, delay = 0 }: { p: Player; delay?: number }) {
+function PlayerCard({ p, totalPool, delay = 0, onBet }: PlayerCardProps) {
+  const odds = calculateOdds(p.pool, totalPool);
+  
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
@@ -43,20 +58,28 @@ function PlayerCard({ p, delay = 0 }: { p: Player; delay?: number }) {
     >
       <div className="flex-1">
         <div className="text-[14px] md:text-[15px] font-medium tracking-tight">{p.name}</div>
-        <div className="text-sm md:text-xs text-purple-300/90 font-medium shadow-[0_0_8px_rgba(168,85,247,0.2)]">{p.odds.toFixed(1)}x</div>
+        <div className="text-sm md:text-xs text-purple-300/90 font-medium shadow-[0_0_8px_rgba(168,85,247,0.2)]">{odds.toFixed(1)}x</div>
+        <div className="text-[10px] text-muted-foreground/60 mt-0.5">${p.pool.toLocaleString()} pool</div>
       </div>
-      <BetButton onClick={() => console.log(`Bet on ${p.name} at ${p.odds}x`)} />
+      <BetButton onClick={() => onBet(p.id)} />
     </motion.div>
   );
 }
 
-function MatchPair({ players, delay = 0 }: { players: [Player, Player]; delay?: number }) {
+interface MatchPairProps {
+  players: [Player, Player];
+  totalPool: number;
+  delay?: number;
+  onBet: (playerId: string) => void;
+}
+
+function MatchPair({ players, totalPool, delay = 0, onBet }: MatchPairProps) {
   return (
     <div className="md:hidden w-full max-w-md">
       <div className="flex gap-3 items-center justify-center">
-        <PlayerCard p={players[0]} delay={delay} />
+        <PlayerCard p={players[0]} totalPool={totalPool} delay={delay} onBet={onBet} />
         <div className="text-white/30 font-bold text-sm">VS</div>
-        <PlayerCard p={players[1]} delay={delay + 0.05} />
+        <PlayerCard p={players[1]} totalPool={totalPool} delay={delay + 0.05} onBet={onBet} />
       </div>
     </div>
   );
@@ -228,6 +251,38 @@ function NeonCourtLines() {
 }
 
 export default function TournamentsPage() {
+  const [semifinalists, setSemifinalists] = useState<Player[]>(INITIAL_SEMIFINALISTS);
+  const [finalists, setFinalists] = useState<Player[]>(INITIAL_FINALISTS);
+
+  const semifinalistsTotalPool = semifinalists.reduce((sum, p) => sum + p.pool, 0);
+  const finalistsTotalPool = finalists.reduce((sum, p) => sum + p.pool, 0);
+
+  const handleBet = (playerId: string, isSemifinal: boolean) => {
+    const BET_AMOUNT = 100;
+    
+    if (isSemifinal) {
+      setSemifinalists(prev => prev.map(p => 
+        p.id === playerId 
+          ? { ...p, pool: p.pool + BET_AMOUNT }
+          : p
+      ));
+    } else {
+      setFinalists(prev => prev.map(p => 
+        p.id === playerId 
+          ? { ...p, pool: p.pool + BET_AMOUNT }
+          : p
+      ));
+    }
+    
+    const player = isSemifinal 
+      ? semifinalists.find(p => p.id === playerId)
+      : finalists.find(p => p.id === playerId);
+    
+    toast.success(`Demo bet placed on ${player?.name}!`, {
+      description: `$${BET_AMOUNT} added to pool. Watch odds adjust!`
+    });
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <Navigation />
@@ -265,11 +320,16 @@ export default function TournamentsPage() {
             <div className="flex flex-col items-center gap-4 mb-6">
               <h2 className="text-xs uppercase tracking-wider text-muted-foreground/70">Final</h2>
               {/* Mobile: Paired Layout */}
-              <MatchPair players={[finalists[0], finalists[1]]} delay={0.6} />
+              <MatchPair 
+                players={[finalists[0], finalists[1]]} 
+                totalPool={finalistsTotalPool}
+                delay={0.6}
+                onBet={(id) => handleBet(id, false)}
+              />
               {/* Desktop: Side by Side */}
               <div className="hidden md:flex gap-12 justify-center items-center">
-                <PlayerCard p={finalists[0]} delay={0.6} />
-                <PlayerCard p={finalists[1]} delay={0.65} />
+                <PlayerCard p={finalists[0]} totalPool={finalistsTotalPool} delay={0.6} onBet={(id) => handleBet(id, false)} />
+                <PlayerCard p={finalists[1]} totalPool={finalistsTotalPool} delay={0.65} onBet={(id) => handleBet(id, false)} />
               </div>
             </div>
 
@@ -281,14 +341,30 @@ export default function TournamentsPage() {
               <h2 className="text-xs uppercase tracking-wider text-muted-foreground/70">Semifinals</h2>
               {/* Mobile: Paired Layout with Connectors */}
               <div className="md:hidden flex flex-col gap-y-3 w-full items-center">
-                <MatchPair players={[semifinalists[0], semifinalists[1]]} delay={0.1} />
+                <MatchPair 
+                  players={[semifinalists[0], semifinalists[1]]} 
+                  totalPool={semifinalistsTotalPool}
+                  delay={0.1}
+                  onBet={(id) => handleBet(id, true)}
+                />
                 <MobileMatchConnector />
-                <MatchPair players={[semifinalists[2], semifinalists[3]]} delay={0.2} />
+                <MatchPair 
+                  players={[semifinalists[2], semifinalists[3]]} 
+                  totalPool={semifinalistsTotalPool}
+                  delay={0.2}
+                  onBet={(id) => handleBet(id, true)}
+                />
               </div>
               {/* Desktop: All Side by Side */}
               <div className="hidden md:flex gap-12 justify-center items-center">
                 {semifinalists.map((p, idx) => (
-                  <PlayerCard key={p.id} p={p} delay={0.1 + idx * 0.1} />
+                  <PlayerCard 
+                    key={p.id} 
+                    p={p} 
+                    totalPool={semifinalistsTotalPool}
+                    delay={0.1 + idx * 0.1}
+                    onBet={(id) => handleBet(id, true)}
+                  />
                 ))}
               </div>
             </div>
