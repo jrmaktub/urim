@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { WagmiProvider } from 'wagmi';
 import Index from "./pages/Index";
 import QuantumBets from "./pages/QuantumBets";
+import Elections from "./pages/Elections";
 import EverythingBets from "./pages/EverythingBets";
 import CreateBet from "./pages/CreateBet";
 import MarketDetail from "./pages/MarketDetail";
@@ -74,6 +75,7 @@ const App = () => {
                   <Routes>
                     <Route path="/" element={<Index />} />
                     <Route path="/quantum-bets" element={<QuantumBets />} />
+                    <Route path="/elections" element={<Elections />} />
                     <Route path="/everything-bets" element={<EverythingBets />} />
                     <Route path="/tournaments" element={<Tournaments />} />
                     <Route path="/lottery" element={<Lottery />} />
