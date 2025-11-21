@@ -21,6 +21,7 @@ const Navigation = () => {
   
   const navLinks = [
     { name: "Quantum Bets", path: "/" },
+    { name: "Elections", path: "/elections" },
     { name: "50/50 Lottery", path: "/lottery" },
     { name: "Everything Bets", path: "/everything-bets" },
     { name: "Tournaments", path: "/tournaments" },
