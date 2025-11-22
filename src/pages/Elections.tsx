@@ -13,7 +13,7 @@ const candidates = [
     image: "/placeholder.svg",
     percentage: 44,
     volume: "$125,430",
-    color: "hsl(270 85% 68%)",
+    color: "hsl(0 100% 50%)",
   },
   {
     id: 2,
@@ -21,7 +21,7 @@ const candidates = [
     image: "/placeholder.svg",
     percentage: 32,
     volume: "$89,210",
-    color: "hsl(0 100% 50%)",
+    color: "hsl(45 100% 55%)",
   },
   {
     id: 3,
