@@ -41,18 +41,6 @@ const candidatesBase = [
   },
 ];
 
-// Placeholder order book data
-const yesOrders = [
-  { price: "$0.44", shares: "1,234", total: "$543.00" },
-  { price: "$0.43", shares: "2,456", total: "$1,056.00" },
-  { price: "$0.42", shares: "890", total: "$374.00" },
-];
-
-const noOrders = [
-  { price: "$0.56", shares: "987", total: "$552.00" },
-  { price: "$0.57", shares: "1,543", total: "$880.00" },
-  { price: "$0.58", shares: "654", total: "$379.00" },
-];
 
 const Elections = () => {
   const { address, isConnected } = useAccount();
@@ -144,7 +132,7 @@ const Elections = () => {
           toast.info("Waiting for approval confirmation...");
           let confirmed = false;
           let attempts = 0;
-          const maxAttempts = 10; // 10 seconds max
+          const maxAttempts = 3; // 3 seconds max
           
           while (!confirmed && attempts < maxAttempts) {
             await new Promise(resolve => setTimeout(resolve, 1000));
@@ -381,59 +369,6 @@ const Elections = () => {
                     </div>
                   </div>
                   
-                  {/* Order Book - Shows under selected candidate */}
-                  {selectedCandidateId === candidate.id && (
-                    <div className="glass-card p-6 mt-4">
-                      <h2 className="text-2xl font-bold text-foreground mb-6">
-                        Order Book - {selectedCandidate.name}
-                      </h2>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {/* YES Orders */}
-                        <div>
-                          <h3 className="text-lg font-semibold text-green-500 mb-4">YES Orders</h3>
-                          <div className="space-y-2">
-                            <div className="grid grid-cols-3 gap-2 text-xs font-semibold text-muted-foreground mb-2">
-                              <div>Price</div>
-                              <div className="text-right">Shares</div>
-                              <div className="text-right">Total</div>
-                            </div>
-                            {yesOrders.map((order, idx) => (
-                              <div
-                                key={idx}
-                                className="grid grid-cols-3 gap-2 text-sm bg-green-500/5 hover:bg-green-500/10 p-2 rounded-lg transition-colors"
-                              >
-                                <div className="text-green-500 font-medium">{order.price}</div>
-                                <div className="text-right text-foreground">{order.shares}</div>
-                                <div className="text-right text-muted-foreground">{order.total}</div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* NO Orders */}
-                        <div>
-                          <h3 className="text-lg font-semibold text-red-500 mb-4">NO Orders</h3>
-                          <div className="space-y-2">
-                            <div className="grid grid-cols-3 gap-2 text-xs font-semibold text-muted-foreground mb-2">
-                              <div>Price</div>
-                              <div className="text-right">Shares</div>
-                              <div className="text-right">Total</div>
-                            </div>
-                            {noOrders.map((order, idx) => (
-                              <div
-                                key={idx}
-                                className="grid grid-cols-3 gap-2 text-sm bg-red-500/5 hover:bg-red-500/10 p-2 rounded-lg transition-colors"
-                              >
-                                <div className="text-red-500 font-medium">{order.price}</div>
-                                <div className="text-right text-foreground">{order.shares}</div>
-                                <div className="text-right text-muted-foreground">{order.total}</div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
                 </div>
               ))}
             </div>
