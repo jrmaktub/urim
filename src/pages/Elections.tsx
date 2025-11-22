@@ -6,6 +6,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ExternalLink, TrendingUp, Users, Clock, Loader2 } from "lucide-react";
 import { useAccount } from "wagmi";
 import { toast } from "sonner";
+import { parseUnits } from "viem";
 import {
   useHondurasElectionPrices,
   useUserPosition,
@@ -15,6 +16,7 @@ import {
   useBuyShares,
   useSellShares,
   useClaimWinnings,
+  useUSDCAllowance,
 } from "@/hooks/useHondurasElection";
 import { CANDIDATE_IDS, MARKET_STATES } from "@/constants/hondurasElection";
 
@@ -67,6 +69,7 @@ const Elections = () => {
   const nasrallaPosition = useUserPosition(CANDIDATE_IDS.NASRALLA);
   const moncadaPosition = useUserPosition(CANDIDATE_IDS.MONCADA);
   const asfuraPosition = useUserPosition(CANDIDATE_IDS.ASFURA);
+  const { allowance, refetch: refetchAllowance } = useUSDCAllowance();
 
   const { approve, isPending: isApprovingTx, isConfirming: isApprovalConfirming, isSuccess: isApprovalSuccess } = useApproveUSDC();
   const { buyShares, isConfirming: isBuying, isPending: isBuyingPending } = useBuyShares();
@@ -125,20 +128,41 @@ const Elections = () => {
 
     try {
       if (tradeType === "YES") {
-        // Step 1: Approve USDC
-        setIsApproving(true);
-        toast.info("Step 1/2: Approving USDC...");
-        await approve(tradeAmount);
+        const requiredAmount = parseUnits(tradeAmount, 6);
         
-        // Step 2: Wait for approval to be mined (poll for a few seconds)
-        toast.info("Waiting for approval confirmation...");
-        await new Promise(resolve => setTimeout(resolve, 3000)); // Wait 3 seconds for tx to mine
+        // Check current allowance
+        await refetchAllowance();
+        const hasAllowance = allowance >= requiredAmount;
         
-        setIsApproving(false);
-        toast.success("USDC approved!");
+        if (!hasAllowance) {
+          // Step 1: Approve USDC
+          setIsApproving(true);
+          toast.info("Step 1/2: Approving USDC...");
+          await approve(tradeAmount);
+          
+          // Wait for approval to be mined by checking allowance
+          toast.info("Waiting for approval confirmation...");
+          let confirmed = false;
+          let attempts = 0;
+          const maxAttempts = 30; // 30 seconds max
+          
+          while (!confirmed && attempts < maxAttempts) {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            await refetchAllowance();
+            confirmed = allowance >= requiredAmount;
+            attempts++;
+          }
+          
+          if (!confirmed) {
+            throw new Error("Approval transaction did not confirm in time");
+          }
+          
+          setIsApproving(false);
+          toast.success("USDC approved!");
+        }
         
-        // Step 3: Buy shares
-        toast.info("Step 2/2: Buying shares...");
+        // Step 2: Buy shares
+        toast.info(hasAllowance ? "Buying shares..." : "Step 2/2: Buying shares...");
         await buyShares(selectedCandidateId, tradeAmount);
         toast.success("Shares purchased successfully!");
       } else {

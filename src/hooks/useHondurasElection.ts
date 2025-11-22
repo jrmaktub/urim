@@ -96,6 +96,26 @@ export function useMarketState() {
   return data !== undefined ? Number(data) : 0;
 }
 
+export function useUSDCAllowance() {
+  const { address } = useAccount();
+  
+  const { data, refetch } = useReadContract({
+    address: BASE_USDC_ADDRESS as `0x${string}`,
+    abi: (ERC20ABI as { abi: Abi }).abi,
+    functionName: "allowance",
+    args: address ? [address, HONDURAS_ELECTION_ADDRESS] : undefined,
+    chainId: base.id,
+    query: {
+      enabled: !!address,
+    },
+  });
+
+  return { 
+    allowance: data ? data as bigint : BigInt(0),
+    refetch 
+  };
+}
+
 export function useApproveUSDC() {
   const { address } = useAccount();
   const { writeContractAsync, data: hash, isPending } = useWriteContract();
