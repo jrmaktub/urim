@@ -10,7 +10,7 @@ import { useEffect } from "react";
 export function useHondurasElectionPrices() {
   const { data, refetch } = useReadContract({
     address: HONDURAS_ELECTION_ADDRESS as `0x${string}`,
-    abi: HondurasElectionABI as unknown as Abi,
+    abi: HondurasElectionABI as Abi,
     functionName: "getAllPrices",
     chainId: base.id,
   });
@@ -44,7 +44,7 @@ export function useUserPosition(candidateId: number) {
   
   const { data } = useReadContract({
     address: HONDURAS_ELECTION_ADDRESS as `0x${string}`,
-    abi: HondurasElectionABI as unknown as Abi,
+    abi: HondurasElectionABI as Abi,
     functionName: "getUserSharesInUSDC",
     args: [address, candidateId],
     chainId: base.id,
@@ -62,7 +62,7 @@ export function useUserPosition(candidateId: number) {
 export function useMarketTimeRemaining() {
   const { data, refetch } = useReadContract({
     address: HONDURAS_ELECTION_ADDRESS as `0x${string}`,
-    abi: HondurasElectionABI as unknown as Abi,
+    abi: HondurasElectionABI as Abi,
     functionName: "getMarketTimeRemaining",
     chainId: base.id,
   });
@@ -81,7 +81,7 @@ export function useMarketTimeRemaining() {
 export function useMarketState() {
   const { data, refetch } = useReadContract({
     address: HONDURAS_ELECTION_ADDRESS as `0x${string}`,
-    abi: HondurasElectionABI as unknown as Abi,
+    abi: HondurasElectionABI as Abi,
     functionName: "state",
     chainId: base.id,
   });
@@ -106,7 +106,7 @@ export function useApproveUSDC() {
     
     return await writeContractAsync({
       address: BASE_USDC_ADDRESS as `0x${string}`,
-      abi: ERC20ABI as unknown as Abi,
+      abi: (ERC20ABI as { abi: Abi }).abi,
       functionName: "approve",
       args: [HONDURAS_ELECTION_ADDRESS, amountInWei],
       account: address,
@@ -135,7 +135,7 @@ export function useBuyShares() {
     
     return await writeContractAsync({
       address: HONDURAS_ELECTION_ADDRESS as `0x${string}`,
-      abi: HondurasElectionABI as unknown as Abi,
+      abi: HondurasElectionABI as Abi,
       functionName: "buySharesUSD",
       args: [candidateId, amountInWei],
       account: address,
@@ -164,7 +164,7 @@ export function useSellShares() {
     
     return await writeContractAsync({
       address: HONDURAS_ELECTION_ADDRESS as `0x${string}`,
-      abi: HondurasElectionABI as unknown as Abi,
+      abi: HondurasElectionABI as Abi,
       functionName: "sellSharesUSD",
       args: [candidateId, amountInWei],
       account: address,
@@ -184,7 +184,7 @@ export function useClaimWinnings() {
   const claimWinnings = async () => {
     return await writeContractAsync({
       address: HONDURAS_ELECTION_ADDRESS as `0x${string}`,
-      abi: HondurasElectionABI as unknown as Abi,
+      abi: HondurasElectionABI as Abi,
       functionName: "claimWinnings",
       account: address,
       chain: base,
