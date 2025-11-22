@@ -1,34 +1,40 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Navigation from "@/components/Navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ExternalLink, TrendingUp, Users, Clock } from "lucide-react";
+import { ExternalLink, TrendingUp, Users, Clock, Loader2 } from "lucide-react";
+import { useAccount } from "wagmi";
+import { toast } from "sonner";
+import {
+  useHondurasElectionPrices,
+  useUserPosition,
+  useMarketTimeRemaining,
+  useMarketState,
+  useApproveUSDC,
+  useBuyShares,
+  useSellShares,
+  useClaimWinnings,
+} from "@/hooks/useHondurasElection";
+import { CANDIDATE_IDS, MARKET_STATES } from "@/constants/hondurasElection";
 
-// Placeholder candidate data
-const candidates = [
+const candidatesBase = [
   {
-    id: 1,
+    id: CANDIDATE_IDS.NASRALLA,
     name: "Salvador Nasralla",
     image: "/placeholder.svg",
-    percentage: 44,
-    volume: "$125,430",
     color: "hsl(0 100% 50%)",
   },
   {
-    id: 2,
+    id: CANDIDATE_IDS.MONCADA,
     name: "Rixi Moncada",
     image: "/placeholder.svg",
-    percentage: 32,
-    volume: "$89,210",
     color: "hsl(45 100% 55%)",
   },
   {
-    id: 3,
+    id: CANDIDATE_IDS.ASFURA,
     name: "Nasry Asfura",
     image: "/placeholder.svg",
-    percentage: 24,
-    volume: "$62,890",
     color: "#0073CF",
   },
 ];
@@ -47,10 +53,124 @@ const noOrders = [
 ];
 
 const Elections = () => {
+  const { address, isConnected } = useAccount();
   const [timeRange, setTimeRange] = useState("1D");
-  const [selectedCandidate, setSelectedCandidate] = useState(candidates[0]);
+  const [selectedCandidateId, setSelectedCandidateId] = useState<number>(CANDIDATE_IDS.NASRALLA);
   const [tradeAmount, setTradeAmount] = useState("");
   const [tradeType, setTradeType] = useState<"YES" | "NO">("YES");
+  const [isApproving, setIsApproving] = useState(false);
+
+  // Contract hooks
+  const prices = useHondurasElectionPrices();
+  const marketState = useMarketState();
+  const timeRemaining = useMarketTimeRemaining();
+  const nasrallaPosition = useUserPosition(CANDIDATE_IDS.NASRALLA);
+  const moncadaPosition = useUserPosition(CANDIDATE_IDS.MONCADA);
+  const asfuraPosition = useUserPosition(CANDIDATE_IDS.ASFURA);
+
+  const { approve, isPending: isApprovingTx } = useApproveUSDC();
+  const { buyShares, isConfirming: isBuying, isPending: isBuyingPending } = useBuyShares();
+  const { sellShares, isConfirming: isSelling, isPending: isSellingPending } = useSellShares();
+  const { claimWinnings, isConfirming: isClaiming, isPending: isClaimingPending } = useClaimWinnings();
+
+  // Map candidates with live data
+  const candidates = candidatesBase.map((candidate) => {
+    let percentage = 0;
+    let position = "0.00";
+
+    if (candidate.id === CANDIDATE_IDS.NASRALLA) {
+      percentage = prices.nasralla;
+      position = nasrallaPosition;
+    } else if (candidate.id === CANDIDATE_IDS.MONCADA) {
+      percentage = prices.moncada;
+      position = moncadaPosition;
+    } else if (candidate.id === CANDIDATE_IDS.ASFURA) {
+      percentage = prices.asfura;
+      position = asfuraPosition;
+    }
+
+    return {
+      ...candidate,
+      percentage: Math.round(percentage * 100) / 100,
+      position,
+    };
+  });
+
+  const selectedCandidate = candidates.find((c) => c.id === selectedCandidateId) || candidates[0];
+
+  // Format time remaining
+  const formatTimeRemaining = (seconds: number) => {
+    if (seconds <= 0) return "Market Closed";
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    return `${hours}h ${minutes}m ${secs}s`;
+  };
+
+  const handleTrade = async () => {
+    if (!isConnected) {
+      toast.error("Please connect your wallet");
+      return;
+    }
+
+    if (!tradeAmount || parseFloat(tradeAmount) <= 0) {
+      toast.error("Please enter a valid amount");
+      return;
+    }
+
+    if (marketState !== MARKET_STATES.OPEN) {
+      toast.error("Market is not open for trading");
+      return;
+    }
+
+    try {
+      setIsApproving(true);
+      
+      // Step 1: Approve USDC
+      toast.info("Approving USDC...");
+      await approve(tradeAmount);
+      
+      // Wait a bit for approval to process
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      setIsApproving(false);
+
+      // Step 2: Buy or Sell shares
+      if (tradeType === "YES") {
+        toast.info("Buying shares...");
+        await buyShares(selectedCandidateId, tradeAmount);
+        toast.success("Shares purchased successfully!");
+      } else {
+        toast.info("Selling shares...");
+        await sellShares(selectedCandidateId, tradeAmount);
+        toast.success("Shares sold successfully!");
+      }
+
+      setTradeAmount("");
+    } catch (error: any) {
+      console.error("Trade error:", error);
+      toast.error(error?.message || "Transaction failed");
+      setIsApproving(false);
+    }
+  };
+
+  const handleClaimWinnings = async () => {
+    if (!isConnected) {
+      toast.error("Please connect your wallet");
+      return;
+    }
+
+    try {
+      toast.info("Claiming winnings...");
+      await claimWinnings();
+      toast.success("Winnings claimed successfully!");
+    } catch (error: any) {
+      console.error("Claim error:", error);
+      toast.error(error?.message || "Claim failed");
+    }
+  };
+
+  const isProcessing = isApproving || isApprovingTx || isBuying || isSelling || isClaiming || isBuyingPending || isSellingPending || isClaimingPending;
 
   return (
     <div className="min-h-screen bg-background">
@@ -59,13 +179,29 @@ const Elections = () => {
       <main className="pt-24 pb-16 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-8 animate-fade-in">
-          <h1 className="text-4xl md:text-5xl font-bold mb-3 text-foreground">
-            Honduras Presidential 2025
-            <span className="text-primary ml-3">– Prediction Market</span>
-          </h1>
-          <p className="text-lg text-muted-foreground">
-            Trade the future. Quantum-powered political markets.
-          </p>
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div>
+              <h1 className="text-4xl md:text-5xl font-bold mb-3 text-foreground">
+                Honduras Presidential 2025
+                <span className="text-primary ml-3">– Prediction Market</span>
+              </h1>
+              <p className="text-lg text-muted-foreground">
+                Trade the future. Live on Base Mainnet.
+              </p>
+            </div>
+            <div className="flex flex-col items-end gap-2">
+              <div className="text-sm text-muted-foreground">Time Remaining</div>
+              <div className="text-2xl font-bold text-primary">
+                {formatTimeRemaining(timeRemaining)}
+              </div>
+              {marketState === MARKET_STATES.RESOLVED && (
+                <Button onClick={handleClaimWinnings} disabled={isClaiming} className="mt-2">
+                  {isClaiming && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                  Claim Winnings
+                </Button>
+              )}
+            </div>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -152,9 +288,9 @@ const Elections = () => {
               {candidates.map((candidate, index) => (
                 <div key={candidate.id} style={{ animationDelay: `${index * 100}ms` }}>
                   <div
-                    onClick={() => setSelectedCandidate(candidate)}
+                    onClick={() => setSelectedCandidateId(candidate.id)}
                     className={`glass-card p-6 hover:border-primary/50 transition-all cursor-pointer ${
-                      selectedCandidate.id === candidate.id ? "border-primary" : ""
+                      selectedCandidateId === candidate.id ? "border-primary" : ""
                     }`}
                   >
                     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -175,31 +311,35 @@ const Elections = () => {
                               <TrendingUp className="w-4 h-4" />
                               <span className="text-primary font-bold text-lg">{candidate.percentage}%</span>
                             </div>
-                            <div className="flex items-center gap-1 text-muted-foreground">
-                              <Users className="w-4 h-4" />
-                              <span>{candidate.volume}</span>
-                            </div>
+                            {isConnected && parseFloat(candidate.position) > 0 && (
+                              <div className="flex items-center gap-1 text-muted-foreground">
+                                <Users className="w-4 h-4" />
+                                <span>Your position: ${candidate.position}</span>
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>
                       <div className="flex gap-2 w-full sm:w-auto">
                         <Button
                           onClick={() => {
-                            setSelectedCandidate(candidate);
+                            setSelectedCandidateId(candidate.id);
                             setTradeType("YES");
                           }}
                           className="flex-1 sm:flex-none bg-green-600 hover:bg-green-700 text-white border-0"
+                          disabled={marketState !== MARKET_STATES.OPEN}
                         >
-                          Buy YES
+                          Buy
                         </Button>
                         <Button
                           onClick={() => {
-                            setSelectedCandidate(candidate);
+                            setSelectedCandidateId(candidate.id);
                             setTradeType("NO");
                           }}
                           className="flex-1 sm:flex-none bg-red-600 hover:bg-red-700 text-white border-0"
+                          disabled={marketState !== MARKET_STATES.OPEN}
                         >
-                          Buy NO
+                          Sell
                         </Button>
                       </div>
                     </div>
@@ -216,7 +356,7 @@ const Elections = () => {
                   </div>
                   
                   {/* Order Book - Shows under selected candidate */}
-                  {selectedCandidate.id === candidate.id && (
+                  {selectedCandidateId === candidate.id && (
                     <div className="glass-card p-6 mt-4">
                       <h2 className="text-2xl font-bold text-foreground mb-6">
                         Order Book - {selectedCandidate.name}
@@ -384,6 +524,7 @@ const Elections = () => {
                       ? "bg-green-600 hover:bg-green-700 text-white"
                       : "bg-secondary text-muted-foreground hover:bg-secondary/80"
                   }`}
+                  disabled={marketState !== MARKET_STATES.OPEN}
                 >
                   Buy
                 </Button>
@@ -394,32 +535,44 @@ const Elections = () => {
                       ? "bg-red-600 hover:bg-red-700 text-white"
                       : "bg-secondary text-muted-foreground hover:bg-secondary/80"
                   }`}
+                  disabled={marketState !== MARKET_STATES.OPEN}
                 >
                   Sell
                 </Button>
               </div>
 
+              {/* User Position */}
+              {isConnected && parseFloat(selectedCandidate.position) > 0 && (
+                <div className="bg-card/50 rounded-xl p-4 border border-border/30">
+                  <div className="text-sm text-muted-foreground mb-1">Your Position</div>
+                  <div className="text-2xl font-bold text-primary">${selectedCandidate.position}</div>
+                </div>
+              )}
+
               {/* Price Display */}
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">YES Price</span>
-                  <span className="font-semibold text-green-500">$0.44</span>
+                  <span className="text-muted-foreground">Current Price</span>
+                  <span className="font-semibold text-primary">{selectedCandidate.percentage}%</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">NO Price</span>
-                  <span className="font-semibold text-red-500">$0.56</span>
+                  <span className="text-muted-foreground">Market Status</span>
+                  <span className={`font-semibold ${marketState === MARKET_STATES.OPEN ? 'text-green-500' : marketState === MARKET_STATES.RESOLVED ? 'text-blue-500' : 'text-red-500'}`}>
+                    {marketState === MARKET_STATES.OPEN ? 'OPEN' : marketState === MARKET_STATES.RESOLVED ? 'RESOLVED' : 'CLOSED'}
+                  </span>
                 </div>
               </div>
 
               {/* Amount Input */}
               <div className="space-y-3">
-                <label className="text-sm font-medium text-foreground">Amount (USD)</label>
+                <label className="text-sm font-medium text-foreground">Amount (USDC)</label>
                 <Input
                   type="number"
                   placeholder="0.00"
                   value={tradeAmount}
                   onChange={(e) => setTradeAmount(e.target.value)}
                   className="text-lg"
+                  disabled={marketState !== MARKET_STATES.OPEN || isProcessing}
                 />
                 <div className="flex gap-2">
                   {[1, 5, 20, 100].map((amount) => (
@@ -429,48 +582,56 @@ const Elections = () => {
                       variant="outline"
                       onClick={() => setTradeAmount(amount.toString())}
                       className="flex-1 text-xs"
+                      disabled={marketState !== MARKET_STATES.OPEN || isProcessing}
                     >
-                      +${amount}
+                      ${amount}
                     </Button>
                   ))}
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setTradeAmount("1000")}
-                    className="flex-1 text-xs"
-                  >
-                    Max
-                  </Button>
                 </div>
               </div>
 
-              {/* To Win Section */}
+              {/* Transaction Summary */}
               <div className="bg-card/50 rounded-xl p-4 space-y-2 border border-border/30">
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">You pay</span>
+                  <span className="text-muted-foreground">You {tradeType === "YES" ? "pay" : "receive"}</span>
                   <span className="font-semibold text-foreground">
-                    ${tradeAmount || "0.00"}
+                    ${tradeAmount || "0.00"} USDC
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">To win</span>
+                  <span className="text-muted-foreground">Expected value</span>
                   <span className="font-semibold text-primary">
-                    ${tradeAmount ? (parseFloat(tradeAmount) * (tradeType === "YES" ? 2.27 : 1.79)).toFixed(2) : "0.00"}
+                    ${tradeAmount ? (parseFloat(tradeAmount) / (selectedCandidate.percentage / 100)).toFixed(2) : "0.00"}
                   </span>
                 </div>
                 <div className="flex justify-between text-sm pt-2 border-t border-border/30">
-                  <span className="text-muted-foreground">Avg. Price</span>
-                  <span className="font-medium text-foreground">44¢</span>
+                  <span className="text-muted-foreground">Current Price</span>
+                  <span className="font-medium text-foreground">{selectedCandidate.percentage}%</span>
                 </div>
               </div>
 
-              {/* Checkout Button */}
+              {/* Trade Button */}
               <Button
+                onClick={handleTrade}
+                disabled={!isConnected || marketState !== MARKET_STATES.OPEN || isProcessing || !tradeAmount}
                 className="w-full bg-gradient-to-r from-primary to-primary-glow hover:opacity-90 text-white shadow-lg shadow-primary/25"
                 size="lg"
               >
-                Place Order
+                {!isConnected ? (
+                  "Connect Wallet"
+                ) : isProcessing ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    {isApproving || isApprovingTx ? "Approving USDC..." : tradeType === "YES" ? "Buying..." : "Selling..."}
+                  </>
+                ) : (
+                  `${tradeType === "YES" ? "Buy" : "Sell"} Shares`
+                )}
               </Button>
+              
+              <p className="text-xs text-muted-foreground text-center">
+                Trades execute on Base Mainnet with USDC
+              </p>
             </div>
           </div>
         </div>
