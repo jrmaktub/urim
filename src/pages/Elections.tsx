@@ -128,22 +128,16 @@ const Elections = () => {
         // Step 1: Approve USDC
         setIsApproving(true);
         toast.info("Step 1/2: Approving USDC...");
-        const approvalHash = await approve(tradeAmount);
+        await approve(tradeAmount);
         
-        // Wait for approval confirmation by polling
+        // Step 2: Wait for approval to be mined (poll for a few seconds)
         toast.info("Waiting for approval confirmation...");
-        let attempts = 0;
-        while (attempts < 60) {
-          await new Promise(resolve => setTimeout(resolve, 2000));
-          // Check if we should continue
-          if (attempts > 30) break; // Max 60 seconds wait
-          attempts++;
-        }
+        await new Promise(resolve => setTimeout(resolve, 3000)); // Wait 3 seconds for tx to mine
         
         setIsApproving(false);
         toast.success("USDC approved!");
         
-        // Step 2: Buy shares
+        // Step 3: Buy shares
         toast.info("Step 2/2: Buying shares...");
         await buyShares(selectedCandidateId, tradeAmount);
         toast.success("Shares purchased successfully!");
