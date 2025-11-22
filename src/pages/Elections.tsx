@@ -68,7 +68,7 @@ const Elections = () => {
   const moncadaPosition = useUserPosition(CANDIDATE_IDS.MONCADA);
   const asfuraPosition = useUserPosition(CANDIDATE_IDS.ASFURA);
 
-  const { approve, isPending: isApprovingTx } = useApproveUSDC();
+  const { approve, isPending: isApprovingTx, isConfirming: isApprovalConfirming, isSuccess: isApprovalSuccess } = useApproveUSDC();
   const { buyShares, isConfirming: isBuying, isPending: isBuyingPending } = useBuyShares();
   const { sellShares, isConfirming: isSelling, isPending: isSellingPending } = useSellShares();
   const { claimWinnings, isConfirming: isClaiming, isPending: isClaimingPending } = useClaimWinnings();
@@ -124,23 +124,31 @@ const Elections = () => {
     }
 
     try {
-      setIsApproving(true);
-      
-      // Step 1: Approve USDC
-      toast.info("Approving USDC...");
-      await approve(tradeAmount);
-      
-      // Wait a bit for approval to process
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      setIsApproving(false);
-
-      // Step 2: Buy or Sell shares
       if (tradeType === "YES") {
-        toast.info("Buying shares...");
+        // Step 1: Approve USDC
+        setIsApproving(true);
+        toast.info("Step 1/2: Approving USDC...");
+        const approvalHash = await approve(tradeAmount);
+        
+        // Wait for approval confirmation by polling
+        toast.info("Waiting for approval confirmation...");
+        let attempts = 0;
+        while (attempts < 60) {
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          // Check if we should continue
+          if (attempts > 30) break; // Max 60 seconds wait
+          attempts++;
+        }
+        
+        setIsApproving(false);
+        toast.success("USDC approved!");
+        
+        // Step 2: Buy shares
+        toast.info("Step 2/2: Buying shares...");
         await buyShares(selectedCandidateId, tradeAmount);
         toast.success("Shares purchased successfully!");
       } else {
+        // Selling doesn't need approval
         toast.info("Selling shares...");
         await sellShares(selectedCandidateId, tradeAmount);
         toast.success("Shares sold successfully!");
@@ -149,7 +157,7 @@ const Elections = () => {
       setTradeAmount("");
     } catch (error: any) {
       console.error("Trade error:", error);
-      toast.error(error?.message || "Transaction failed");
+      toast.error(error?.shortMessage || error?.message || "Transaction failed");
       setIsApproving(false);
     }
   };
@@ -170,7 +178,7 @@ const Elections = () => {
     }
   };
 
-  const isProcessing = isApproving || isApprovingTx || isBuying || isSelling || isClaiming || isBuyingPending || isSellingPending || isClaimingPending;
+  const isProcessing = isApproving || isApprovingTx || isApprovalConfirming || isBuying || isSelling || isClaiming || isBuyingPending || isSellingPending || isClaimingPending;
 
   return (
     <div className="min-h-screen bg-background">
@@ -619,10 +627,18 @@ const Elections = () => {
               >
                 {!isConnected ? (
                   "Connect Wallet"
+                ) : marketState !== MARKET_STATES.OPEN ? (
+                  "Market Closed"
                 ) : isProcessing ? (
                   <>
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    {isApproving || isApprovingTx ? "Approving USDC..." : tradeType === "YES" ? "Buying..." : "Selling..."}
+                    {isApproving || isApprovingTx || isApprovalConfirming
+                      ? "Approving USDC..." 
+                      : isBuying || isBuyingPending
+                      ? "Buying Shares..."
+                      : isSelling || isSellingPending
+                      ? "Selling Shares..."
+                      : "Processing..."}
                   </>
                 ) : (
                   `${tradeType === "YES" ? "Buy" : "Sell"} Shares`

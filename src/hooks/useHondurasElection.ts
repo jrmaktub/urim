@@ -98,6 +98,7 @@ export function useMarketState() {
 
 export function useApproveUSDC() {
   const { writeContractAsync, data: hash, isPending } = useWriteContract();
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
 
   const approve = async (amount: string) => {
     const amountInWei = parseUnits(amount, 6); // USDC has 6 decimals
@@ -110,7 +111,7 @@ export function useApproveUSDC() {
     } as any);
   };
 
-  return { approve, isPending, hash };
+  return { approve, isPending, isConfirming, isSuccess, hash };
 }
 
 export function useBuyShares() {
