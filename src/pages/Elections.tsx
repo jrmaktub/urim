@@ -144,12 +144,12 @@ const Elections = () => {
           toast.info("Waiting for approval confirmation...");
           let confirmed = false;
           let attempts = 0;
-          const maxAttempts = 30; // 30 seconds max
+          const maxAttempts = 10; // 10 seconds max
           
           while (!confirmed && attempts < maxAttempts) {
             await new Promise(resolve => setTimeout(resolve, 1000));
-            await refetchAllowance();
-            confirmed = allowance >= requiredAmount;
+            const { data: freshAllowance } = await refetchAllowance();
+            confirmed = (freshAllowance as bigint || BigInt(0)) >= requiredAmount;
             attempts++;
           }
           
