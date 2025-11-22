@@ -15,11 +15,11 @@ export function useHondurasElectionPrices() {
     chainId: base.id,
   });
 
-  // Auto-refresh every 10 seconds
+  // Auto-refresh every 5 seconds
   useEffect(() => {
     const interval = setInterval(() => {
       refetch();
-    }, 10000);
+    }, 5000);
     return () => clearInterval(interval);
   }, [refetch]);
 
