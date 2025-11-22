@@ -1,5 +1,5 @@
 import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
-import { parseUnits, formatUnits } from "viem";
+import { parseUnits, formatUnits, type Abi } from "viem";
 import { base } from "wagmi/chains";
 import { HONDURAS_ELECTION_ADDRESS, BASE_USDC_ADDRESS } from "@/constants/hondurasElection";
 import HondurasElectionABI from "@/contracts/HondurasElection.json";
@@ -10,7 +10,7 @@ import { useEffect } from "react";
 export function useHondurasElectionPrices() {
   const { data, refetch } = useReadContract({
     address: HONDURAS_ELECTION_ADDRESS as `0x${string}`,
-    abi: HondurasElectionABI as any,
+    abi: HondurasElectionABI as unknown as Abi,
     functionName: "getAllPrices",
     chainId: base.id,
   });
@@ -44,7 +44,7 @@ export function useUserPosition(candidateId: number) {
   
   const { data } = useReadContract({
     address: HONDURAS_ELECTION_ADDRESS as `0x${string}`,
-    abi: HondurasElectionABI as any,
+    abi: HondurasElectionABI as unknown as Abi,
     functionName: "getUserSharesInUSDC",
     args: [address, candidateId],
     chainId: base.id,
@@ -62,7 +62,7 @@ export function useUserPosition(candidateId: number) {
 export function useMarketTimeRemaining() {
   const { data, refetch } = useReadContract({
     address: HONDURAS_ELECTION_ADDRESS as `0x${string}`,
-    abi: HondurasElectionABI as any,
+    abi: HondurasElectionABI as unknown as Abi,
     functionName: "getMarketTimeRemaining",
     chainId: base.id,
   });
@@ -81,7 +81,7 @@ export function useMarketTimeRemaining() {
 export function useMarketState() {
   const { data, refetch } = useReadContract({
     address: HONDURAS_ELECTION_ADDRESS as `0x${string}`,
-    abi: HondurasElectionABI as any,
+    abi: HondurasElectionABI as unknown as Abi,
     functionName: "state",
     chainId: base.id,
   });
@@ -97,6 +97,7 @@ export function useMarketState() {
 }
 
 export function useApproveUSDC() {
+  const { address } = useAccount();
   const { writeContractAsync, data: hash, isPending } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
 
@@ -105,16 +106,20 @@ export function useApproveUSDC() {
     
     return await writeContractAsync({
       address: BASE_USDC_ADDRESS as `0x${string}`,
-      abi: ERC20ABI as any,
+      abi: ERC20ABI as unknown as Abi,
       functionName: "approve",
       args: [HONDURAS_ELECTION_ADDRESS, amountInWei],
-    } as any);
+      account: address,
+      chain: base,
+      chainId: base.id,
+    });
   };
 
   return { approve, isPending, isConfirming, isSuccess, hash };
 }
 
 export function useBuyShares() {
+  const { address } = useAccount();
   const { writeContractAsync, data: hash, isPending } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
   const queryClient = useQueryClient();
@@ -130,16 +135,20 @@ export function useBuyShares() {
     
     return await writeContractAsync({
       address: HONDURAS_ELECTION_ADDRESS as `0x${string}`,
-      abi: HondurasElectionABI as any,
+      abi: HondurasElectionABI as unknown as Abi,
       functionName: "buySharesUSD",
       args: [candidateId, amountInWei],
-    } as any);
+      account: address,
+      chain: base,
+      chainId: base.id,
+    });
   };
 
   return { buyShares, isConfirming, isSuccess, hash, isPending };
 }
 
 export function useSellShares() {
+  const { address } = useAccount();
   const { writeContractAsync, data: hash, isPending } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
   const queryClient = useQueryClient();
@@ -155,25 +164,32 @@ export function useSellShares() {
     
     return await writeContractAsync({
       address: HONDURAS_ELECTION_ADDRESS as `0x${string}`,
-      abi: HondurasElectionABI as any,
+      abi: HondurasElectionABI as unknown as Abi,
       functionName: "sellSharesUSD",
       args: [candidateId, amountInWei],
-    } as any);
+      account: address,
+      chain: base,
+      chainId: base.id,
+    });
   };
 
   return { sellShares, isConfirming, isSuccess, hash, isPending };
 }
 
 export function useClaimWinnings() {
+  const { address } = useAccount();
   const { writeContractAsync, data: hash, isPending } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
 
   const claimWinnings = async () => {
     return await writeContractAsync({
       address: HONDURAS_ELECTION_ADDRESS as `0x${string}`,
-      abi: HondurasElectionABI as any,
+      abi: HondurasElectionABI as unknown as Abi,
       functionName: "claimWinnings",
-    } as any);
+      account: address,
+      chain: base,
+      chainId: base.id,
+    });
   };
 
   return { claimWinnings, isConfirming, isSuccess, hash, isPending };
