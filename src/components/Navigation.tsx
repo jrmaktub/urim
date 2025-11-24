@@ -26,6 +26,7 @@ const Navigation = () => {
     { name: "50/50 Lottery", path: "/lottery" },
     { name: "Everything Bets", path: "/everything-bets" },
     { name: "Tournaments", path: "/tournaments" },
+    { name: "Liquidity Provider", path: "/liquidity-provider" },
   ];
 
   const handleOpenTransactionHistory = () => {
