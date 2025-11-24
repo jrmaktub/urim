@@ -107,6 +107,78 @@ const LiquidityProvider = () => {
               </Button>
             </CardContent>
           </Card>
+
+          {/* Benefits Section */}
+          <div className="mt-12 space-y-6">
+            <h2 className="text-3xl font-bold text-center text-foreground">
+              Why Become a Liquidity Provider?
+            </h2>
+            <p className="text-center text-muted-foreground text-lg">
+              URIM rewards the people who power the markets. When you deposit funds, you earn a share of the platform's real economic activity:
+            </p>
+
+            <div className="grid gap-4 mt-8">
+              {/* Market Creation Fees */}
+              <Card className="border-primary/20 hover:border-primary/40 transition-colors">
+                <CardHeader>
+                  <CardTitle className="text-xl">Market Creation Fees</CardTitle>
+                  <CardDescription className="text-base">
+                    Earn a percentage every time a new prediction market is launched.
+                  </CardDescription>
+                </CardHeader>
+              </Card>
+
+              {/* Trading Fees */}
+              <Card className="border-primary/20 hover:border-primary/40 transition-colors">
+                <CardHeader>
+                  <CardTitle className="text-xl">Trading Fees</CardTitle>
+                  <CardDescription className="text-base">
+                    Receive a share of the fees generated from every YES/NO trade executed on the platform.
+                  </CardDescription>
+                </CardHeader>
+              </Card>
+
+              {/* Settlement Fees */}
+              <Card className="border-primary/20 hover:border-primary/40 transition-colors">
+                <CardHeader>
+                  <CardTitle className="text-xl">Settlement Fees</CardTitle>
+                  <CardDescription className="text-base">
+                    When markets resolve, LPs receive part of the settlement costs.
+                  </CardDescription>
+                </CardHeader>
+              </Card>
+
+              {/* Spread Capture */}
+              <Card className="border-primary/20 hover:border-primary/40 transition-colors">
+                <CardHeader>
+                  <CardTitle className="text-xl">Spread Capture</CardTitle>
+                  <CardDescription className="text-base">
+                    You profit from the natural gap between YES and NO prices taken by traders.
+                  </CardDescription>
+                </CardHeader>
+              </Card>
+
+              {/* Passive Income */}
+              <Card className="border-primary/20 hover:border-primary/40 transition-colors">
+                <CardHeader>
+                  <CardTitle className="text-xl">Passive Income, Active Growth</CardTitle>
+                  <CardDescription className="text-base">
+                    Your liquidity helps expand URIM markets, and you earn automatically as activity increases.
+                  </CardDescription>
+                </CardHeader>
+              </Card>
+
+              {/* Transparency */}
+              <Card className="border-primary/20 hover:border-primary/40 transition-colors">
+                <CardHeader>
+                  <CardTitle className="text-xl">Fully Transparent & On-Chain</CardTitle>
+                  <CardDescription className="text-base">
+                    Every LP balance, fee distribution, and payout is visible and verifiable.
+                  </CardDescription>
+                </CardHeader>
+              </Card>
+            </div>
+          </div>
         </div>
       </main>
 
