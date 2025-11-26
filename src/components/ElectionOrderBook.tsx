@@ -74,13 +74,13 @@ const ElectionOrderBook = ({ candidateId, candidateName }: ElectionOrderBookProp
                 <div className="text-muted-foreground font-mono text-xs">
                   {formatAddress(order.trader)}
                 </div>
-                <div className="text-muted-foreground text-xs">{new Date(order.timestamp * 1000).toLocaleTimeString()}</div>
+                <div className="text-muted-foreground text-xs">{order.timestamp}</div>
                 <div>
                   <Button
                     variant="ghost"
                     size="sm"
                     className="h-6 w-6 p-0"
-                    onClick={() => window.open(`https://basescan.org/block/${order.timestamp}`, "_blank")}
+                    onClick={() => window.open(`https://basescan.org/block/${order.blockNumber}`, "_blank")}
                   >
                     <ExternalLink className="h-3 w-3 text-muted-foreground hover:text-primary" />
                   </Button>
@@ -124,13 +124,13 @@ const ElectionOrderBook = ({ candidateId, candidateName }: ElectionOrderBookProp
                 <div className="text-muted-foreground font-mono text-xs">
                   {formatAddress(order.trader)}
                 </div>
-                <div className="text-muted-foreground text-xs">{new Date(order.timestamp * 1000).toLocaleTimeString()}</div>
+                <div className="text-muted-foreground text-xs">{order.timestamp}</div>
                 <div>
                   <Button
                     variant="ghost"
                     size="sm"
                     className="h-6 w-6 p-0"
-                    onClick={() => window.open(`https://basescan.org/block/${order.timestamp}`, "_blank")}
+                    onClick={() => window.open(`https://basescan.org/block/${order.blockNumber}`, "_blank")}
                   >
                     <ExternalLink className="h-3 w-3 text-muted-foreground hover:text-primary" />
                   </Button>
