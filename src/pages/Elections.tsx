@@ -60,7 +60,7 @@ const Elections = () => {
   const moncadaPosition = useUserPosition(CANDIDATE_IDS.MONCADA);
   const asfuraPosition = useUserPosition(CANDIDATE_IDS.ASFURA);
   const { allowance, refetch: refetchAllowance } = useUSDCAllowance();
-  const { recentTrades } = useRealtimeTrades();
+  const { recentTrades, isLoadingHistory } = useRealtimeTrades();
 
   const { approve, isPending: isApprovingTx, isConfirming: isApprovalConfirming, isSuccess: isApprovalSuccess } = useApproveUSDC();
   const { buyShares, isConfirming: isBuying, isPending: isBuyingPending } = useBuyShares();
@@ -378,6 +378,7 @@ const Elections = () => {
                       candidateId={candidate.id}
                       candidateName={candidate.name}
                       trades={recentTrades}
+                      isLoadingHistory={isLoadingHistory}
                     />
                   )}
                 </div>
