@@ -33,27 +33,40 @@ export const useAlchemyContractEvents = (candidateId: number) => {
       console.log("🔍 Fetching events from BaseScan...");
       console.log("Contract Address:", HONDURAS_ELECTION_ADDRESS);
       console.log("Candidate ID:", candidateId);
+      console.log("Event signatures:", SHARES_PURCHASED_SIGNATURE, SHARES_SOLD_SIGNATURE);
 
-      // Fetch all logs from BaseScan API
-      const response = await fetch(
-        `${BASESCAN_API_URL}?module=logs&action=getLogs&fromBlock=0&toBlock=latest&address=${HONDURAS_ELECTION_ADDRESS}&apikey=${BASESCAN_API_KEY}`
+      // Fetch SharesPurchased events
+      const purchaseResponse = await fetch(
+        `${BASESCAN_API_URL}?module=logs&action=getLogs&fromBlock=0&toBlock=latest&address=${HONDURAS_ELECTION_ADDRESS}&topic0=${SHARES_PURCHASED_SIGNATURE}&apikey=${BASESCAN_API_KEY}`
       );
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("❌ BaseScan API error:", errorText);
-        throw new Error(`BaseScan API error: ${response.status} - ${errorText}`);
+      const purchaseData = await purchaseResponse.json();
+      console.log("Purchase events response:", purchaseData);
+
+      if (purchaseData.status !== "1" && purchaseData.message !== "No records found") {
+        console.error("❌ BaseScan API error (purchases):", purchaseData.message);
+        throw new Error(purchaseData.message || "Failed to fetch purchase logs");
       }
 
-      const data = await response.json();
+      // Fetch SharesSold events
+      const saleResponse = await fetch(
+        `${BASESCAN_API_URL}?module=logs&action=getLogs&fromBlock=0&toBlock=latest&address=${HONDURAS_ELECTION_ADDRESS}&topic0=${SHARES_SOLD_SIGNATURE}&apikey=${BASESCAN_API_KEY}`
+      );
 
-      if (data.status !== "1") {
-        console.error("❌ BaseScan API error:", data.message);
-        throw new Error(data.message || "Failed to fetch logs");
+      const saleData = await saleResponse.json();
+      console.log("Sale events response:", saleData);
+
+      if (saleData.status !== "1" && saleData.message !== "No records found") {
+        console.error("❌ BaseScan API error (sales):", saleData.message);
+        throw new Error(saleData.message || "Failed to fetch sale logs");
       }
 
-      const allLogs = data.result || [];
-      console.log(`✅ Total logs fetched: ${allLogs.length}`);
+      // Combine all logs
+      const purchaseLogs = purchaseData.result || [];
+      const saleLogs = saleData.result || [];
+      const allLogs = [...purchaseLogs, ...saleLogs];
+      console.log(`✅ Total logs fetched: ${allLogs.length} (${purchaseLogs.length} purchases, ${saleLogs.length} sales)`);
+
       const processedOrders: OrderBookEntry[] = [];
 
       // Fetch block timestamps for all unique blocks
