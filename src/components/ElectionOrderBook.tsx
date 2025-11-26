@@ -1,4 +1,4 @@
-import { useOrderBookEvents } from "@/hooks/useOrderBookEvents";
+import { useThirdwebTransactions } from "@/hooks/useThirdwebTransactions";
 import { Loader2, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -8,7 +8,7 @@ interface ElectionOrderBookProps {
 }
 
 const ElectionOrderBook = ({ candidateId, candidateName }: ElectionOrderBookProps) => {
-  const { orders, isLoading } = useOrderBookEvents(candidateId);
+  const { orders, isLoading } = useThirdwebTransactions(candidateId);
 
   const formatAddress = (address: string) => {
     if (!address) return "";
@@ -17,10 +17,6 @@ const ElectionOrderBook = ({ candidateId, candidateName }: ElectionOrderBookProp
 
   const bids = orders.filter((o) => o.type === "BID");
   const asks = orders.filter((o) => o.type === "ASK");
-
-  const openBaseScan = (txHash: string) => {
-    window.open(`https://basescan.org/tx/${txHash}`, "_blank");
-  };
 
   if (isLoading) {
     return (
@@ -49,13 +45,12 @@ const ElectionOrderBook = ({ candidateId, candidateName }: ElectionOrderBookProp
         </div>
         
         <div className="space-y-1">
-          <div className="grid grid-cols-6 gap-3 px-3 py-2 text-xs font-medium text-muted-foreground border-b border-border/20">
+          <div className="grid grid-cols-5 gap-3 px-3 py-2 text-xs font-medium text-muted-foreground border-b border-border/20">
             <div>Price (¢)</div>
             <div>Shares</div>
             <div>Total (USDC)</div>
             <div>Trader</div>
             <div>Time</div>
-            <div>Tx</div>
           </div>
           
           {bids.length === 0 ? (
@@ -66,25 +61,24 @@ const ElectionOrderBook = ({ candidateId, candidateName }: ElectionOrderBookProp
             bids.slice(0, 10).map((order, idx) => (
               <div
                 key={idx}
-                className="grid grid-cols-6 gap-3 px-3 py-2 text-sm rounded-lg hover:bg-primary/5 hover:shadow-[0_0_15px_rgba(139,92,246,0.2)] transition-all duration-200"
+                className="grid grid-cols-5 gap-3 px-3 py-2 text-sm rounded-lg hover:bg-primary/5 hover:shadow-[0_0_15px_rgba(139,92,246,0.2)] transition-all duration-200 border-l-2 border-green-500"
               >
                 <div className="font-medium text-green-400">{order.price}¢</div>
                 <div className="text-foreground">{order.shares}</div>
                 <div className="text-foreground">${order.totalUSDC}</div>
-                <div className="text-muted-foreground font-mono text-xs">
+                <button
+                  onClick={() => window.open(`https://basescan.org/address/${order.trader}`, "_blank")}
+                  className="text-muted-foreground font-mono text-xs hover:text-primary transition-colors"
+                >
                   {formatAddress(order.trader)}
-                </div>
-                <div className="text-muted-foreground text-xs">{order.timestamp}</div>
-                <div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 w-6 p-0"
-                    onClick={() => window.open(`https://basescan.org/block/${order.blockNumber}`, "_blank")}
-                  >
-                    <ExternalLink className="h-3 w-3 text-muted-foreground hover:text-primary" />
-                  </Button>
-                </div>
+                </button>
+                <button
+                  onClick={() => window.open(`https://basescan.org/tx/${order.txHash}`, "_blank")}
+                  className="text-muted-foreground text-xs hover:text-primary transition-colors flex items-center gap-1"
+                >
+                  {order.timestamp}
+                  <ExternalLink className="h-3 w-3" />
+                </button>
               </div>
             ))
           )}
@@ -99,13 +93,12 @@ const ElectionOrderBook = ({ candidateId, candidateName }: ElectionOrderBookProp
         </div>
         
         <div className="space-y-1">
-          <div className="grid grid-cols-6 gap-3 px-3 py-2 text-xs font-medium text-muted-foreground border-b border-border/20">
+          <div className="grid grid-cols-5 gap-3 px-3 py-2 text-xs font-medium text-muted-foreground border-b border-border/20">
             <div>Price (¢)</div>
             <div>Shares</div>
             <div>Total (USDC)</div>
             <div>Trader</div>
             <div>Time</div>
-            <div>Tx</div>
           </div>
           
           {asks.length === 0 ? (
@@ -116,25 +109,24 @@ const ElectionOrderBook = ({ candidateId, candidateName }: ElectionOrderBookProp
             asks.slice(0, 10).map((order, idx) => (
               <div
                 key={idx}
-                className="grid grid-cols-6 gap-3 px-3 py-2 text-sm rounded-lg hover:bg-primary/5 hover:shadow-[0_0_15px_rgba(139,92,246,0.2)] transition-all duration-200"
+                className="grid grid-cols-5 gap-3 px-3 py-2 text-sm rounded-lg hover:bg-primary/5 hover:shadow-[0_0_15px_rgba(139,92,246,0.2)] transition-all duration-200 border-l-2 border-red-500"
               >
                 <div className="font-medium text-red-400">{order.price}¢</div>
                 <div className="text-foreground">{order.shares}</div>
                 <div className="text-foreground">${order.totalUSDC}</div>
-                <div className="text-muted-foreground font-mono text-xs">
+                <button
+                  onClick={() => window.open(`https://basescan.org/address/${order.trader}`, "_blank")}
+                  className="text-muted-foreground font-mono text-xs hover:text-primary transition-colors"
+                >
                   {formatAddress(order.trader)}
-                </div>
-                <div className="text-muted-foreground text-xs">{order.timestamp}</div>
-                <div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 w-6 p-0"
-                    onClick={() => window.open(`https://basescan.org/block/${order.blockNumber}`, "_blank")}
-                  >
-                    <ExternalLink className="h-3 w-3 text-muted-foreground hover:text-primary" />
-                  </Button>
-                </div>
+                </button>
+                <button
+                  onClick={() => window.open(`https://basescan.org/tx/${order.txHash}`, "_blank")}
+                  className="text-muted-foreground text-xs hover:text-primary transition-colors flex items-center gap-1"
+                >
+                  {order.timestamp}
+                  <ExternalLink className="h-3 w-3" />
+                </button>
               </div>
             ))
           )}
