@@ -25,13 +25,13 @@ const candidatesBase = [
     id: CANDIDATE_IDS.NASRALLA,
     name: "Salvador Nasralla",
     image: "/placeholder.svg",
-    color: "hsl(0 100% 50%)",
+    color: "#FFFFFF",
   },
   {
     id: CANDIDATE_IDS.MONCADA,
     name: "Rixi Moncada",
     image: "/placeholder.svg",
-    color: "hsl(45 100% 55%)",
+    color: "#FF3B30",
   },
   {
     id: CANDIDATE_IDS.ASFURA,
@@ -378,16 +378,10 @@ const Elections = () => {
               <h2 className="text-2xl font-bold text-foreground">Rules Summary</h2>
               <div className="space-y-4">
                 <p className="text-foreground leading-relaxed">
-                  Presidential elections in Honduras are scheduled for November 30, 2025.
+                  Presidential elections in Honduras are scheduled for November 30, 2025. This market resolves to the candidate who is publicly confirmed as the winner. If no winner is determined by December 31, 2026 at 11:59 PM ET, the market resolves to 'Other'.
                 </p>
                 <p className="text-foreground leading-relaxed">
-                  This market resolves according to the candidate who is publicly confirmed as the winner.
-                </p>
-                <p className="text-foreground leading-relaxed">
-                  If no winner is known by December 31, 2026 at 11:59 PM ET, the market resolves to 'Other'.
-                </p>
-                <p className="text-foreground leading-relaxed">
-                  Winner determination is based on a consensus of credible reporting and the official announcement from the Honduran National Electoral Council (CNE). If major sources disagree temporarily, resolution will wait until a clear public consensus emerges.
+                  Winner determination is based on a consensus of credible reporting — including outlets such as The New York Times, Reuters, AP, Politico, Semafor, CNN, ABC, Fox News, and others — together with the official announcement from the Honduran National Electoral Council (Consejo Nacional Electoral, CNE). If major sources temporarily conflict, resolution will pause until a clear and consistent public consensus emerges.
                 </p>
                 <div className="flex flex-wrap gap-3 pt-2">
                   <Button variant="outline" size="sm" className="gap-2">
@@ -451,19 +445,35 @@ const Elections = () => {
               <p className="text-muted-foreground mb-4">
                 Market resolution is verified through decentralized oracle consensus.
               </p>
-              <Button variant="outline" className="gap-2 border-primary/30 hover:border-primary/50">
-                View Oracle Resolver
-                <ExternalLink className="w-4 h-4" />
-              </Button>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between p-3 bg-card/50 rounded-lg border border-border/30">
+                  <div>
+                    <p className="text-sm font-medium text-foreground">Resolver (UMA)</p>
+                    <a 
+                      href="https://basescan.org/address/0x2aBf1Bd76655de80eDB3086114315Eec75AF500c" 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-xs text-primary hover:underline flex items-center gap-1"
+                    >
+                      0x2aBf...500c
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  </div>
+                </div>
+                <Button variant="outline" className="gap-2 border-primary/30 hover:border-primary/50 w-full">
+                  View Oracle Resolver
+                  <ExternalLink className="w-4 h-4" />
+                </Button>
+              </div>
             </div>
           </div>
 
           {/* Right Sidebar - Purchase Widget */}
           <div className="lg:col-span-1">
-            <div className="sticky top-24 glass-card p-6 space-y-6">
+            <div className="sticky top-24 glass-card p-4 space-y-4">
               {/* Candidate Info */}
-              <div className="flex items-center gap-4 pb-4 border-b border-border/50">
-                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary/20 to-secondary overflow-hidden border-2 border-primary/30">
+              <div className="flex items-center gap-3 pb-3 border-b border-border/50">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/20 to-secondary overflow-hidden border-2 border-primary/30">
                   <img
                     src={selectedCandidate.image}
                     alt={selectedCandidate.name}
@@ -471,8 +481,8 @@ const Elections = () => {
                   />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-foreground">{selectedCandidate.name}</h3>
-                  <p className="text-sm text-muted-foreground">{selectedCandidate.percentage}% probability</p>
+                  <h3 className="text-sm font-semibold text-foreground">{selectedCandidate.name}</h3>
+                  <p className="text-xs text-muted-foreground">{selectedCandidate.percentage}% probability</p>
                 </div>
               </div>
 
@@ -504,19 +514,19 @@ const Elections = () => {
 
               {/* User Position */}
               {isConnected && parseFloat(selectedCandidate.position) > 0 && (
-                <div className="bg-card/50 rounded-xl p-4 border border-border/30">
-                  <div className="text-sm text-muted-foreground mb-1">Your Position</div>
-                  <div className="text-2xl font-bold text-primary">${selectedCandidate.position}</div>
+                <div className="bg-card/50 rounded-lg p-3 border border-border/30">
+                  <div className="text-xs text-muted-foreground mb-1">Your Position</div>
+                  <div className="text-lg font-bold text-primary">${selectedCandidate.position}</div>
                 </div>
               )}
 
               {/* Price Display */}
               <div className="space-y-2">
-                <div className="flex justify-between text-sm">
+                <div className="flex justify-between text-xs">
                   <span className="text-muted-foreground">Current Price</span>
                   <span className="font-semibold text-primary">{selectedCandidate.percentage}%</span>
                 </div>
-                <div className="flex justify-between text-sm">
+                <div className="flex justify-between text-xs">
                   <span className="text-muted-foreground">Market Status</span>
                   <span className={`font-semibold ${marketState === MARKET_STATES.OPEN ? 'text-green-500' : marketState === MARKET_STATES.RESOLVED ? 'text-blue-500' : 'text-red-500'}`}>
                     {marketState === MARKET_STATES.OPEN ? 'OPEN' : marketState === MARKET_STATES.RESOLVED ? 'RESOLVED' : 'CLOSED'}
@@ -524,17 +534,9 @@ const Elections = () => {
                 </div>
               </div>
 
-              {/* Amount Input */}
-              <div className="space-y-3">
-                <label className="text-sm font-medium text-foreground">Amount (USDC)</label>
-                <Input
-                  type="number"
-                  placeholder="0.00"
-                  value={tradeAmount}
-                  onChange={(e) => setTradeAmount(e.target.value)}
-                  className="text-lg"
-                  disabled={marketState !== MARKET_STATES.OPEN || isProcessing}
-                />
+              {/* Quick Amount Buttons */}
+              <div className="space-y-2">
+                <label className="text-xs font-medium text-muted-foreground">Quick Amount</label>
                 <div className="flex gap-2">
                   {[1, 5, 20, 100].map((amount) => (
                     <Button
@@ -542,7 +544,7 @@ const Elections = () => {
                       size="sm"
                       variant="outline"
                       onClick={() => setTradeAmount(amount.toString())}
-                      className="flex-1 text-xs"
+                      className="flex-1 text-xs h-8"
                       disabled={marketState !== MARKET_STATES.OPEN || isProcessing}
                     >
                       ${amount}
@@ -552,20 +554,20 @@ const Elections = () => {
               </div>
 
               {/* Transaction Summary */}
-              <div className="bg-card/50 rounded-xl p-4 space-y-2 border border-border/30">
-                <div className="flex justify-between text-sm">
+              <div className="bg-card/50 rounded-lg p-3 space-y-1.5 border border-border/30">
+                <div className="flex justify-between text-xs">
                   <span className="text-muted-foreground">You {tradeType === "YES" ? "pay" : "receive"}</span>
                   <span className="font-semibold text-foreground">
                     ${tradeAmount || "0.00"} USDC
                   </span>
                 </div>
-                <div className="flex justify-between text-sm">
+                <div className="flex justify-between text-xs">
                   <span className="text-muted-foreground">Expected value</span>
                   <span className="font-semibold text-primary">
                     ${tradeAmount ? (parseFloat(tradeAmount) / (selectedCandidate.percentage / 100)).toFixed(2) : "0.00"}
                   </span>
                 </div>
-                <div className="flex justify-between text-sm pt-2 border-t border-border/30">
+                <div className="flex justify-between text-xs pt-1.5 border-t border-border/30">
                   <span className="text-muted-foreground">Current Price</span>
                   <span className="font-medium text-foreground">{selectedCandidate.percentage}%</span>
                 </div>
