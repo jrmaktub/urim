@@ -23,74 +23,77 @@ export function useRealtimeTrades() {
   // Fetch historical trades on mount
   useEffect(() => {
     const fetchHistoricalTrades = async () => {
-      if (!publicClient) return;
+      if (!publicClient) {
+        console.log("❌ NO PUBLIC CLIENT AVAILABLE");
+        return;
+      }
 
       try {
-        console.log("📚 FETCHING HISTORICAL TRADES...");
+        console.log("📚 STARTING HISTORICAL TRADE FETCH...");
         const latestBlock = await publicClient.getBlockNumber();
-        const startBlock = latestBlock - 1000n > 0n ? latestBlock - 1000n : 0n;
+        console.log("📦 Latest block:", latestBlock);
+        
+        // Start with just last 100 blocks for testing
+        const startBlock = latestBlock - 100n > 0n ? latestBlock - 100n : 0n;
         const allTrades: RealtimeTrade[] = [];
 
-        // Fetch in chunks of 10 blocks to avoid rate limits
-        for (let i = startBlock; i <= latestBlock; i += 10n) {
-          const toBlock = i + 9n > latestBlock ? latestBlock : i + 9n;
+        console.log(`🔍 Fetching blocks ${startBlock} to ${latestBlock}`);
 
-          console.log(`📦 Fetching blocks ${i} to ${toBlock}`);
+        // Fetch all at once for 100 blocks (should be safe)
+        const [purchaseLogs, sellLogs] = await Promise.all([
+          publicClient.getLogs({
+            address: HONDURAS_ELECTION_ADDRESS as `0x${string}`,
+            event: parseAbiItem('event SharesPurchased(address indexed buyer, uint8 indexed candidateId, uint256 usdcAmount, uint256 sharesReceived, uint256 newPrice)'),
+            fromBlock: startBlock,
+            toBlock: latestBlock
+          }),
+          publicClient.getLogs({
+            address: HONDURAS_ELECTION_ADDRESS as `0x${string}`,
+            event: parseAbiItem('event SharesSold(address indexed seller, uint8 indexed candidateId, uint256 sharesSold, uint256 usdcReceived, uint256 newPrice)'),
+            fromBlock: startBlock,
+            toBlock: latestBlock
+          })
+        ]);
 
-          const [purchaseLogs, sellLogs] = await Promise.all([
-            publicClient.getLogs({
-              address: HONDURAS_ELECTION_ADDRESS as `0x${string}`,
-              event: parseAbiItem('event SharesPurchased(address indexed buyer, uint8 indexed candidateId, uint256 usdcAmount, uint256 sharesReceived, uint256 newPrice)'),
-              fromBlock: i,
-              toBlock: toBlock
-            }),
-            publicClient.getLogs({
-              address: HONDURAS_ELECTION_ADDRESS as `0x${string}`,
-              event: parseAbiItem('event SharesSold(address indexed seller, uint8 indexed candidateId, uint256 sharesSold, uint256 usdcReceived, uint256 newPrice)'),
-              fromBlock: i,
-              toBlock: toBlock
-            })
-          ]);
+        console.log(`✅ FOUND ${purchaseLogs.length} BUYS, ${sellLogs.length} SELLS`);
 
-          // Process purchase events
-          for (const log of purchaseLogs) {
-            const block = await publicClient.getBlock({ blockNumber: log.blockNumber });
-            allTrades.push({
-              type: "BUY",
-              candidateId: Number((log.args as any).candidateId),
-              shares: formatUnits((log.args as any).sharesReceived, 18),
-              usdcAmount: formatUnits((log.args as any).usdcAmount, 6),
-              price: formatUnits((log.args as any).newPrice, 6),
-              trader: (log.args as any).buyer,
-              timestamp: Number(block.timestamp) * 1000,
-              txHash: log.transactionHash
-            });
-          }
+        // Process purchase events
+        for (const log of purchaseLogs) {
+          const block = await publicClient.getBlock({ blockNumber: log.blockNumber });
+          allTrades.push({
+            type: "BUY",
+            candidateId: Number((log.args as any).candidateId),
+            shares: formatUnits((log.args as any).sharesReceived, 18),
+            usdcAmount: formatUnits((log.args as any).usdcAmount, 6),
+            price: formatUnits((log.args as any).newPrice, 6),
+            trader: (log.args as any).buyer,
+            timestamp: Number(block.timestamp) * 1000,
+            txHash: log.transactionHash
+          });
+        }
 
-          // Process sell events
-          for (const log of sellLogs) {
-            const block = await publicClient.getBlock({ blockNumber: log.blockNumber });
-            allTrades.push({
-              type: "SELL",
-              candidateId: Number((log.args as any).candidateId),
-              shares: formatUnits((log.args as any).sharesSold, 18),
-              usdcAmount: formatUnits((log.args as any).usdcReceived, 6),
-              price: formatUnits((log.args as any).newPrice, 6),
-              trader: (log.args as any).seller,
-              timestamp: Number(block.timestamp) * 1000,
-              txHash: log.transactionHash
-            });
-          }
-
-          // Small delay to avoid hammering the RPC
-          await new Promise(resolve => setTimeout(resolve, 100));
+        // Process sell events
+        for (const log of sellLogs) {
+          const block = await publicClient.getBlock({ blockNumber: log.blockNumber });
+          allTrades.push({
+            type: "SELL",
+            candidateId: Number((log.args as any).candidateId),
+            shares: formatUnits((log.args as any).sharesSold, 18),
+            usdcAmount: formatUnits((log.args as any).usdcReceived, 6),
+            price: formatUnits((log.args as any).newPrice, 6),
+            trader: (log.args as any).seller,
+            timestamp: Number(block.timestamp) * 1000,
+            txHash: log.transactionHash
+          });
         }
 
         // Sort by timestamp (newest first)
         allTrades.sort((a, b) => b.timestamp - a.timestamp);
         
-        console.log(`✅ LOADED ${allTrades.length} HISTORICAL TRADES`);
-        setRecentTrades(allTrades.slice(0, 100)); // Keep last 100
+        console.log(`✅ PROCESSED ${allTrades.length} TOTAL TRADES`);
+        console.log("First trade:", allTrades[0]);
+        
+        setRecentTrades(allTrades.slice(0, 100));
         setIsLoadingHistory(false);
       } catch (error) {
         console.error("❌ ERROR FETCHING HISTORICAL TRADES:", error);
