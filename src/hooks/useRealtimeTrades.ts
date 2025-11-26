@@ -40,13 +40,13 @@ export function useRealtimeTrades() {
           const [purchaseLogs, sellLogs] = await Promise.all([
             publicClient.getLogs({
               address: HONDURAS_ELECTION_ADDRESS as `0x${string}`,
-              event: parseAbiItem('event SharesPurchased(uint8 indexed candidateId, address indexed buyer, uint256 shareAmount, uint256 cost, uint256 newPrice)'),
+              event: parseAbiItem('event SharesPurchased(address indexed buyer, uint8 indexed candidateId, uint256 usdcAmount, uint256 sharesReceived, uint256 newPrice)'),
               fromBlock: i,
               toBlock: toBlock
             }),
             publicClient.getLogs({
               address: HONDURAS_ELECTION_ADDRESS as `0x${string}`,
-              event: parseAbiItem('event SharesSold(uint8 indexed candidateId, address indexed seller, uint256 shareAmount, uint256 payout, uint256 newPrice)'),
+              event: parseAbiItem('event SharesSold(address indexed seller, uint8 indexed candidateId, uint256 sharesSold, uint256 usdcReceived, uint256 newPrice)'),
               fromBlock: i,
               toBlock: toBlock
             })
@@ -58,8 +58,8 @@ export function useRealtimeTrades() {
             allTrades.push({
               type: "BUY",
               candidateId: Number((log.args as any).candidateId),
-              shares: formatUnits((log.args as any).shareAmount, 18),
-              usdcAmount: formatUnits((log.args as any).cost, 6),
+              shares: formatUnits((log.args as any).sharesReceived, 18),
+              usdcAmount: formatUnits((log.args as any).usdcAmount, 6),
               price: formatUnits((log.args as any).newPrice, 6),
               trader: (log.args as any).buyer,
               timestamp: Number(block.timestamp) * 1000,
@@ -73,8 +73,8 @@ export function useRealtimeTrades() {
             allTrades.push({
               type: "SELL",
               candidateId: Number((log.args as any).candidateId),
-              shares: formatUnits((log.args as any).shareAmount, 18),
-              usdcAmount: formatUnits((log.args as any).payout, 6),
+              shares: formatUnits((log.args as any).sharesSold, 18),
+              usdcAmount: formatUnits((log.args as any).usdcReceived, 6),
               price: formatUnits((log.args as any).newPrice, 6),
               trader: (log.args as any).seller,
               timestamp: Number(block.timestamp) * 1000,
@@ -112,14 +112,14 @@ export function useRealtimeTrades() {
       const newTrade: RealtimeTrade = {
         type: "BUY",
         candidateId: Number(log.args.candidateId),
-        shares: formatUnits(log.args.shareAmount, 18),
-        usdcAmount: formatUnits(log.args.cost, 6),
+        shares: formatUnits(log.args.sharesReceived, 18),
+        usdcAmount: formatUnits(log.args.usdcAmount, 6),
         price: formatUnits(log.args.newPrice, 6),
         trader: log.args.buyer,
         timestamp: Date.now(),
         txHash: log.transactionHash,
       };
-      setRecentTrades((prev) => [newTrade, ...prev].slice(0, 20));
+      setRecentTrades((prev) => [newTrade, ...prev].slice(0, 100));
     },
   });
 
@@ -134,14 +134,14 @@ export function useRealtimeTrades() {
       const newTrade: RealtimeTrade = {
         type: "SELL",
         candidateId: Number(log.args.candidateId),
-        shares: formatUnits(log.args.shareAmount, 18),
-        usdcAmount: formatUnits(log.args.payout, 6),
+        shares: formatUnits(log.args.sharesSold, 18),
+        usdcAmount: formatUnits(log.args.usdcReceived, 6),
         price: formatUnits(log.args.newPrice, 6),
         trader: log.args.seller,
         timestamp: Date.now(),
         txHash: log.transactionHash,
       };
-      setRecentTrades((prev) => [newTrade, ...prev].slice(0, 20));
+      setRecentTrades((prev) => [newTrade, ...prev].slice(0, 100));
     },
   });
 
