@@ -1,4 +1,4 @@
-import { useHondurasElectionEvents } from "@/hooks/useHondurasElectionEvents";
+import { useOrderBookEvents } from "@/hooks/useOrderBookEvents";
 import { Loader2, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -8,7 +8,7 @@ interface ElectionOrderBookProps {
 }
 
 const ElectionOrderBook = ({ candidateId, candidateName }: ElectionOrderBookProps) => {
-  const { orders, isLoading } = useHondurasElectionEvents(candidateId);
+  const { orders, isLoading } = useOrderBookEvents(candidateId);
 
   const formatAddress = (address: string) => {
     if (!address) return "";
