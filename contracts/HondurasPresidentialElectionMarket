@@ -68,6 +68,9 @@ contract HondurasPresidentialElectionMarket is
     mapping(address => uint256) public userSharesNasralla;
     mapping(address => uint256) public userSharesMoncada;
     mapping(address => uint256) public userSharesAsfura;
+    
+    uint256 public seedAmount;
+    mapping(address => uint256) public userDeposits;
 
     enum MarketState {
         OPEN,
@@ -77,7 +80,6 @@ contract HondurasPresidentialElectionMarket is
     MarketState public state;
 
     uint256 public immutable MARKET_CLOSE_TIME;
-    uint256 public constant ELECTION_DATE = 1764547200;
 
     uint8 public winningCandidate;
 
@@ -91,6 +93,8 @@ contract HondurasPresidentialElectionMarket is
     uint256 public constant FEE_PERCENT = 50;
     uint256 public constant FEE_DENOMINATOR = 10000;
     uint256 public collectedFees;
+
+    bool public emergencyMode;
 
     event SharesPurchased(
         address indexed buyer,
@@ -122,29 +126,27 @@ contract HondurasPresidentialElectionMarket is
         uint256 usdcPayout
     );
 
+    event EmergencyModeActivated();
+
     constructor(
         address _optimisticOracleV3,
         address _usdc
     ) Ownable(msg.sender) {
         oo = OptimisticOracleV3Interface(_optimisticOracleV3);
         usdc = IERC20(_usdc);
-        MARKET_CLOSE_TIME = block.timestamp + 15 minutes;
+        MARKET_CLOSE_TIME = 1764558000;
         state = MarketState.OPEN;
-
         nasrallaShares = INITIAL_SHARES;
         moncadaShares = INITIAL_SHARES;
         asfuraShares = INITIAL_SHARES;
-
         k = INITIAL_SHARES * INITIAL_SHARES * INITIAL_SHARES;
     }
 
     function seedLiquidity(uint256 amount) external onlyOwner {
-        require(state == MarketState.OPEN, "Market not open");
-        require(amount >= ASSERTION_REWARD, "Must cover assertion reward");
-        require(
-            usdc.transferFrom(msg.sender, address(this), amount),
-            "Transfer failed"
-        );
+        require(state == MarketState.OPEN);
+        require(amount >= ASSERTION_REWARD);
+        seedAmount = amount;
+        require(usdc.transferFrom(msg.sender, address(this), amount));
     }
 
     function buyShares(
@@ -152,47 +154,81 @@ contract HondurasPresidentialElectionMarket is
         uint256 usdcAmount,
         uint256 minShares
     ) external nonReentrant returns (uint256 sharesReceived) {
-        require(state == MarketState.OPEN, "Market not open");
-        require(block.timestamp < MARKET_CLOSE_TIME, "Market closed");
-        require(candidateId >= 1 && candidateId <= 3, "Invalid candidate");
-        require(usdcAmount > 0, "Amount must be > 0");
+        require(state == MarketState.OPEN);
+        require(block.timestamp < MARKET_CLOSE_TIME);
+        require(candidateId >= 1 && candidateId <= 3);
+        require(usdcAmount > 0);
 
         uint256 fee = (usdcAmount * FEE_PERCENT) / FEE_DENOMINATOR;
-        uint256 amountAfterFee = usdcAmount - fee;
+        uint256 totalCost = usdcAmount + fee;
         collectedFees += fee;
 
-        sharesReceived = _calculateBuyShares(candidateId, amountAfterFee);
-        require(sharesReceived >= minShares, "Slippage too high");
-        require(sharesReceived > 0, "Shares received must be > 0");
+        sharesReceived = _calculateBuyShares(candidateId, usdcAmount);
+        require(sharesReceived >= minShares);
+        require(sharesReceived > 0);
 
         if (candidateId == 1) {
-            require(nasrallaShares > sharesReceived, "Insufficient liquidity");
+            require(nasrallaShares > sharesReceived);
             nasrallaShares -= sharesReceived;
             userSharesNasralla[msg.sender] += sharesReceived;
         } else if (candidateId == 2) {
-            require(moncadaShares > sharesReceived, "Insufficient liquidity");
+            require(moncadaShares > sharesReceived);
             moncadaShares -= sharesReceived;
             userSharesMoncada[msg.sender] += sharesReceived;
         } else {
-            require(asfuraShares > sharesReceived, "Insufficient liquidity");
+            require(asfuraShares > sharesReceived);
             asfuraShares -= sharesReceived;
             userSharesAsfura[msg.sender] += sharesReceived;
         }
 
-        require(
-            usdc.transferFrom(msg.sender, address(this), usdcAmount),
-            "Transfer failed"
-        );
+        userDeposits[msg.sender] += totalCost;
+
+        require(usdc.transferFrom(msg.sender, address(this), totalCost));
 
         uint256 newPrice = getCurrentPrice(candidateId);
-        emit SharesPurchased(
-            msg.sender,
-            candidateId,
-            usdcAmount,
-            sharesReceived,
-            newPrice
-        );
+        emit SharesPurchased(msg.sender, candidateId, totalCost, sharesReceived, newPrice);
+        return sharesReceived;
+    }
 
+    function buySharesUSD(
+        uint8 candidateId,
+        uint256 usdcAmount
+    ) external nonReentrant returns (uint256 sharesReceived) {
+        require(state == MarketState.OPEN);
+        require(block.timestamp < MARKET_CLOSE_TIME);
+        require(candidateId >= 1 && candidateId <= 3);
+        require(usdcAmount > 0);
+
+        uint256 fee = (usdcAmount * FEE_PERCENT) / FEE_DENOMINATOR;
+        uint256 totalCost = usdcAmount + fee;
+        collectedFees += fee;
+
+        sharesReceived = _calculateBuyShares(candidateId, usdcAmount);
+        require(sharesReceived > 0);
+        
+        uint256 maxBuyable = (getCurrentShares(candidateId) * 95) / 100;
+        require(sharesReceived < maxBuyable);
+
+        if (candidateId == 1) {
+            require(nasrallaShares > sharesReceived);
+            nasrallaShares -= sharesReceived;
+            userSharesNasralla[msg.sender] += sharesReceived;
+        } else if (candidateId == 2) {
+            require(moncadaShares > sharesReceived);
+            moncadaShares -= sharesReceived;
+            userSharesMoncada[msg.sender] += sharesReceived;
+        } else {
+            require(asfuraShares > sharesReceived);
+            asfuraShares -= sharesReceived;
+            userSharesAsfura[msg.sender] += sharesReceived;
+        }
+
+        userDeposits[msg.sender] += totalCost;
+
+        require(usdc.transferFrom(msg.sender, address(this), totalCost));
+
+        uint256 newPrice = getCurrentPrice(candidateId);
+        emit SharesPurchased(msg.sender, candidateId, totalCost, sharesReceived, newPrice);
         return sharesReceived;
     }
 
@@ -201,10 +237,10 @@ contract HondurasPresidentialElectionMarket is
         uint256 shareAmount,
         uint256 minUsdc
     ) external nonReentrant returns (uint256 usdcReceived) {
-        require(state == MarketState.OPEN, "Market not open");
-        require(block.timestamp < MARKET_CLOSE_TIME, "Market closed");
-        require(candidateId >= 1 && candidateId <= 3, "Invalid candidate");
-        require(shareAmount > 0, "Amount must be > 0");
+        require(state == MarketState.OPEN);
+        require(block.timestamp < MARKET_CLOSE_TIME);
+        require(candidateId >= 1 && candidateId <= 3);
+        require(shareAmount > 0);
 
         uint256 userShares;
         if (candidateId == 1) {
@@ -214,7 +250,7 @@ contract HondurasPresidentialElectionMarket is
         } else {
             userShares = userSharesAsfura[msg.sender];
         }
-        require(userShares >= shareAmount, "Insufficient shares");
+        require(userShares >= shareAmount);
 
         usdcReceived = _calculateSellUsdc(candidateId, shareAmount);
 
@@ -222,7 +258,7 @@ contract HondurasPresidentialElectionMarket is
         uint256 amountAfterFee = usdcReceived - fee;
         collectedFees += fee;
 
-        require(amountAfterFee >= minUsdc, "Slippage too high");
+        require(amountAfterFee >= minUsdc);
 
         if (candidateId == 1) {
             nasrallaShares += shareAmount;
@@ -235,30 +271,73 @@ contract HondurasPresidentialElectionMarket is
             userSharesAsfura[msg.sender] -= shareAmount;
         }
 
-        require(usdc.transfer(msg.sender, amountAfterFee), "Transfer failed");
+        if (userDeposits[msg.sender] > amountAfterFee) {
+            userDeposits[msg.sender] -= amountAfterFee;
+        } else {
+            userDeposits[msg.sender] = 0;
+        }
+
+        require(usdc.transfer(msg.sender, amountAfterFee));
 
         uint256 newPrice = getCurrentPrice(candidateId);
-        emit SharesSold(
-            msg.sender,
-            candidateId,
-            shareAmount,
-            amountAfterFee,
-            newPrice
-        );
-
+        emit SharesSold(msg.sender, candidateId, shareAmount, amountAfterFee, newPrice);
         return amountAfterFee;
     }
 
+    function sellSharesUSD(
+        uint8 candidateId,
+        uint256 usdcAmount
+    ) external nonReentrant returns (uint256 sharesSold) {
+        require(state == MarketState.OPEN);
+        require(block.timestamp < MARKET_CLOSE_TIME);
+        require(candidateId >= 1 && candidateId <= 3);
+        require(usdcAmount > 0);
+
+        uint256 usdcBeforeFee = (usdcAmount * FEE_DENOMINATOR) / (FEE_DENOMINATOR - FEE_PERCENT);
+        sharesSold = _calculateSharesNeededForUSDC(candidateId, usdcBeforeFee);
+
+        uint256 userShares;
+        if (candidateId == 1) {
+            userShares = userSharesNasralla[msg.sender];
+            require(userShares >= sharesSold);
+            nasrallaShares += sharesSold;
+            userSharesNasralla[msg.sender] -= sharesSold;
+        } else if (candidateId == 2) {
+            userShares = userSharesMoncada[msg.sender];
+            require(userShares >= sharesSold);
+            moncadaShares += sharesSold;
+            userSharesMoncada[msg.sender] -= sharesSold;
+        } else {
+            userShares = userSharesAsfura[msg.sender];
+            require(userShares >= sharesSold);
+            asfuraShares += sharesSold;
+            userSharesAsfura[msg.sender] -= sharesSold;
+        }
+
+        uint256 fee = (usdcBeforeFee * FEE_PERCENT) / FEE_DENOMINATOR;
+        collectedFees += fee;
+
+        if (userDeposits[msg.sender] > usdcAmount) {
+            userDeposits[msg.sender] -= usdcAmount;
+        } else {
+            userDeposits[msg.sender] = 0;
+        }
+
+        require(usdc.transfer(msg.sender, usdcAmount));
+
+        uint256 newPrice = getCurrentPrice(candidateId);
+        emit SharesSold(msg.sender, candidateId, sharesSold, usdcAmount, newPrice);
+        return sharesSold;
+    }
+
     function getCurrentPrice(uint8 candidateId) public view returns (uint256) {
-        require(candidateId >= 1 && candidateId <= 3, "Invalid candidate");
+        require(candidateId >= 1 && candidateId <= 3);
 
         uint256 inversePriceA = (1e18 * INITIAL_SHARES) / nasrallaShares;
         uint256 inversePriceB = (1e18 * INITIAL_SHARES) / moncadaShares;
         uint256 inversePriceC = (1e18 * INITIAL_SHARES) / asfuraShares;
 
-        uint256 totalInversePrice = inversePriceA +
-            inversePriceB +
-            inversePriceC;
+        uint256 totalInversePrice = inversePriceA + inversePriceB + inversePriceC;
 
         if (candidateId == 1) {
             return (inversePriceA * 1e18) / totalInversePrice;
@@ -267,6 +346,12 @@ contract HondurasPresidentialElectionMarket is
         } else {
             return (inversePriceC * 1e18) / totalInversePrice;
         }
+    }
+
+    function getCurrentShares(uint8 candidateId) internal view returns (uint256) {
+        if (candidateId == 1) return nasrallaShares;
+        if (candidateId == 2) return moncadaShares;
+        return asfuraShares;
     }
 
     function _calculateBuyShares(
@@ -289,7 +374,7 @@ contract HondurasPresidentialElectionMarket is
         uint256 totalPoolValue = usdc.balanceOf(address(this)) -
             collectedFees -
             reservedAmount;
-        require(totalPoolValue > 0, "No liquidity");
+        require(totalPoolValue > 0);
 
         uint256 sharesToBuy = (usdcAmount * currentShares) /
             (totalPoolValue + usdcAmount);
@@ -322,24 +407,44 @@ contract HondurasPresidentialElectionMarket is
         return (shareAmount * totalValue) / (currentShares + shareAmount);
     }
 
+    function _calculateSharesNeededForUSDC(
+        uint8 candidateId,
+        uint256 desiredUSDC
+    ) internal view returns (uint256) {
+        uint256 currentShares;
+
+        if (candidateId == 1) {
+            currentShares = nasrallaShares;
+        } else if (candidateId == 2) {
+            currentShares = moncadaShares;
+        } else {
+            currentShares = asfuraShares;
+        }
+
+        uint256 reservedAmount = rewardPaid ? 0 : ASSERTION_REWARD;
+        uint256 totalValue = usdc.balanceOf(address(this)) -
+            collectedFees -
+            reservedAmount;
+
+        require(totalValue > desiredUSDC);
+        return (desiredUSDC * currentShares) / (totalValue - desiredUSDC);
+    }
+
     function closeMarket() external {
-        require(block.timestamp >= MARKET_CLOSE_TIME, "Too early to close");
-        require(state == MarketState.OPEN, "Already closed");
+        require(block.timestamp >= MARKET_CLOSE_TIME);
+        require(state == MarketState.OPEN);
         state = MarketState.CLOSED;
     }
 
     function assertMarket(uint8 candidateId) external returns (bytes32) {
-        require(state == MarketState.CLOSED, "Market not closed");
-        require(assertionId == bytes32(0), "Already asserted");
-        require(candidateId >= 1 && candidateId <= 3, "Invalid candidate");
+        require(state == MarketState.CLOSED);
+        require(assertionId == bytes32(0));
+        require(candidateId >= 1 && candidateId <= 3);
 
         uint256 bond = oo.getMinimumBond(address(usdc));
 
-        require(
-            usdc.transferFrom(msg.sender, address(this), bond),
-            "Transfer failed"
-        );
-        usdc.approve(address(oo), bond);
+        require(usdc.transferFrom(msg.sender, address(this), bond));
+        require(usdc.approve(address(oo), bond));
 
         bytes memory claim = _composeClaim(candidateId);
 
@@ -359,33 +464,60 @@ contract HondurasPresidentialElectionMarket is
         winningCandidate = candidateId;
 
         emit MarketAsserted(candidateId, assertionId, msg.sender);
-
         return assertionId;
     }
 
     function resolveMarket(uint8 _winningCandidate) external onlyOwner {
-        require(state == MarketState.CLOSED, "Market not closed");
-        require(
-            _winningCandidate >= 1 && _winningCandidate <= 3,
-            "Invalid winner"
-        );
-
+        require(state == MarketState.CLOSED);
+        require(_winningCandidate >= 1 && _winningCandidate <= 3);
         winningCandidate = _winningCandidate;
         state = MarketState.RESOLVED;
-
         emit MarketResolved(_winningCandidate);
+    }
+
+    function emergencyAction(uint8 _winningCandidate) external onlyOwner {
+        require(_winningCandidate <= 3);
+        emergencyMode = true;
+        state = MarketState.RESOLVED;
+        if (_winningCandidate > 0) {
+            winningCandidate = _winningCandidate;
+            emit MarketResolved(_winningCandidate);
+        }
+        emit EmergencyModeActivated();
+    }
+
+    function emergencyRefund() external nonReentrant {
+        require(emergencyMode);
+        require(winningCandidate == 0);
+        
+        uint256 deposit = userDeposits[msg.sender];
+        require(deposit > 0);
+        
+        userDeposits[msg.sender] = 0;
+        userSharesNasralla[msg.sender] = 0;
+        userSharesMoncada[msg.sender] = 0;
+        userSharesAsfura[msg.sender] = 0;
+        
+        require(usdc.transfer(msg.sender, deposit));
+    }
+
+    function emergencyWithdrawRemaining() external onlyOwner {
+        require(emergencyMode);
+        uint256 balance = usdc.balanceOf(address(this));
+        require(usdc.transfer(owner(), balance));
+        seedAmount = 0;
     }
 
     function assertionResolvedCallback(
         bytes32 _assertionId,
         bool assertedTruthfully
     ) external override {
-        require(msg.sender == address(oo), "Not authorized");
-        require(_assertionId == assertionId, "Invalid assertion");
+        require(msg.sender == address(oo));
+        require(_assertionId == assertionId);
 
         if (assertedTruthfully) {
             state = MarketState.RESOLVED;
-            usdc.transfer(asserter, ASSERTION_REWARD);
+            require(usdc.transfer(asserter, ASSERTION_REWARD));
             rewardPaid = true;
             emit MarketResolved(winningCandidate);
         } else {
@@ -395,13 +527,9 @@ contract HondurasPresidentialElectionMarket is
         }
     }
 
-    function assertionDisputedCallback(
-        bytes32 _assertionId
-    ) external override {}
+    function assertionDisputedCallback(bytes32) external override {}
 
-    function _composeClaim(
-        uint8 candidateId
-    ) internal pure returns (bytes memory) {
+    function _composeClaim(uint8 candidateId) internal pure returns (bytes memory) {
         string memory candidateName;
 
         if (candidateId == 1) {
@@ -409,18 +537,17 @@ contract HondurasPresidentialElectionMarket is
         } else if (candidateId == 2) {
             candidateName = "Rixi Ramona Moncada Godoy";
         } else {
-            candidateName = "Renato Florentino Elvir Jose Arturo Zablah";
+            candidateName = "Nasry Juan Asfura Zablah";
         }
 
-        return
-            abi.encodePacked(
-                candidateName,
-                " won the Honduras 2025 Presidential Election held on November 30, 2025."
-            );
+        return abi.encodePacked(
+            candidateName,
+            " won the Honduras 2025 Presidential Election held on November 30, 2025."
+        );
     }
 
     function claimWinnings() external nonReentrant returns (uint256 payout) {
-        require(state == MarketState.RESOLVED, "Market not resolved");
+        require(state == MarketState.RESOLVED);
 
         uint256 winningShares;
         if (winningCandidate == 1) {
@@ -434,7 +561,7 @@ contract HondurasPresidentialElectionMarket is
             userSharesAsfura[msg.sender] = 0;
         }
 
-        require(winningShares > 0, "No winning shares");
+        require(winningShares > 0);
 
         uint256 totalWinningShares;
         if (winningCandidate == 1) {
@@ -445,48 +572,48 @@ contract HondurasPresidentialElectionMarket is
             totalWinningShares = INITIAL_SHARES - asfuraShares;
         }
 
-        uint256 totalPool = usdc.balanceOf(address(this)) - collectedFees;
+        uint256 totalBalance = usdc.balanceOf(address(this)) - collectedFees;
+        uint256 totalPool = totalBalance > seedAmount ? totalBalance - seedAmount : totalBalance;
         payout = (winningShares * totalPool) / totalWinningShares;
 
-        require(usdc.transfer(msg.sender, payout), "Transfer failed");
-
+        require(usdc.transfer(msg.sender, payout));
         emit WinningsClaimed(msg.sender, winningShares, payout);
         return payout;
+    }
+
+    function withdrawSeed() external onlyOwner {
+        require(state == MarketState.RESOLVED);
+        require(seedAmount > 0);
+        uint256 seed = seedAmount;
+        seedAmount = 0;
+        require(usdc.transfer(owner(), seed));
     }
 
     function getAllPrices() external view returns (uint256, uint256, uint256) {
         return (getCurrentPrice(1), getCurrentPrice(2), getCurrentPrice(3));
     }
 
-    function getUserShares(
-        address user
-    ) external view returns (uint256, uint256, uint256) {
-        return (
-            userSharesNasralla[user],
-            userSharesMoncada[user],
-            userSharesAsfura[user]
-        );
+    function getUserShares(address user) external view returns (uint256, uint256, uint256) {
+        return (userSharesNasralla[user], userSharesMoncada[user], userSharesAsfura[user]);
     }
 
     function withdrawFees() external onlyOwner {
         uint256 fees = collectedFees;
         collectedFees = 0;
-        require(usdc.transfer(owner(), fees), "Transfer failed");
+        require(usdc.transfer(owner(), fees));
     }
 
-
-    function getUserSharesInUSDC(
-        address user,
-        uint8 candidateId
-    ) external view returns (uint256) {
+    function getUserSharesInUSDC(address user, uint8 candidateId) external view returns (uint256) {
         uint256 shares;
         if (candidateId == 1) shares = userSharesNasralla[user];
         else if (candidateId == 2) shares = userSharesMoncada[user];
         else shares = userSharesAsfura[user];
 
-        // Return approx USDC value if they sold now
         if (shares == 0) return 0;
-        return _calculateSellUsdc(candidateId, shares);
+        
+        uint256 usdcValue = _calculateSellUsdc(candidateId, shares);
+        uint256 fee = (usdcValue * FEE_PERCENT) / FEE_DENOMINATOR;
+        return usdcValue - fee;
     }
 
     function getMarketTimeRemaining() external view returns (uint256) {
@@ -494,11 +621,26 @@ contract HondurasPresidentialElectionMarket is
         return MARKET_CLOSE_TIME - block.timestamp;
     }
 
-    function getMarketDuration() external view returns (uint256) {
+    function getMarketCloseTime() external view returns (uint256) {
         return MARKET_CLOSE_TIME;
     }
 
+    function getAssertionTimeRemaining() external view returns (uint256) {
+        if (assertionId == bytes32(0)) return 0;
+        if (state == MarketState.RESOLVED) return 0;
+        if (assertionId != bytes32(0) && state == MarketState.CLOSED) {
+            return ASSERTION_LIVENESS;
+        }
+        return 0;
+    }
+
     function getAssertionId() external view returns (bytes32) {
-    return assertionId;
+        return assertionId;
+    }
+
+    function canSettleAssertion() external view returns (bool) {
+        if (assertionId == bytes32(0)) return false;
+        if (state == MarketState.RESOLVED) return false;
+        return state == MarketState.CLOSED && assertionId != bytes32(0);
     }
 }
