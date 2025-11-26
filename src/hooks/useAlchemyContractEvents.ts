@@ -29,38 +29,54 @@ export const useAlchemyContractEvents = (candidateId: number) => {
       setIsLoading(true);
       setError(null);
 
+      console.log("🔍 Fetching events from Alchemy...");
+      console.log("Contract Address:", HONDURAS_ELECTION_ADDRESS);
+      console.log("Candidate ID:", candidateId);
+      console.log("RPC URL:", ALCHEMY_RPC_URL);
+      
+      const requestBody = {
+        jsonrpc: "2.0",
+        id: 1,
+        method: "eth_getLogs",
+        params: [
+          {
+            address: HONDURAS_ELECTION_ADDRESS,
+            fromBlock: "0x0",
+            toBlock: "latest",
+            topics: [
+              [SHARES_PURCHASED_SIGNATURE, SHARES_SOLD_SIGNATURE],
+            ],
+          },
+        ],
+      };
+
+      console.log("Request body:", JSON.stringify(requestBody, null, 2));
+
       // Fetch all events from the contract
       const response = await fetch(ALCHEMY_RPC_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          jsonrpc: "2.0",
-          id: 1,
-          method: "eth_getLogs",
-          params: [
-            {
-              address: HONDURAS_ELECTION_ADDRESS,
-              fromBlock: "0x0",
-              toBlock: "latest",
-              topics: [
-                [SHARES_PURCHASED_SIGNATURE, SHARES_SOLD_SIGNATURE], // Filter for both events
-              ],
-            },
-          ],
-        }),
+        body: JSON.stringify(requestBody),
       });
 
+      console.log("Response status:", response.status, response.statusText);
+
       if (!response.ok) {
-        throw new Error(`Alchemy API error: ${response.statusText}`);
+        const errorText = await response.text();
+        console.error("❌ Response not OK:", errorText);
+        throw new Error(`Alchemy API error: ${response.status} - ${errorText}`);
       }
 
       const data = await response.json();
+      console.log("Response data:", data);
 
       if (data.error) {
+        console.error("❌ JSON-RPC Error:", data.error);
         throw new Error(data.error.message || "Failed to fetch logs");
       }
 
       const logs = data.result || [];
+      console.log(`✅ Fetched ${logs.length} total logs from contract`);
       const processedOrders: OrderBookEntry[] = [];
 
       // Fetch block timestamps for all unique blocks
@@ -95,14 +111,22 @@ export const useAlchemyContractEvents = (candidateId: number) => {
         const isBuy = log.topics[0] === SHARES_PURCHASED_SIGNATURE;
         const isSell = log.topics[0] === SHARES_SOLD_SIGNATURE;
 
-        if (!isBuy && !isSell) continue;
+        if (!isBuy && !isSell) {
+          console.log("⚠️ Unknown event signature:", log.topics[0]);
+          continue;
+        }
 
         // Parse topics
         const traderAddress = ethers.getAddress("0x" + log.topics[1].slice(26));
         const outcomeIndex = parseInt(log.topics[2], 16);
 
+        console.log(`Event: ${isBuy ? 'BUY' : 'SELL'} for candidate ${outcomeIndex} by ${traderAddress}`);
+
         // Only include events for this candidate
-        if (outcomeIndex !== candidateId) continue;
+        if (outcomeIndex !== candidateId) {
+          console.log(`⏭️ Skipping - not for candidate ${candidateId}`);
+          continue;
+        }
 
         // Parse data field (contains shares and usdcAmount)
         const dataHex = log.data.slice(2); // Remove '0x'
@@ -134,9 +158,12 @@ export const useAlchemyContractEvents = (candidateId: number) => {
       // Sort by block number (most recent first)
       processedOrders.sort((a, b) => b.blockNumber - a.blockNumber);
 
+      console.log(`📊 Processed ${processedOrders.length} orders for candidate ${candidateId}`);
+      console.log("Orders:", processedOrders);
+
       setOrders(processedOrders);
     } catch (err) {
-      console.error("Error fetching Alchemy contract events:", err);
+      console.error("❌ Error fetching Alchemy contract events:", err);
       setError(err instanceof Error ? err.message : "Failed to fetch contract events");
     } finally {
       setIsLoading(false);
