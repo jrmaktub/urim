@@ -1,5 +1,6 @@
-import { useHondurasElectionEvents } from "@/hooks/useHondurasElectionEvents";
-import { Loader2 } from "lucide-react";
+import { useThirdwebTransactions } from "@/hooks/useThirdwebTransactions";
+import { Loader2, ExternalLink } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface ElectionOrderBookProps {
   candidateId: number;
@@ -7,7 +8,7 @@ interface ElectionOrderBookProps {
 }
 
 const ElectionOrderBook = ({ candidateId, candidateName }: ElectionOrderBookProps) => {
-  const { orders, isLoading } = useHondurasElectionEvents(candidateId);
+  const { orders, isLoading, error } = useThirdwebTransactions(candidateId);
 
   const formatAddress = (address: string) => {
     if (!address) return "";
@@ -17,6 +18,10 @@ const ElectionOrderBook = ({ candidateId, candidateName }: ElectionOrderBookProp
   const bids = orders.filter((o) => o.type === "BID");
   const asks = orders.filter((o) => o.type === "ASK");
 
+  const openBaseScan = (txHash: string) => {
+    window.open(`https://basescan.org/tx/${txHash}`, "_blank");
+  };
+
   if (isLoading) {
     return (
       <div className="mt-6 p-6 rounded-xl border border-border/30 bg-background/20 backdrop-blur-sm">
@@ -25,6 +30,19 @@ const ElectionOrderBook = ({ candidateId, candidateName }: ElectionOrderBookProp
         </h3>
         <div className="flex justify-center items-center py-8">
           <Loader2 className="h-6 w-6 animate-spin text-primary" />
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="mt-6 p-6 rounded-xl border border-border/30 bg-background/20 backdrop-blur-sm">
+        <h3 className="text-lg font-semibold mb-4 text-foreground">
+          Order Book - {candidateName}
+        </h3>
+        <div className="text-center py-8 text-red-400">
+          Error loading order book: {error}
         </div>
       </div>
     );
@@ -44,11 +62,12 @@ const ElectionOrderBook = ({ candidateId, candidateName }: ElectionOrderBookProp
         </div>
         
         <div className="space-y-1">
-          <div className="grid grid-cols-4 gap-4 px-3 py-2 text-xs font-medium text-muted-foreground border-b border-border/20">
+          <div className="grid grid-cols-5 gap-4 px-3 py-2 text-xs font-medium text-muted-foreground border-b border-border/20">
             <div>Price (¢)</div>
             <div>Shares</div>
             <div>Total (USDC)</div>
             <div>Trader</div>
+            <div>Tx</div>
           </div>
           
           {bids.length === 0 ? (
@@ -59,13 +78,23 @@ const ElectionOrderBook = ({ candidateId, candidateName }: ElectionOrderBookProp
             bids.slice(0, 10).map((order, idx) => (
               <div
                 key={idx}
-                className="grid grid-cols-4 gap-4 px-3 py-2 text-sm rounded-lg hover:bg-primary/5 hover:shadow-[0_0_15px_rgba(139,92,246,0.2)] transition-all duration-200 cursor-pointer"
+                className="grid grid-cols-5 gap-4 px-3 py-2 text-sm rounded-lg hover:bg-primary/5 hover:shadow-[0_0_15px_rgba(139,92,246,0.2)] transition-all duration-200"
               >
                 <div className="font-medium text-green-400">{order.price}¢</div>
                 <div className="text-foreground">{parseFloat(order.shares).toFixed(2)}</div>
                 <div className="text-foreground">${parseFloat(order.totalUSDC).toFixed(2)}</div>
                 <div className="text-muted-foreground font-mono text-xs">
                   {formatAddress(order.trader)}
+                </div>
+                <div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 w-6 p-0"
+                    onClick={() => openBaseScan(order.txHash)}
+                  >
+                    <ExternalLink className="h-3 w-3 text-muted-foreground hover:text-primary" />
+                  </Button>
                 </div>
               </div>
             ))
@@ -81,11 +110,12 @@ const ElectionOrderBook = ({ candidateId, candidateName }: ElectionOrderBookProp
         </div>
         
         <div className="space-y-1">
-          <div className="grid grid-cols-4 gap-4 px-3 py-2 text-xs font-medium text-muted-foreground border-b border-border/20">
+          <div className="grid grid-cols-5 gap-4 px-3 py-2 text-xs font-medium text-muted-foreground border-b border-border/20">
             <div>Price (¢)</div>
             <div>Shares</div>
             <div>Total (USDC)</div>
             <div>Trader</div>
+            <div>Tx</div>
           </div>
           
           {asks.length === 0 ? (
@@ -96,13 +126,23 @@ const ElectionOrderBook = ({ candidateId, candidateName }: ElectionOrderBookProp
             asks.slice(0, 10).map((order, idx) => (
               <div
                 key={idx}
-                className="grid grid-cols-4 gap-4 px-3 py-2 text-sm rounded-lg hover:bg-primary/5 hover:shadow-[0_0_15px_rgba(139,92,246,0.2)] transition-all duration-200 cursor-pointer"
+                className="grid grid-cols-5 gap-4 px-3 py-2 text-sm rounded-lg hover:bg-primary/5 hover:shadow-[0_0_15px_rgba(139,92,246,0.2)] transition-all duration-200"
               >
                 <div className="font-medium text-red-400">{order.price}¢</div>
                 <div className="text-foreground">{parseFloat(order.shares).toFixed(2)}</div>
                 <div className="text-foreground">${parseFloat(order.totalUSDC).toFixed(2)}</div>
                 <div className="text-muted-foreground font-mono text-xs">
                   {formatAddress(order.trader)}
+                </div>
+                <div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 w-6 p-0"
+                    onClick={() => openBaseScan(order.txHash)}
+                  >
+                    <ExternalLink className="h-3 w-3 text-muted-foreground hover:text-primary" />
+                  </Button>
                 </div>
               </div>
             ))
