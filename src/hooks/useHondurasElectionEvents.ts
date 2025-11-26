@@ -21,10 +21,21 @@ export function useHondurasElectionEvents(candidateId: number) {
 
   useEffect(() => {
     const fetchEvents = async () => {
-      if (!publicClient) return;
+      if (!publicClient) {
+        console.log("⚠️ No public client available");
+        return;
+      }
       
       setIsLoading(true);
       try {
+        // Get current block to fetch recent events only
+        const currentBlock = await publicClient.getBlockNumber();
+        const fromBlock = currentBlock - BigInt(100000); // Last ~2 weeks on Base
+        
+        console.log("🔍 Fetching events for candidate:", candidateId);
+        console.log("📊 Block range:", fromBlock.toString(), "to", currentBlock.toString());
+        console.log("📍 Contract:", HONDURAS_ELECTION_ADDRESS);
+        
         // Fetch SharesPurchased events (Bids)
         const purchaseEvents = await publicClient.getLogs({
           address: HONDURAS_ELECTION_ADDRESS as `0x${string}`,
@@ -39,9 +50,11 @@ export function useHondurasElectionEvents(candidateId: number) {
               { indexed: false, name: 'newPrice', type: 'uint256' },
             ],
           },
-          fromBlock: BigInt(0),
+          fromBlock,
           toBlock: 'latest',
         });
+
+        console.log(`✅ Fetched ${purchaseEvents.length} purchase events`);
 
         // Fetch SharesSold events (Asks)
         const saleEvents = await publicClient.getLogs({
@@ -57,13 +70,19 @@ export function useHondurasElectionEvents(candidateId: number) {
               { indexed: false, name: 'newPrice', type: 'uint256' },
             ],
           },
-          fromBlock: BigInt(0),
+          fromBlock,
           toBlock: 'latest',
         });
 
+        console.log(`✅ Fetched ${saleEvents.length} sale events`);
+
         // Process purchase events (Bids)
         const bids: OrderBookEntry[] = purchaseEvents
-          .filter((event: any) => Number(event.args.candidateId) === candidateId)
+          .filter((event: any) => {
+            const eventCandidateId = Number(event.args.candidateId);
+            console.log(`📝 Purchase event: candidate ${eventCandidateId}, buyer ${event.args.buyer}`);
+            return eventCandidateId === candidateId;
+          })
           .map((event: any) => {
             const shares = formatUnits(event.args.sharesReceived, 6);
             const price = Number(formatUnits(event.args.newPrice, 16));
@@ -79,9 +98,15 @@ export function useHondurasElectionEvents(candidateId: number) {
             };
           });
 
+        console.log(`✅ Processed ${bids.length} bids for candidate ${candidateId}`);
+
         // Process sale events (Asks)
         const asks: OrderBookEntry[] = saleEvents
-          .filter((event: any) => Number(event.args.candidateId) === candidateId)
+          .filter((event: any) => {
+            const eventCandidateId = Number(event.args.candidateId);
+            console.log(`📝 Sale event: candidate ${eventCandidateId}, seller ${event.args.seller}`);
+            return eventCandidateId === candidateId;
+          })
           .map((event: any) => {
             const shares = formatUnits(event.args.sharesSold, 6);
             const price = Number(formatUnits(event.args.newPrice, 16));
@@ -97,11 +122,14 @@ export function useHondurasElectionEvents(candidateId: number) {
             };
           });
 
+        console.log(`✅ Processed ${asks.length} asks for candidate ${candidateId}`);
+
         // Combine and sort by timestamp (most recent first)
         const allOrders = [...bids, ...asks].sort((a, b) => b.timestamp - a.timestamp);
+        console.log(`📦 Total orders:`, allOrders.length);
         setOrders(allOrders);
       } catch (error) {
-        console.error("Error fetching events:", error);
+        console.error("❌ Error fetching events:", error);
       } finally {
         setIsLoading(false);
       }
