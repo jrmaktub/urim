@@ -15,11 +15,11 @@ export const hondurasElectionContract = getContract({
   abi: HondurasElectionABI as any,
 });
 
-// Prepare events for listening
+// Prepare events for listening (candidateId is uint8)
 export const sharesPurchasedEvent = prepareEvent({
-  signature: "event SharesPurchased(address indexed buyer, uint256 candidateId, uint256 usdcAmount, uint256 sharesReceived, uint256 newPrice)",
+  signature: "event SharesPurchased(address indexed buyer, uint8 indexed candidateId, uint256 usdcAmount, uint256 sharesReceived, uint256 newPrice)",
 });
 
 export const sharesSoldEvent = prepareEvent({
-  signature: "event SharesSold(address indexed seller, uint256 candidateId, uint256 sharesSold, uint256 usdcReceived, uint256 newPrice)",
+  signature: "event SharesSold(address indexed seller, uint8 indexed candidateId, uint256 sharesSold, uint256 usdcReceived, uint256 newPrice)",
 });
