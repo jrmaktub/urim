@@ -1,4 +1,4 @@
-import { useThirdwebTransactions } from "@/hooks/useThirdwebTransactions";
+import { useAlchemyContractEvents } from "@/hooks/useAlchemyContractEvents";
 import { Loader2, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -8,7 +8,7 @@ interface ElectionOrderBookProps {
 }
 
 const ElectionOrderBook = ({ candidateId, candidateName }: ElectionOrderBookProps) => {
-  const { orders, isLoading, error } = useThirdwebTransactions(candidateId);
+  const { orders, isLoading, error } = useAlchemyContractEvents(candidateId);
 
   const formatAddress = (address: string) => {
     if (!address) return "";
@@ -62,11 +62,12 @@ const ElectionOrderBook = ({ candidateId, candidateName }: ElectionOrderBookProp
         </div>
         
         <div className="space-y-1">
-          <div className="grid grid-cols-5 gap-4 px-3 py-2 text-xs font-medium text-muted-foreground border-b border-border/20">
+          <div className="grid grid-cols-6 gap-3 px-3 py-2 text-xs font-medium text-muted-foreground border-b border-border/20">
             <div>Price (¢)</div>
             <div>Shares</div>
             <div>Total (USDC)</div>
             <div>Trader</div>
+            <div>Time</div>
             <div>Tx</div>
           </div>
           
@@ -78,14 +79,15 @@ const ElectionOrderBook = ({ candidateId, candidateName }: ElectionOrderBookProp
             bids.slice(0, 10).map((order, idx) => (
               <div
                 key={idx}
-                className="grid grid-cols-5 gap-4 px-3 py-2 text-sm rounded-lg hover:bg-primary/5 hover:shadow-[0_0_15px_rgba(139,92,246,0.2)] transition-all duration-200"
+                className="grid grid-cols-6 gap-3 px-3 py-2 text-sm rounded-lg hover:bg-primary/5 hover:shadow-[0_0_15px_rgba(139,92,246,0.2)] transition-all duration-200"
               >
                 <div className="font-medium text-green-400">{order.price}¢</div>
-                <div className="text-foreground">{parseFloat(order.shares).toFixed(2)}</div>
-                <div className="text-foreground">${parseFloat(order.totalUSDC).toFixed(2)}</div>
+                <div className="text-foreground">{order.shares}</div>
+                <div className="text-foreground">${order.totalUSDC}</div>
                 <div className="text-muted-foreground font-mono text-xs">
                   {formatAddress(order.trader)}
                 </div>
+                <div className="text-muted-foreground text-xs">{order.timestamp}</div>
                 <div>
                   <Button
                     variant="ghost"
@@ -110,11 +112,12 @@ const ElectionOrderBook = ({ candidateId, candidateName }: ElectionOrderBookProp
         </div>
         
         <div className="space-y-1">
-          <div className="grid grid-cols-5 gap-4 px-3 py-2 text-xs font-medium text-muted-foreground border-b border-border/20">
+          <div className="grid grid-cols-6 gap-3 px-3 py-2 text-xs font-medium text-muted-foreground border-b border-border/20">
             <div>Price (¢)</div>
             <div>Shares</div>
             <div>Total (USDC)</div>
             <div>Trader</div>
+            <div>Time</div>
             <div>Tx</div>
           </div>
           
@@ -126,14 +129,15 @@ const ElectionOrderBook = ({ candidateId, candidateName }: ElectionOrderBookProp
             asks.slice(0, 10).map((order, idx) => (
               <div
                 key={idx}
-                className="grid grid-cols-5 gap-4 px-3 py-2 text-sm rounded-lg hover:bg-primary/5 hover:shadow-[0_0_15px_rgba(139,92,246,0.2)] transition-all duration-200"
+                className="grid grid-cols-6 gap-3 px-3 py-2 text-sm rounded-lg hover:bg-primary/5 hover:shadow-[0_0_15px_rgba(139,92,246,0.2)] transition-all duration-200"
               >
                 <div className="font-medium text-red-400">{order.price}¢</div>
-                <div className="text-foreground">{parseFloat(order.shares).toFixed(2)}</div>
-                <div className="text-foreground">${parseFloat(order.totalUSDC).toFixed(2)}</div>
+                <div className="text-foreground">{order.shares}</div>
+                <div className="text-foreground">${order.totalUSDC}</div>
                 <div className="text-muted-foreground font-mono text-xs">
                   {formatAddress(order.trader)}
                 </div>
+                <div className="text-muted-foreground text-xs">{order.timestamp}</div>
                 <div>
                   <Button
                     variant="ghost"
