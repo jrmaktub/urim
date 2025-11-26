@@ -1,4 +1,10 @@
 import { useState, useEffect } from "react";
+import { createThirdwebClient } from "thirdweb";
+
+// Initialize Thirdweb client
+const client = createThirdwebClient({
+  clientId: "6338fc246f407a9d38ba885ba43487f2"
+});
 
 interface ThirdwebTransaction {
   hash: string;
