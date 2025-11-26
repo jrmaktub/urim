@@ -32,55 +32,83 @@ export const useAlchemyContractEvents = (candidateId: number) => {
       console.log("🔍 Fetching events from Alchemy...");
       console.log("Contract Address:", HONDURAS_ELECTION_ADDRESS);
       console.log("Candidate ID:", candidateId);
-      console.log("RPC URL:", ALCHEMY_RPC_URL);
-      
-      const requestBody = {
-        jsonrpc: "2.0",
-        id: 1,
-        method: "eth_getLogs",
-        params: [
-          {
-            address: HONDURAS_ELECTION_ADDRESS,
-            fromBlock: "0x0",
-            toBlock: "latest",
-            topics: [
-              [SHARES_PURCHASED_SIGNATURE, SHARES_SOLD_SIGNATURE],
-            ],
-          },
-        ],
-      };
 
-      console.log("Request body:", JSON.stringify(requestBody, null, 2));
-
-      // Fetch all events from the contract
-      const response = await fetch(ALCHEMY_RPC_URL, {
+      // First, get the current block number
+      const blockResponse = await fetch(ALCHEMY_RPC_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(requestBody),
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          method: "eth_blockNumber",
+          params: [],
+        }),
       });
 
-      console.log("Response status:", response.status, response.statusText);
+      const blockData = await blockResponse.json();
+      const currentBlock = parseInt(blockData.result, 16);
+      console.log("Current block:", currentBlock);
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("❌ Response not OK:", errorText);
-        throw new Error(`Alchemy API error: ${response.status} - ${errorText}`);
+      // Fetch events from the last 50,000 blocks (roughly 1 week on Base)
+      const fromBlock = Math.max(0, currentBlock - 50000);
+      const toBlock = currentBlock;
+
+      console.log(`Fetching logs from block ${fromBlock} to ${toBlock}`);
+
+      // Fetch events in chunks of 10,000 blocks to avoid rate limits
+      const chunkSize = 10000;
+      let allLogs: any[] = [];
+
+      for (let start = fromBlock; start <= toBlock; start += chunkSize) {
+        const end = Math.min(start + chunkSize - 1, toBlock);
+        
+        console.log(`Fetching chunk: ${start} to ${end}`);
+
+        const requestBody = {
+          jsonrpc: "2.0",
+          id: 1,
+          method: "eth_getLogs",
+          params: [
+            {
+              address: HONDURAS_ELECTION_ADDRESS,
+              fromBlock: `0x${start.toString(16)}`,
+              toBlock: `0x${end.toString(16)}`,
+              topics: [
+                [SHARES_PURCHASED_SIGNATURE, SHARES_SOLD_SIGNATURE],
+              ],
+            },
+          ],
+        };
+
+        const response = await fetch(ALCHEMY_RPC_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(requestBody),
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error("❌ Response not OK:", errorText);
+          throw new Error(`Alchemy API error: ${response.status} - ${errorText}`);
+        }
+
+        const data = await response.json();
+
+        if (data.error) {
+          console.error("❌ JSON-RPC Error:", data.error);
+          throw new Error(data.error.message || "Failed to fetch logs");
+        }
+
+        const logs = data.result || [];
+        console.log(`✅ Fetched ${logs.length} logs from chunk ${start}-${end}`);
+        allLogs = allLogs.concat(logs);
       }
 
-      const data = await response.json();
-      console.log("Response data:", data);
-
-      if (data.error) {
-        console.error("❌ JSON-RPC Error:", data.error);
-        throw new Error(data.error.message || "Failed to fetch logs");
-      }
-
-      const logs = data.result || [];
-      console.log(`✅ Fetched ${logs.length} total logs from contract`);
+      console.log(`✅ Total logs fetched: ${allLogs.length}`);
       const processedOrders: OrderBookEntry[] = [];
 
       // Fetch block timestamps for all unique blocks
-      const blockNumbers = [...new Set(logs.map((log: any) => log.blockNumber))];
+      const blockNumbers = [...new Set(allLogs.map((log: any) => log.blockNumber))];
       const blockTimestamps: Record<string, number> = {};
 
       await Promise.all(
@@ -107,7 +135,7 @@ export const useAlchemyContractEvents = (candidateId: number) => {
       );
 
       // Parse each log
-      for (const log of logs) {
+      for (const log of allLogs) {
         const isBuy = log.topics[0] === SHARES_PURCHASED_SIGNATURE;
         const isSell = log.topics[0] === SHARES_SOLD_SIGNATURE;
 
