@@ -1,4 +1,4 @@
-import { useAlchemyContractEvents } from "@/hooks/useAlchemyContractEvents";
+import { useHondurasElectionEvents } from "@/hooks/useHondurasElectionEvents";
 import { Loader2, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -8,7 +8,7 @@ interface ElectionOrderBookProps {
 }
 
 const ElectionOrderBook = ({ candidateId, candidateName }: ElectionOrderBookProps) => {
-  const { orders, isLoading, error } = useAlchemyContractEvents(candidateId);
+  const { orders, isLoading } = useHondurasElectionEvents(candidateId);
 
   const formatAddress = (address: string) => {
     if (!address) return "";
@@ -30,19 +30,6 @@ const ElectionOrderBook = ({ candidateId, candidateName }: ElectionOrderBookProp
         </h3>
         <div className="flex justify-center items-center py-8">
           <Loader2 className="h-6 w-6 animate-spin text-primary" />
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="mt-6 p-6 rounded-xl border border-border/30 bg-background/20 backdrop-blur-sm">
-        <h3 className="text-lg font-semibold mb-4 text-foreground">
-          Order Book - {candidateName}
-        </h3>
-        <div className="text-center py-8 text-red-400">
-          Error loading order book: {error}
         </div>
       </div>
     );
@@ -87,13 +74,13 @@ const ElectionOrderBook = ({ candidateId, candidateName }: ElectionOrderBookProp
                 <div className="text-muted-foreground font-mono text-xs">
                   {formatAddress(order.trader)}
                 </div>
-                <div className="text-muted-foreground text-xs">{order.timestamp}</div>
+                <div className="text-muted-foreground text-xs">{new Date(order.timestamp * 1000).toLocaleTimeString()}</div>
                 <div>
                   <Button
                     variant="ghost"
                     size="sm"
                     className="h-6 w-6 p-0"
-                    onClick={() => openBaseScan(order.txHash)}
+                    onClick={() => window.open(`https://basescan.org/block/${order.timestamp}`, "_blank")}
                   >
                     <ExternalLink className="h-3 w-3 text-muted-foreground hover:text-primary" />
                   </Button>
@@ -137,13 +124,13 @@ const ElectionOrderBook = ({ candidateId, candidateName }: ElectionOrderBookProp
                 <div className="text-muted-foreground font-mono text-xs">
                   {formatAddress(order.trader)}
                 </div>
-                <div className="text-muted-foreground text-xs">{order.timestamp}</div>
+                <div className="text-muted-foreground text-xs">{new Date(order.timestamp * 1000).toLocaleTimeString()}</div>
                 <div>
                   <Button
                     variant="ghost"
                     size="sm"
                     className="h-6 w-6 p-0"
-                    onClick={() => openBaseScan(order.txHash)}
+                    onClick={() => window.open(`https://basescan.org/block/${order.timestamp}`, "_blank")}
                   >
                     <ExternalLink className="h-3 w-3 text-muted-foreground hover:text-primary" />
                   </Button>
