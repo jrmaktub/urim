@@ -73,34 +73,79 @@ export const useThirdwebTransactions = (candidateId: number) => {
       const allTransactions = data.result.data;
       console.log(`🔍 THIRDWEB: Found ${allTransactions.length} total transactions`);
 
-      // Log first transaction to see structure
+      // Log first few transactions to see actual structure
       if (allTransactions.length > 0) {
-        console.log("🔍 THIRDWEB: First transaction structure:", JSON.stringify(allTransactions[0], null, 2));
+        console.log("🔍 THIRDWEB: First 3 transactions:", JSON.stringify(allTransactions.slice(0, 3), null, 2));
       }
 
       // Filter and process trades for the specific candidate
       const trades = allTransactions
-        .filter((tx: ThirdwebTransaction) => {
+        .filter((tx: any) => {
+          // Log every transaction to understand structure
+          console.log("🔍 THIRDWEB: Inspecting TX:", {
+            hash: tx.transactionHash || tx.hash,
+            functionName: tx.functionName,
+            decodedName: tx.decoded?.name,
+            hasEvents: !!tx.events,
+            eventsCount: tx.events?.length,
+            eventNames: tx.events?.map((e: any) => e.eventName)
+          });
+
+          // Check if transaction has events (not decoded directly on tx)
+          if (tx.events && tx.events.length > 0) {
+            for (const event of tx.events) {
+              if (event.eventName === "SharesPurchased" || event.eventName === "SharesSold") {
+                // Check if this event is for our candidate
+                const eventCandidateId = event.args?.candidateId || event.decodedLog?.args?.candidateId;
+                console.log(`🔍 THIRDWEB: Found ${event.eventName} event, candidateId: ${eventCandidateId}, looking for: ${candidateId}`);
+                
+                if (parseInt(eventCandidateId) === candidateId) {
+                  return true;
+                }
+              }
+            }
+          }
+
+          // Fallback to old structure
           const hasDecoded = tx.decoded !== undefined;
           const eventName = tx.decoded?.name;
           const isCorrectEvent = eventName === "SharesPurchased" || eventName === "SharesSold";
           const txCandidateId = tx.decoded?.inputs?.candidateId;
-          const matchesCandidate = txCandidateId === candidateId;
-          
-          console.log(`🔍 THIRDWEB: TX ${tx.hash?.slice(0, 10)}... - decoded:${hasDecoded}, event:${eventName}, candidateId:${txCandidateId}, matches:${matchesCandidate}`);
+          const matchesCandidate = parseInt(txCandidateId) === candidateId;
           
           return hasDecoded && isCorrectEvent && matchesCandidate;
         })
-        .map((tx: ThirdwebTransaction) => {
-          const isBuy = tx.decoded!.name === "SharesPurchased";
-          const shares = isBuy
-            ? tx.decoded!.inputs.sharesReceived
-            : tx.decoded!.inputs.sharesSold;
-          const usdcAmount = isBuy
-            ? tx.decoded!.inputs.usdcAmount
-            : tx.decoded!.inputs.usdcReceived;
-          const price = tx.decoded!.inputs.newPrice;
-          const trader = isBuy ? tx.decoded!.inputs.buyer : tx.decoded!.inputs.seller;
+        .map((tx: any) => {
+          // Try to extract from events first
+          let isBuy = false;
+          let shares = "0";
+          let usdcAmount = "0";
+          let price = "0";
+          let trader = "";
+          let txHash = tx.transactionHash || tx.hash || "";
+          
+          if (tx.events && tx.events.length > 0) {
+            const relevantEvent = tx.events.find((e: any) => 
+              e.eventName === "SharesPurchased" || e.eventName === "SharesSold"
+            );
+            
+            if (relevantEvent) {
+              isBuy = relevantEvent.eventName === "SharesPurchased";
+              const args = relevantEvent.args || relevantEvent.decodedLog?.args || {};
+              
+              shares = isBuy ? (args.sharesReceived || "0") : (args.sharesSold || "0");
+              usdcAmount = isBuy ? (args.usdcAmount || "0") : (args.usdcReceived || "0");
+              price = args.newPrice || "0";
+              trader = isBuy ? (args.buyer || tx.from || "") : (args.seller || tx.from || "");
+            }
+          } else if (tx.decoded) {
+            // Fallback to old structure
+            isBuy = tx.decoded.name === "SharesPurchased";
+            shares = isBuy ? tx.decoded.inputs.sharesReceived : tx.decoded.inputs.sharesSold;
+            usdcAmount = isBuy ? tx.decoded.inputs.usdcAmount : tx.decoded.inputs.usdcReceived;
+            price = tx.decoded.inputs.newPrice;
+            trader = isBuy ? tx.decoded.inputs.buyer : tx.decoded.inputs.seller;
+          }
 
           // Convert from wei to readable format
           const sharesFormatted = shares ? (parseFloat(shares) / 1e18).toFixed(2) : "0";
@@ -108,9 +153,10 @@ export const useThirdwebTransactions = (candidateId: number) => {
           const priceFormatted = price ? (parseFloat(price) * 100).toFixed(1) : "0";
 
           // Format timestamp
-          const timeAgo = getTimeAgo(new Date(tx.blockTimestamp).getTime());
+          const timestamp = tx.blockTimestamp || tx.timestamp || new Date().toISOString();
+          const timeAgo = getTimeAgo(new Date(timestamp).getTime());
 
-          console.log(`🔍 THIRDWEB: Processed trade - ${isBuy ? 'BUY' : 'SELL'} ${sharesFormatted} shares at ${priceFormatted}¢`);
+          console.log(`✅ THIRDWEB: Processed trade - ${isBuy ? 'BUY' : 'SELL'} ${sharesFormatted} shares at ${priceFormatted}¢ by ${trader?.slice(0, 8)}...`);
 
           return {
             type: isBuy ? "BID" : "ASK",
@@ -119,7 +165,7 @@ export const useThirdwebTransactions = (candidateId: number) => {
             totalUSDC: usdcFormatted,
             trader: trader || "",
             timestamp: timeAgo,
-            txHash: tx.hash,
+            txHash: txHash,
           } as OrderBookEntry;
         });
 
