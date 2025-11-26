@@ -116,19 +116,21 @@ export function useUSDCAllowance() {
   };
 }
 
+// Max uint256 for unlimited approval (standard in DeFi)
+const MAX_UINT256 = BigInt('115792089237316195423570985008687907853269984665640564039457584007913129639935');
+
 export function useApproveUSDC() {
   const { address } = useAccount();
   const { writeContractAsync, data: hash, isPending } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
 
-  const approve = async (amount: string) => {
-    const amountInWei = parseUnits(amount, 6); // USDC has 6 decimals
-    
+  const approve = async () => {
+    // Approve unlimited USDC - user only needs to approve once
     return await writeContractAsync({
       address: BASE_USDC_ADDRESS as `0x${string}`,
       abi: (ERC20ABI as { abi: Abi }).abi,
       functionName: "approve",
-      args: [HONDURAS_ELECTION_ADDRESS, amountInWei],
+      args: [HONDURAS_ELECTION_ADDRESS, MAX_UINT256],
       account: address,
       chain: base,
       chainId: base.id,

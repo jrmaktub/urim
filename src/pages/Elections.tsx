@@ -123,10 +123,10 @@ const Elections = () => {
         const hasAllowance = allowance >= requiredAmount;
         
         if (!hasAllowance) {
-          // Step 1: Approve USDC
+          // Step 1: Approve unlimited USDC (one-time approval)
           setIsApproving(true);
-          toast.info("Step 1/2: Approving USDC...");
-          await approve(tradeAmount);
+          toast.info("Step 1/2: Approving USDC (one-time unlimited approval)...");
+          await approve();
           
           // Wait for approval to be mined by checking allowance
           toast.info("Waiting for approval confirmation...");
