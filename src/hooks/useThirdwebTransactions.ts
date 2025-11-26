@@ -45,26 +45,52 @@ export const useThirdwebTransactions = (candidateId: number) => {
   const fetchTransactions = async () => {
     try {
       setIsLoading(true);
+      console.log("🔍 THIRDWEB: Starting fetch for candidate", candidateId);
+      
       const response = await fetch(`${THIRDWEB_API_URL}?page=1&limit=100`, {
         headers: {
           "x-secret-key": THIRDWEB_SECRET_KEY,
         },
       });
 
+      console.log("🔍 THIRDWEB: Response status:", response.status);
+
       if (!response.ok) {
-        throw new Error(`Failed to fetch transactions: ${response.status}`);
+        const errorText = await response.text();
+        console.error("🔍 THIRDWEB: Error response:", errorText);
+        throw new Error(`Failed to fetch transactions: ${response.status} - ${errorText}`);
       }
 
       const data = await response.json();
+      console.log("🔍 THIRDWEB: Full response data:", data);
+
+      // Check response structure
+      if (!data.result || !data.result.data) {
+        console.error("🔍 THIRDWEB: Unexpected response structure:", data);
+        throw new Error("Unexpected API response structure");
+      }
+
+      const allTransactions = data.result.data;
+      console.log(`🔍 THIRDWEB: Found ${allTransactions.length} total transactions`);
+
+      // Log first transaction to see structure
+      if (allTransactions.length > 0) {
+        console.log("🔍 THIRDWEB: First transaction structure:", JSON.stringify(allTransactions[0], null, 2));
+      }
 
       // Filter and process trades for the specific candidate
-      const trades = data.result.data
-        .filter(
-          (tx: ThirdwebTransaction) =>
-            tx.decoded &&
-            (tx.decoded.name === "SharesPurchased" || tx.decoded.name === "SharesSold") &&
-            tx.decoded.inputs.candidateId === candidateId
-        )
+      const trades = allTransactions
+        .filter((tx: ThirdwebTransaction) => {
+          const hasDecoded = tx.decoded !== undefined;
+          const eventName = tx.decoded?.name;
+          const isCorrectEvent = eventName === "SharesPurchased" || eventName === "SharesSold";
+          const txCandidateId = tx.decoded?.inputs?.candidateId;
+          const matchesCandidate = txCandidateId === candidateId;
+          
+          console.log(`🔍 THIRDWEB: TX ${tx.hash?.slice(0, 10)}... - decoded:${hasDecoded}, event:${eventName}, candidateId:${txCandidateId}, matches:${matchesCandidate}`);
+          
+          return hasDecoded && isCorrectEvent && matchesCandidate;
+        })
         .map((tx: ThirdwebTransaction) => {
           const isBuy = tx.decoded!.name === "SharesPurchased";
           const shares = isBuy
@@ -84,6 +110,8 @@ export const useThirdwebTransactions = (candidateId: number) => {
           // Format timestamp
           const timeAgo = getTimeAgo(new Date(tx.blockTimestamp).getTime());
 
+          console.log(`🔍 THIRDWEB: Processed trade - ${isBuy ? 'BUY' : 'SELL'} ${sharesFormatted} shares at ${priceFormatted}¢`);
+
           return {
             type: isBuy ? "BID" : "ASK",
             price: priceFormatted,
@@ -95,10 +123,11 @@ export const useThirdwebTransactions = (candidateId: number) => {
           } as OrderBookEntry;
         });
 
+      console.log(`🔍 THIRDWEB: Final filtered trades count: ${trades.length}`);
       setOrders(trades);
       setError(null);
     } catch (err) {
-      console.error("Error fetching thirdweb transactions:", err);
+      console.error("❌ THIRDWEB ERROR:", err);
       setError(err instanceof Error ? err.message : "Unknown error");
     } finally {
       setIsLoading(false);

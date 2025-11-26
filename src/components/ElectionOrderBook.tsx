@@ -8,7 +8,10 @@ interface ElectionOrderBookProps {
 }
 
 const ElectionOrderBook = ({ candidateId, candidateName }: ElectionOrderBookProps) => {
-  const { orders, isLoading } = useThirdwebTransactions(candidateId);
+  const { orders, isLoading, error } = useThirdwebTransactions(candidateId);
+
+  // Log for debugging
+  console.log(`📊 ORDER BOOK RENDER - Candidate: ${candidateName} (ID: ${candidateId}), Orders: ${orders.length}, Loading: ${isLoading}, Error: ${error}`);
 
   const formatAddress = (address: string) => {
     if (!address) return "";
@@ -26,6 +29,20 @@ const ElectionOrderBook = ({ candidateId, candidateName }: ElectionOrderBookProp
         </h3>
         <div className="flex justify-center items-center py-8">
           <Loader2 className="h-6 w-6 animate-spin text-primary" />
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="mt-6 p-6 rounded-xl border border-red-500/30 bg-background/20 backdrop-blur-sm">
+        <h3 className="text-lg font-semibold mb-4 text-foreground">
+          Order Book - {candidateName}
+        </h3>
+        <div className="py-8 text-center text-red-500">
+          <p className="font-semibold mb-2">Failed to load order book</p>
+          <p className="text-sm">{error}</p>
         </div>
       </div>
     );
