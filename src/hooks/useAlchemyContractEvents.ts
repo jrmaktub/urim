@@ -13,7 +13,8 @@ export interface OrderBookEntry {
   blockNumber: number;
 }
 
-const ALCHEMY_RPC_URL = "https://base-mainnet.g.alchemy.com/v2/27SvVEbGAVC2VSJ8rPss0";
+const BASESCAN_API_KEY = "6VT5S4WW78C4WSEPS1NTUEJAP4GE4XMQP8";
+const BASESCAN_API_URL = "https://api.basescan.org/api";
 
 // Event signatures
 const SHARES_PURCHASED_SIGNATURE = ethers.id("SharesPurchased(address,uint8,uint256,uint256)");
@@ -29,81 +30,29 @@ export const useAlchemyContractEvents = (candidateId: number) => {
       setIsLoading(true);
       setError(null);
 
-      console.log("🔍 Fetching events from Alchemy...");
+      console.log("🔍 Fetching events from BaseScan...");
       console.log("Contract Address:", HONDURAS_ELECTION_ADDRESS);
       console.log("Candidate ID:", candidateId);
 
-      // First, get the current block number
-      const blockResponse = await fetch(ALCHEMY_RPC_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          jsonrpc: "2.0",
-          id: 1,
-          method: "eth_blockNumber",
-          params: [],
-        }),
-      });
+      // Fetch all logs from BaseScan API
+      const response = await fetch(
+        `${BASESCAN_API_URL}?module=logs&action=getLogs&fromBlock=0&toBlock=latest&address=${HONDURAS_ELECTION_ADDRESS}&apikey=${BASESCAN_API_KEY}`
+      );
 
-      const blockData = await blockResponse.json();
-      const currentBlock = parseInt(blockData.result, 16);
-      console.log("Current block:", currentBlock);
-
-      // Fetch events from the last 50,000 blocks (roughly 1 week on Base)
-      const fromBlock = Math.max(0, currentBlock - 50000);
-      const toBlock = currentBlock;
-
-      console.log(`Fetching logs from block ${fromBlock} to ${toBlock}`);
-
-      // Fetch events in chunks of 10,000 blocks to avoid rate limits
-      const chunkSize = 10000;
-      let allLogs: any[] = [];
-
-      for (let start = fromBlock; start <= toBlock; start += chunkSize) {
-        const end = Math.min(start + chunkSize - 1, toBlock);
-        
-        console.log(`Fetching chunk: ${start} to ${end}`);
-
-        const requestBody = {
-          jsonrpc: "2.0",
-          id: 1,
-          method: "eth_getLogs",
-          params: [
-            {
-              address: HONDURAS_ELECTION_ADDRESS,
-              fromBlock: `0x${start.toString(16)}`,
-              toBlock: `0x${end.toString(16)}`,
-              topics: [
-                [SHARES_PURCHASED_SIGNATURE, SHARES_SOLD_SIGNATURE],
-              ],
-            },
-          ],
-        };
-
-        const response = await fetch(ALCHEMY_RPC_URL, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(requestBody),
-        });
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error("❌ Response not OK:", errorText);
-          throw new Error(`Alchemy API error: ${response.status} - ${errorText}`);
-        }
-
-        const data = await response.json();
-
-        if (data.error) {
-          console.error("❌ JSON-RPC Error:", data.error);
-          throw new Error(data.error.message || "Failed to fetch logs");
-        }
-
-        const logs = data.result || [];
-        console.log(`✅ Fetched ${logs.length} logs from chunk ${start}-${end}`);
-        allLogs = allLogs.concat(logs);
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("❌ BaseScan API error:", errorText);
+        throw new Error(`BaseScan API error: ${response.status} - ${errorText}`);
       }
 
+      const data = await response.json();
+
+      if (data.status !== "1") {
+        console.error("❌ BaseScan API error:", data.message);
+        throw new Error(data.message || "Failed to fetch logs");
+      }
+
+      const allLogs = data.result || [];
       console.log(`✅ Total logs fetched: ${allLogs.length}`);
       const processedOrders: OrderBookEntry[] = [];
 
@@ -114,19 +63,13 @@ export const useAlchemyContractEvents = (candidateId: number) => {
       await Promise.all(
         blockNumbers.map(async (blockNum: string) => {
           try {
-            const blockResponse = await fetch(ALCHEMY_RPC_URL, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                jsonrpc: "2.0",
-                id: 1,
-                method: "eth_getBlockByNumber",
-                params: [blockNum, false],
-              }),
-            });
-            const blockData = await blockResponse.json();
-            if (blockData.result) {
-              blockTimestamps[blockNum] = parseInt(blockData.result.timestamp, 16);
+            const blockNumber = parseInt(blockNum, 16);
+            const response = await fetch(
+              `${BASESCAN_API_URL}?module=block&action=getblockreward&blockno=${blockNumber}&apikey=${BASESCAN_API_KEY}`
+            );
+            const data = await response.json();
+            if (data.status === "1" && data.result && data.result.timeStamp) {
+              blockTimestamps[blockNum] = parseInt(data.result.timeStamp);
             }
           } catch (err) {
             console.error(`Error fetching block ${blockNum}:`, err);
@@ -191,7 +134,7 @@ export const useAlchemyContractEvents = (candidateId: number) => {
 
       setOrders(processedOrders);
     } catch (err) {
-      console.error("❌ Error fetching Alchemy contract events:", err);
+      console.error("❌ Error fetching BaseScan contract events:", err);
       setError(err instanceof Error ? err.message : "Failed to fetch contract events");
     } finally {
       setIsLoading(false);
