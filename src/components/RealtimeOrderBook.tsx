@@ -1,12 +1,14 @@
 import { RealtimeTrade } from "@/hooks/useRealtimeTrades";
+import { Loader2 } from "lucide-react";
 
 interface RealtimeOrderBookProps {
   candidateId: number;
   candidateName: string;
   trades: RealtimeTrade[];
+  isLoadingHistory: boolean;
 }
 
-const RealtimeOrderBook = ({ candidateId, candidateName, trades }: RealtimeOrderBookProps) => {
+const RealtimeOrderBook = ({ candidateId, candidateName, trades, isLoadingHistory }: RealtimeOrderBookProps) => {
   const candidateTrades = trades.filter((t) => t.candidateId === candidateId);
 
   const formatAddress = (address: string) => {
@@ -25,11 +27,19 @@ const RealtimeOrderBook = ({ candidateId, candidateName, trades }: RealtimeOrder
 
   return (
     <div className="mt-6 p-6 rounded-xl border border-border/30 bg-background/20 backdrop-blur-sm shadow-[0_0_20px_rgba(139,92,246,0.15)]">
-      <h3 className="text-lg font-semibold mb-4 text-foreground">
-        Recent Trades - {candidateName}
-      </h3>
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-lg font-semibold text-foreground">
+          Recent Trades - {candidateName}
+        </h3>
+        {isLoadingHistory && (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Loading history...
+          </div>
+        )}
+      </div>
 
-      {candidateTrades.length === 0 ? (
+      {!isLoadingHistory && candidateTrades.length === 0 ? (
         <div className="py-8 text-center text-muted-foreground">
           No trades yet. Trades will appear here in real-time.
         </div>
