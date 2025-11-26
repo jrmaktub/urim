@@ -19,7 +19,8 @@ import {
   useUSDCAllowance,
 } from "@/hooks/useHondurasElection";
 import { CANDIDATE_IDS, MARKET_STATES } from "@/constants/hondurasElection";
-import ElectionOrderBook from "@/components/ElectionOrderBook";
+import { useRealtimeTrades } from "@/hooks/useRealtimeTrades";
+import RealtimeOrderBook from "@/components/RealtimeOrderBook";
 
 const candidatesBase = [
   {
@@ -59,6 +60,7 @@ const Elections = () => {
   const moncadaPosition = useUserPosition(CANDIDATE_IDS.MONCADA);
   const asfuraPosition = useUserPosition(CANDIDATE_IDS.ASFURA);
   const { allowance, refetch: refetchAllowance } = useUSDCAllowance();
+  const { recentTrades } = useRealtimeTrades();
 
   const { approve, isPending: isApprovingTx, isConfirming: isApprovalConfirming, isSuccess: isApprovalSuccess } = useApproveUSDC();
   const { buyShares, isConfirming: isBuying, isPending: isBuyingPending } = useBuyShares();
@@ -370,11 +372,12 @@ const Elections = () => {
                     </div>
                   </div>
                   
-                  {/* Order Book - Only show for selected candidate */}
+                  {/* Realtime Order Book - Only show for selected candidate */}
                   {selectedCandidateId === candidate.id && (
-                    <ElectionOrderBook 
+                    <RealtimeOrderBook 
                       candidateId={candidate.id}
                       candidateName={candidate.name}
+                      trades={recentTrades}
                     />
                   )}
                 </div>
