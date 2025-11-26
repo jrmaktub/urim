@@ -19,6 +19,7 @@ import {
   useUSDCAllowance,
 } from "@/hooks/useHondurasElection";
 import { CANDIDATE_IDS, MARKET_STATES } from "@/constants/hondurasElection";
+import ElectionOrderBook from "@/components/ElectionOrderBook";
 
 const candidatesBase = [
   {
@@ -369,6 +370,13 @@ const Elections = () => {
                     </div>
                   </div>
                   
+                  {/* Order Book - Only show for selected candidate */}
+                  {selectedCandidateId === candidate.id && (
+                    <ElectionOrderBook 
+                      candidateId={candidate.id}
+                      candidateName={candidate.name}
+                    />
+                  )}
                 </div>
               ))}
             </div>
