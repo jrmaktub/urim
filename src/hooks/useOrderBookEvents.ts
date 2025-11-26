@@ -1,5 +1,8 @@
 import { useState, useEffect } from "react";
+import { usePublicClient } from "wagmi";
 import { HONDURAS_ELECTION_ADDRESS } from "@/constants/hondurasElection";
+import HondurasElectionABI from "@/contracts/HondurasElection.json";
+import { parseAbiItem, formatUnits } from "viem";
 
 export interface OrderBookEntry {
   type: "BID" | "ASK";
@@ -12,70 +15,97 @@ export interface OrderBookEntry {
   txHash: string;
 }
 
-const BASESCAN_API_KEY = "6VT5S4WW78C4WSEPS1NTUEJAP4GE4XMQP8";
-
 export function useOrderBookEvents(candidateId: number) {
   const [orders, setOrders] = useState<OrderBookEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const publicClient = usePublicClient();
 
   useEffect(() => {
-    const fetchTransactions = async () => {
+    const fetchEvents = async () => {
+      if (!publicClient) return;
+      
       try {
-        console.log("🔍 FETCHING TRANSACTIONS FROM BASESCAN");
+        console.log("🔍 FETCHING EVENTS FOR CANDIDATE:", candidateId);
         
-        // Get internal transactions (contract calls)
-        const url = `https://api.basescan.org/api?module=account&action=txlist&address=${HONDURAS_ELECTION_ADDRESS}&startblock=0&endblock=99999999&sort=desc&apikey=${BASESCAN_API_KEY}`;
+        const currentBlock = await publicClient.getBlockNumber();
+        const fromBlock = currentBlock - 50000n; // Last ~50k blocks
         
-        console.log("Fetching from:", url);
+        console.log(`📦 Fetching from block ${fromBlock} to ${currentBlock}`);
         
-        const response = await fetch(url);
-        const data = await response.json();
+        // Fetch SharesPurchased events
+        const purchaseLogs = await publicClient.getLogs({
+          address: HONDURAS_ELECTION_ADDRESS as `0x${string}`,
+          event: parseAbiItem('event SharesPurchased(uint8 indexed candidateId, address indexed buyer, uint256 shareAmount, uint256 cost, uint256 newPrice)'),
+          fromBlock,
+          toBlock: 'latest'
+        });
         
-        console.log("BaseScan response:", data);
+        // Fetch SharesSold events
+        const sellLogs = await publicClient.getLogs({
+          address: HONDURAS_ELECTION_ADDRESS as `0x${string}`,
+          event: parseAbiItem('event SharesSold(uint8 indexed candidateId, address indexed seller, uint256 shareAmount, uint256 payout, uint256 newPrice)'),
+          fromBlock,
+          toBlock: 'latest'
+        });
         
-        if (data.status === "1" && data.result) {
-          const txs = data.result;
-          console.log(`✅ GOT ${txs.length} TRANSACTIONS`);
-          console.log("First transaction:", txs[0]);
-          
-          // Show ALL successful transactions as orders
-          const allOrders: OrderBookEntry[] = txs
-            .filter((tx: any) => tx.isError === "0")
-            .slice(0, 50) // Show last 50
-            .map((tx: any, idx: number) => {
-              // Parse the input to determine buy/sell
-              const isBuy = tx.input.includes("0x5d77c4d6"); // buyShares method ID
-              
+        console.log(`✅ GOT ${purchaseLogs.length} purchase events, ${sellLogs.length} sell events`);
+        
+        // Process purchase events
+        const purchases: OrderBookEntry[] = await Promise.all(
+          purchaseLogs
+            .filter((log: any) => Number(log.args.candidateId) === candidateId)
+            .map(async (log: any) => {
+              const block = await publicClient.getBlock({ blockNumber: log.blockNumber });
               return {
-                type: isBuy ? "BID" : "ASK",
-                price: 33, // Will parse later
-                shares: "1.00",
-                totalUSDC: (Number(tx.value) / 1e18).toFixed(4),
-                trader: tx.from,
-                timestamp: new Date(Number(tx.timeStamp) * 1000).toLocaleTimeString(),
-                blockNumber: Number(tx.blockNumber),
-                txHash: tx.hash,
+                type: "BID" as const,
+                price: Number(formatUnits(log.args.newPrice, 6)),
+                shares: formatUnits(log.args.shareAmount, 18),
+                totalUSDC: formatUnits(log.args.cost, 6),
+                trader: log.args.buyer,
+                timestamp: new Date(Number(block.timestamp) * 1000).toLocaleTimeString(),
+                blockNumber: Number(log.blockNumber),
+                txHash: log.transactionHash
               };
-            });
-          
-          console.log(`✅ PROCESSED ${allOrders.length} ORDERS`);
-          setOrders(allOrders);
-        } else {
-          console.error("❌ BaseScan returned error:", data.message);
-        }
+            })
+        );
+        
+        // Process sell events
+        const sells: OrderBookEntry[] = await Promise.all(
+          sellLogs
+            .filter((log: any) => Number(log.args.candidateId) === candidateId)
+            .map(async (log: any) => {
+              const block = await publicClient.getBlock({ blockNumber: log.blockNumber });
+              return {
+                type: "ASK" as const,
+                price: Number(formatUnits(log.args.newPrice, 6)),
+                shares: formatUnits(log.args.shareAmount, 18),
+                totalUSDC: formatUnits(log.args.payout, 6),
+                trader: log.args.seller,
+                timestamp: new Date(Number(block.timestamp) * 1000).toLocaleTimeString(),
+                blockNumber: Number(log.blockNumber),
+                txHash: log.transactionHash
+              };
+            })
+        );
+        
+        // Combine and sort by block number (newest first)
+        const allOrders = [...purchases, ...sells].sort((a, b) => b.blockNumber - a.blockNumber);
+        
+        console.log(`✅ PROCESSED ${allOrders.length} TOTAL ORDERS FOR CANDIDATE ${candidateId}`);
+        setOrders(allOrders);
+        setIsLoading(false);
       } catch (error) {
         console.error("❌ FETCH ERROR:", error);
-      } finally {
         setIsLoading(false);
       }
     };
 
-    fetchTransactions();
+    fetchEvents();
     
-    // Refresh every 10 seconds
-    const interval = setInterval(fetchTransactions, 10000);
+    // Refresh every 15 seconds
+    const interval = setInterval(fetchEvents, 15000);
     return () => clearInterval(interval);
-  }, [candidateId]);
+  }, [candidateId, publicClient]);
 
   return { orders, isLoading };
 }
