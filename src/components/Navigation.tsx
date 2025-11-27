@@ -20,9 +20,9 @@ const Navigation = () => {
     'disabled:opacity-50 disabled:cursor-not-allowed';
   
   const navLinks = [
-    { name: "Quantum Bets", path: "/" },
+    { name: "Elections", path: "/" },
+    { name: "Quantum Bets", path: "/quantum-bets" },
     { name: "Quantum Pyth Prices", path: "/quantum-pyth-prices" },
-    { name: "Elections", path: "/elections" },
     { name: "50/50 Lottery", path: "/lottery" },
     { name: "Everything Bets", path: "/everything-bets" },
     { name: "Tournaments", path: "/tournaments" },
