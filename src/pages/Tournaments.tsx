@@ -287,7 +287,7 @@ export default function TournamentsPage() {
     <div className="min-h-screen bg-background">
       <Navigation />
       
-      <div className="relative min-h-[calc(100vh-80px)] px-4 sm:px-6 lg:px-10 py-10 pt-8 md:pt-24 text-foreground">
+      <div className="relative min-h-[calc(100vh-80px)] px-4 sm:px-6 lg:px-10 py-10 pt-28 sm:pt-32 text-foreground">
         {/* Background gradient */}
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(60%_60%_at_50%_0%,rgba(139,92,246,0.12),transparent_60%)]" />
         

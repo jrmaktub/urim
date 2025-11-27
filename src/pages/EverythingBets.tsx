@@ -220,7 +220,7 @@ const EverythingBets = () => {
       <Navigation />
 
       {/* Create Section */}
-      <section className="pt-32 pb-20 px-6">
+      <section className="pt-28 sm:pt-32 pb-20 px-6">
         <div className="max-w-3xl mx-auto">
           {/* Header */}
           <div className="text-center mb-12 animate-fade-up space-y-4">
