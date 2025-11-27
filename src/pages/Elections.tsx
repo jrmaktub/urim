@@ -4,6 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ExternalLink, TrendingUp, Users, Clock, Loader2, X } from "lucide-react";
+import nasrallaImage from "@/assets/nasralla.jpg";
+import moncadaImage from "@/assets/moncada.jpg";
+import asfuraImage from "@/assets/asfura.jpg";
 import {
   Drawer,
   DrawerClose,
@@ -34,19 +37,19 @@ const candidatesBase = [
   {
     id: CANDIDATE_IDS.NASRALLA,
     name: "Salvador Nasralla",
-    image: "/placeholder.svg",
+    image: nasrallaImage,
     color: "#FFFFFF",
   },
   {
     id: CANDIDATE_IDS.MONCADA,
     name: "Rixi Moncada",
-    image: "/placeholder.svg",
+    image: moncadaImage,
     color: "#FF3B30",
   },
   {
     id: CANDIDATE_IDS.ASFURA,
     name: "Nasry Asfura",
-    image: "/placeholder.svg",
+    image: asfuraImage,
     color: "#0073CF",
   },
 ];
