@@ -553,7 +553,7 @@ const Elections = () => {
               <div className="space-y-2">
                 <label className="text-xs font-medium text-muted-foreground">Quick Amount</label>
                 <div className="flex gap-2">
-                  {[1, 5, 20, 100].map((amount) => (
+                  {[1, 5, 20, 50].map((amount) => (
                     <Button
                       key={amount}
                       size="sm"
@@ -714,7 +714,7 @@ const Elections = () => {
             <div className="space-y-2">
               <label className="text-sm font-medium text-muted-foreground">Select Amount (USDC)</label>
               <div className="grid grid-cols-4 gap-3">
-                {[1, 5, 20, 100].map((amount) => (
+                {[1, 5, 20, 50].map((amount) => (
                   <button
                     key={amount}
                     onClick={() => setTradeAmount(amount.toString())}
