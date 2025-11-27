@@ -408,16 +408,6 @@ const Elections = () => {
                 <p className="text-foreground leading-relaxed">
                   Winner determination is based on a consensus of credible reporting — including outlets such as The New York Times, Reuters, AP, Politico, Semafor, CNN, ABC, Fox News, and others — together with the official announcement from the Honduran National Electoral Council (Consejo Nacional Electoral, CNE). If major sources temporarily conflict, resolution will pause until a clear and consistent public consensus emerges.
                 </p>
-                <div className="flex flex-wrap gap-3 pt-2">
-                  <Button variant="outline" size="sm" className="gap-2">
-                    View full rules
-                    <ExternalLink className="w-4 h-4" />
-                  </Button>
-                  <Button variant="outline" size="sm" className="gap-2">
-                    Help center
-                    <ExternalLink className="w-4 h-4" />
-                  </Button>
-                </div>
               </div>
             </div>
 
