@@ -720,31 +720,25 @@ const Elections = () => {
               </div>
             )}
 
-            {/* Amount Input */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-muted-foreground">Amount (USDC)</label>
-              <Input
-                type="number"
-                value={tradeAmount}
-                onChange={(e) => setTradeAmount(e.target.value)}
-                placeholder="0.00"
-                className="h-14 text-lg bg-secondary/20 border-border/30 focus:border-primary/50"
-                disabled={marketState !== MARKET_STATES.OPEN || isProcessing}
-              />
-            </div>
-
             {/* Quick Amount Buttons */}
-            <div className="grid grid-cols-4 gap-2">
-              {[1, 5, 20, 100].map((amount) => (
-                <button
-                  key={amount}
-                  onClick={() => setTradeAmount(amount.toString())}
-                  className="py-3 px-3 bg-secondary/40 hover:bg-secondary/60 rounded-lg text-sm font-semibold text-foreground transition-colors"
-                  disabled={marketState !== MARKET_STATES.OPEN || isProcessing}
-                >
-                  ${amount}
-                </button>
-              ))}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-muted-foreground">Select Amount (USDC)</label>
+              <div className="grid grid-cols-4 gap-3">
+                {[1, 5, 20, 100].map((amount) => (
+                  <button
+                    key={amount}
+                    onClick={() => setTradeAmount(amount.toString())}
+                    className={`py-4 px-3 rounded-xl text-base font-bold transition-all ${
+                      tradeAmount === amount.toString()
+                        ? "bg-primary text-primary-foreground shadow-lg scale-105"
+                        : "bg-secondary/40 hover:bg-secondary/60 text-foreground"
+                    }`}
+                    disabled={marketState !== MARKET_STATES.OPEN || isProcessing}
+                  >
+                    ${amount}
+                  </button>
+                ))}
+              </div>
             </div>
 
             {/* Estimated Payout */}
