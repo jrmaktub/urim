@@ -94,7 +94,7 @@ const Lottery = () => {
       
       <Navigation />
       
-      <main className="pt-24 sm:pt-20 pb-12 px-4 md:px-6 relative z-10">
+      <main className="pt-28 sm:pt-32 pb-12 px-4 md:px-6 relative z-10">
         <div className="max-w-7xl mx-auto">
           {/* Hero Section */}
           <motion.div

@@ -233,7 +233,7 @@ const Index = () => {
     <div className="min-h-screen bg-gradient-to-b from-background via-background to-purple-950/10">
       <Navigation />
       
-      <section className="max-w-4xl mx-auto px-6 pt-24 pb-12 text-center">
+      <section className="max-w-4xl mx-auto px-6 pt-28 sm:pt-32 pb-12 text-center">
         <h1 className="text-6xl font-bold mb-4 bg-gradient-to-r from-white via-purple-200 to-purple-400 bg-clip-text text-transparent">
           URIM
         </h1>
