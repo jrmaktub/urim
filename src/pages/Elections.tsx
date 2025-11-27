@@ -463,25 +463,19 @@ const Elections = () => {
               <p className="text-muted-foreground mb-4">
                 Market resolution is verified through decentralized oracle consensus.
               </p>
-              <div className="space-y-3">
-                <div className="flex items-center justify-between p-3 bg-card/50 rounded-lg border border-border/30">
-                  <div>
-                    <p className="text-sm font-medium text-foreground">Resolver (UMA)</p>
-                    <a 
-                      href="https://basescan.org/address/0x2aBf1Bd76655de80eDB3086114315Eec75AF500c" 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="text-xs text-primary hover:underline flex items-center gap-1"
-                    >
-                      0x2aBf...500c
-                      <ExternalLink className="w-3 h-3" />
-                    </a>
-                  </div>
+              <div className="flex items-center justify-between p-3 bg-card/50 rounded-lg border border-border/30">
+                <div>
+                  <p className="text-sm font-medium text-foreground">Resolver (UMA)</p>
+                  <a 
+                    href="https://basescan.org/address/0x2aBf1Bd76655de80eDB3086114315Eec75AF500c" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-xs text-primary hover:underline flex items-center gap-1"
+                  >
+                    0x2aBf...500c
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
                 </div>
-                <Button variant="outline" className="gap-2 border-primary/30 hover:border-primary/50 w-full">
-                  View Oracle Resolver
-                  <ExternalLink className="w-4 h-4" />
-                </Button>
               </div>
             </div>
           </div>
