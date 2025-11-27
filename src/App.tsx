@@ -75,8 +75,8 @@ const App = () => {
                 <Sonner />
                 <BrowserRouter>
                   <Routes>
-                    <Route path="/" element={<Index />} />
-                    <Route path="/quantum-bets" element={<QuantumBets />} />
+                    <Route path="/" element={<Elections />} />
+                    <Route path="/quantum-bets" element={<Index />} />
                     <Route path="/elections" element={<Elections />} />
                     <Route path="/everything-bets" element={<EverythingBets />} />
                     <Route path="/tournaments" element={<Tournaments />} />

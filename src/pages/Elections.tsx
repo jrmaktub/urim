@@ -3,7 +3,16 @@ import Navigation from "@/components/Navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ExternalLink, TrendingUp, Users, Clock, Loader2 } from "lucide-react";
+import { ExternalLink, TrendingUp, Users, Clock, Loader2, X } from "lucide-react";
+import {
+  Drawer,
+  DrawerClose,
+  DrawerContent,
+  DrawerDescription,
+  DrawerFooter,
+  DrawerHeader,
+  DrawerTitle,
+} from "@/components/ui/drawer";
 import { useAccount } from "wagmi";
 import { toast } from "sonner";
 import { parseUnits } from "viem";
@@ -50,6 +59,8 @@ const Elections = () => {
   const [tradeAmount, setTradeAmount] = useState("");
   const [tradeType, setTradeType] = useState<"YES" | "NO">("YES");
   const [isApproving, setIsApproving] = useState(false);
+  const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
+  const [isOrderBookExpanded, setIsOrderBookExpanded] = useState(false);
 
   // Contract hooks
   const prices = useHondurasElectionPrices();
@@ -340,6 +351,9 @@ const Elections = () => {
                           onClick={() => {
                             setSelectedCandidateId(candidate.id);
                             setTradeType("YES");
+                            if (window.innerWidth < 1024) {
+                              setIsMobileDrawerOpen(true);
+                            }
                           }}
                           className="flex-1 sm:flex-none bg-green-600 hover:bg-green-700 text-white border-0"
                           disabled={marketState !== MARKET_STATES.OPEN}
@@ -350,6 +364,9 @@ const Elections = () => {
                           onClick={() => {
                             setSelectedCandidateId(candidate.id);
                             setTradeType("NO");
+                            if (window.innerWidth < 1024) {
+                              setIsMobileDrawerOpen(true);
+                            }
                           }}
                           className="flex-1 sm:flex-none bg-red-600 hover:bg-red-700 text-white border-0"
                           disabled={marketState !== MARKET_STATES.OPEN}
@@ -476,8 +493,8 @@ const Elections = () => {
             </div>
           </div>
 
-          {/* Right Sidebar - Purchase Widget */}
-          <div className="lg:col-span-1">
+          {/* Right Sidebar - Purchase Widget (Desktop Only) */}
+          <div className="hidden lg:block lg:col-span-1">
             <div className="sticky top-24 glass-card p-4 space-y-4">
               {/* Candidate Info */}
               <div className="flex items-center gap-3 pb-3 border-b border-border/50">
@@ -614,7 +631,183 @@ const Elections = () => {
             </div>
           </div>
         </div>
+
+        {/* Mobile Order Book (Collapsible) */}
+        <div className="lg:hidden mt-6">
+          <div className="glass-card p-4">
+            <button
+              onClick={() => setIsOrderBookExpanded(!isOrderBookExpanded)}
+              className="w-full flex items-center justify-between text-foreground font-semibold mb-2"
+            >
+              <span>Order Book & Trades</span>
+              <span className="text-muted-foreground text-xl">{isOrderBookExpanded ? '−' : '+'}</span>
+            </button>
+            {isOrderBookExpanded && (
+              <div className="mt-4">
+                <ElectionOrderBook 
+                  candidateId={selectedCandidateId}
+                  candidateName={selectedCandidate.name}
+                />
+              </div>
+            )}
+          </div>
+        </div>
       </main>
+
+      {/* Mobile Trading Drawer */}
+      <Drawer open={isMobileDrawerOpen} onOpenChange={setIsMobileDrawerOpen}>
+        <DrawerContent className="bg-background/95 backdrop-blur-xl border-t border-border/50 rounded-t-[20px]">
+          <DrawerHeader className="text-left border-b border-border/30 pb-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary/20 to-secondary overflow-hidden border-2 border-primary/30">
+                  <img
+                    src={selectedCandidate.image}
+                    alt={selectedCandidate.name}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <div>
+                  <DrawerTitle className="text-lg text-foreground">{selectedCandidate.name}</DrawerTitle>
+                  <DrawerDescription 
+                    className="text-2xl font-bold mt-1"
+                    style={{ color: candidates.find(c => c.id === selectedCandidateId)?.color }}
+                  >
+                    {selectedCandidate.percentage}%
+                  </DrawerDescription>
+                </div>
+              </div>
+              <DrawerClose asChild>
+                <Button variant="ghost" size="icon" className="rounded-full hover:bg-secondary/60">
+                  <X className="h-5 w-5" />
+                </Button>
+              </DrawerClose>
+            </div>
+          </DrawerHeader>
+
+          <div className="p-6 space-y-6 max-h-[60vh] overflow-y-auto">
+            {/* Buy/Sell Toggle */}
+            <div className="flex gap-2 p-1 bg-secondary/40 rounded-lg">
+              <button
+                onClick={() => setTradeType("YES")}
+                className={`flex-1 py-3 rounded-md font-semibold transition-all ${
+                  tradeType === "YES"
+                    ? "bg-green-600 text-white shadow-lg"
+                    : "text-muted-foreground hover:bg-secondary/60"
+                }`}
+                disabled={marketState !== MARKET_STATES.OPEN}
+              >
+                Buy
+              </button>
+              <button
+                onClick={() => setTradeType("NO")}
+                className={`flex-1 py-3 rounded-md font-semibold transition-all ${
+                  tradeType === "NO"
+                    ? "bg-red-600 text-white shadow-lg"
+                    : "text-muted-foreground hover:bg-secondary/60"
+                }`}
+                disabled={marketState !== MARKET_STATES.OPEN}
+              >
+                Sell
+              </button>
+            </div>
+
+            {/* User Position */}
+            {isConnected && parseFloat(selectedCandidate.position) > 0 && (
+              <div className="bg-card/50 rounded-lg p-4 border border-border/30">
+                <div className="text-xs text-muted-foreground mb-1">Your Position</div>
+                <div className="text-xl font-bold text-primary">${selectedCandidate.position}</div>
+              </div>
+            )}
+
+            {/* Amount Input */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-muted-foreground">Amount (USDC)</label>
+              <Input
+                type="number"
+                value={tradeAmount}
+                onChange={(e) => setTradeAmount(e.target.value)}
+                placeholder="0.00"
+                className="h-14 text-lg bg-secondary/20 border-border/30 focus:border-primary/50"
+                disabled={marketState !== MARKET_STATES.OPEN || isProcessing}
+              />
+            </div>
+
+            {/* Quick Amount Buttons */}
+            <div className="grid grid-cols-4 gap-2">
+              {[1, 5, 20, 100].map((amount) => (
+                <button
+                  key={amount}
+                  onClick={() => setTradeAmount(amount.toString())}
+                  className="py-3 px-3 bg-secondary/40 hover:bg-secondary/60 rounded-lg text-sm font-semibold text-foreground transition-colors"
+                  disabled={marketState !== MARKET_STATES.OPEN || isProcessing}
+                >
+                  ${amount}
+                </button>
+              ))}
+            </div>
+
+            {/* Estimated Payout */}
+            {tradeAmount && parseFloat(tradeAmount) > 0 && (
+              <div className="p-4 bg-gradient-to-br from-primary/10 to-secondary/10 rounded-lg border border-primary/20">
+                <div className="flex items-center justify-between text-sm mb-2">
+                  <span className="text-muted-foreground">You {tradeType === "YES" ? "pay" : "receive"}:</span>
+                  <span className="font-semibold text-foreground text-lg">
+                    ${tradeAmount} USDC
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Expected value:</span>
+                  <span className="font-semibold text-primary text-lg">
+                    ${(parseFloat(tradeAmount) / (selectedCandidate.percentage / 100)).toFixed(2)}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-xs mt-2 pt-2 border-t border-border/20">
+                  <span className="text-muted-foreground">Avg price:</span>
+                  <span className="text-muted-foreground">{selectedCandidate.percentage}¢</span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DrawerFooter className="border-t border-border/30 pt-4 px-6 pb-6">
+            <Button
+              onClick={() => {
+                handleTrade();
+                setIsMobileDrawerOpen(false);
+              }}
+              disabled={!isConnected || marketState !== MARKET_STATES.OPEN || isProcessing || !tradeAmount || parseFloat(tradeAmount) <= 0}
+              className={`w-full py-6 text-lg font-bold shadow-lg ${
+                tradeType === "YES"
+                  ? "bg-green-600 hover:bg-green-700 text-white"
+                  : "bg-red-600 hover:bg-red-700 text-white"
+              }`}
+            >
+              {!isConnected ? (
+                "Connect Wallet"
+              ) : marketState !== MARKET_STATES.OPEN ? (
+                "Market Closed"
+              ) : isProcessing ? (
+                <>
+                  <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                  {isApproving || isApprovingTx || isApprovalConfirming
+                    ? "Approving..." 
+                    : isBuying || isBuyingPending
+                    ? "Buying..."
+                    : isSelling || isSellingPending
+                    ? "Selling..."
+                    : "Processing..."}
+                </>
+              ) : (
+                `${tradeType === "YES" ? "Buy" : "Sell"} Shares`
+              )}
+            </Button>
+            <p className="text-xs text-center text-muted-foreground mt-2">
+              Trades execute on Base Mainnet with USDC
+            </p>
+          </DrawerFooter>
+        </DrawerContent>
+      </Drawer>
     </div>
   );
 };
