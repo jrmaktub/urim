@@ -1,5 +1,5 @@
 import { useThirdwebTransactions } from "@/hooks/useThirdwebTransactions";
-import { Loader2, ExternalLink } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface ElectionOrderBookProps {
@@ -80,13 +80,9 @@ const ElectionOrderBook = ({ candidateId, candidateName }: ElectionOrderBookProp
               >
                 <div className="font-medium text-green-400">{order.price.toString().slice(0, 2)}</div>
                 <div className="text-foreground">${order.totalUSDC}</div>
-                <button
-                  onClick={() => window.open(`https://basescan.org/tx/${order.txHash}`, "_blank")}
-                  className="text-muted-foreground text-xs hover:text-primary transition-colors flex items-center gap-1"
-                >
+                <div className="text-muted-foreground text-xs">
                   {order.timestamp}
-                  <ExternalLink className="h-3 w-3" />
-                </button>
+                </div>
               </div>
             ))
           )}
@@ -119,13 +115,9 @@ const ElectionOrderBook = ({ candidateId, candidateName }: ElectionOrderBookProp
               >
                 <div className="font-medium text-red-400">{order.price.toString().slice(0, 2)}</div>
                 <div className="text-foreground">${order.totalUSDC}</div>
-                <button
-                  onClick={() => window.open(`https://basescan.org/tx/${order.txHash}`, "_blank")}
-                  className="text-muted-foreground text-xs hover:text-primary transition-colors flex items-center gap-1"
-                >
+                <div className="text-muted-foreground text-xs">
                   {order.timestamp}
-                  <ExternalLink className="h-3 w-3" />
-                </button>
+                </div>
               </div>
             ))
           )}
