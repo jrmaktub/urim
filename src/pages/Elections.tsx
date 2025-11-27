@@ -409,7 +409,7 @@ const Elections = () => {
                   Presidential elections in Honduras are scheduled for November 30, 2025. This market resolves to the candidate who is publicly confirmed as the winner. If no winner is determined by December 31, 2026 at 11:59 PM ET, the market resolves to 'Other'.
                 </p>
                 <p className="text-foreground leading-relaxed">
-                  Winner determination is based on a consensus of credible reporting — including outlets such as The New York Times, Reuters, AP, Politico, Semafor, CNN, ABC, Fox News, and others — together with the official announcement from the Honduran National Electoral Council (Consejo Nacional Electoral, CNE). If major sources temporarily conflict, resolution will pause until a clear and consistent public consensus emerges.
+                  Winner determination is based on a consensus of credible reporting — including sources such as Reuters, the United Nations, and The New York Times — together with the official announcement from the Honduran National Electoral Council (Consejo Nacional Electoral, CNE). If major sources temporarily conflict, resolution will pause until a clear and consistent public consensus emerges.
                 </p>
               </div>
             </div>
