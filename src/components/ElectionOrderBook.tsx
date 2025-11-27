@@ -78,7 +78,7 @@ const ElectionOrderBook = ({ candidateId, candidateName }: ElectionOrderBookProp
                 key={idx}
                 className="grid grid-cols-3 gap-3 px-3 py-2 text-sm rounded-lg hover:bg-primary/5 hover:shadow-[0_0_15px_rgba(139,92,246,0.2)] transition-all duration-200 border-l-2 border-green-500"
               >
-                <div className="font-medium text-green-400 border-l-2 border-r-2 border-green-500 rounded-lg px-2">{order.price.toString().slice(0, 2)}</div>
+                <div className="font-medium text-green-400">{order.price.toString().slice(0, 2)}</div>
                 <div className="text-foreground">${order.totalUSDC}</div>
                 <button
                   onClick={() => window.open(`https://basescan.org/tx/${order.txHash}`, "_blank")}
@@ -117,7 +117,7 @@ const ElectionOrderBook = ({ candidateId, candidateName }: ElectionOrderBookProp
                 key={idx}
                 className="grid grid-cols-3 gap-3 px-3 py-2 text-sm rounded-lg hover:bg-primary/5 hover:shadow-[0_0_15px_rgba(139,92,246,0.2)] transition-all duration-200 border-l-2 border-red-500"
               >
-                <div className="font-medium text-red-400 border-l-2 border-r-2 border-red-500 rounded-lg px-2">{order.price.toString().slice(0, 2)}</div>
+                <div className="font-medium text-red-400">{order.price.toString().slice(0, 2)}</div>
                 <div className="text-foreground">${order.totalUSDC}</div>
                 <button
                   onClick={() => window.open(`https://basescan.org/tx/${order.txHash}`, "_blank")}
