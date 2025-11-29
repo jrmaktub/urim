@@ -1,24 +1,20 @@
 {
+  "frame": {
+    "name": "Urim",
+    "version": "1",
+    "iconUrl": "https://urim.live/icon.png",
+    "homeUrl": "https://urim.live",
+    "imageUrl": "https://urim.live/hero.png",
+    "splashImageUrl": "https://urim.live/splash.png",
+    "splashBackgroundColor": "#6200EA",
+    "webhookUrl": "https://urim.live/api/webhook",
+    "subtitle": "Predict and earn",
+    "description": "Predict the quantum reality markets",
+    "primaryCategory": "finance"
+  },
   "accountAssociation": {
     "header": "eyJmaWQiOjExMTI3MDgsInR5cGUiOiJjdXN0b2R5Iiwia2V5IjoiMHg4ZGMyZGU5NzgyMGRiNDNkZjAyRDYxZWUyQjE4ZjZGNDNBNTRhODhlIn0",
     "payload": "eyJkb21haW4iOiJ1cmltLmxpdmUifQ",
     "signature": "bWMMJdmt88o64JuNiW6KIwTBNVM1GhUwv+jspsze4tAzjhTd6ZEsGp2x9rLKJyrQcgst7kBEgNLSf11HN+w+Cxs="
-  },
-  "baseBuilder": {
-    "ownerAddress": "0x791C77ef827eEe7aa8cAB3A12254F50538935fe0"
-  },
-  "miniapp": {
-    "version": "1",
-    "name": "Urim",
-    "homeUrl": "https://urim.live",
-    "iconUrl": "https://urim.live/icon.png",
-    "splashImageUrl": "https://urim.live/splash.png",
-    "splashBackgroundColor": "#141414",
-    "subtitle": "Predict and earn",
-    "description": "Predict the quantum reality markets",
-    "heroImageUrl": "https://urim.live/hero.png",
-    "tagline": "Predict Quantum Futures",
-    "primaryCategory": "finance",
-    "tags": ["defi", "prediction", "base"]
   }
 }
