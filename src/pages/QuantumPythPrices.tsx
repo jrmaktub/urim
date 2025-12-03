@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Activity, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
 
 const BASE_PRICE = 131.96;
 
@@ -77,8 +78,7 @@ const PredictionCard = ({ market, onDemoBet }: PredictionCardProps) => {
     onDemoBet({ question: market.question, side, amount: numericAmount });
 
     toast({
-      title: "Demo bet placed",
-      description: "Simulation only – no real funds moved.",
+      title: "Demo bet placed (no real funds used)",
     });
   };
 
@@ -152,28 +152,47 @@ const QuantumPythPrices = () => {
   const [demoBets, setDemoBets] = useState<DemoBet[]>([]);
 
   useEffect(() => {
-    // Initialize values on mount
-    setCurrentPrice(BASE_PRICE);
-    setHigh24h(BASE_PRICE);
-    setLow24h(BASE_PRICE);
-    setChange24hPercent(0);
+    let isMounted = true;
 
-    const interval = setInterval(() => {
-      setCurrentPrice((prev) => {
-        const maxDelta = prev * 0.003; // ±0.3%
-        const delta = (Math.random() * 2 - 1) * maxDelta;
-        const rawNext = prev + delta;
-        const next = Math.max(0.01, parseFloat(rawNext.toFixed(2)));
+    const fetchPrice = async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke("getSolPrice");
 
-        setHigh24h((h) => Math.max(h, next));
-        setLow24h((l) => Math.min(l, next));
-        setChange24hPercent(((next - BASE_PRICE) / BASE_PRICE) * 100);
+        if (error) {
+          console.error("Error fetching SOL price from backend:", error);
+          return;
+        }
 
-        return next;
-      });
-    }, 5000);
+        if (!data) return;
 
-    return () => clearInterval(interval);
+        const { price, high24h, low24h, change24h } = data as {
+          price: number;
+          high24h: number;
+          low24h: number;
+          change24h: number;
+        };
+
+        if (!isMounted) return;
+
+        setCurrentPrice(price);
+        setHigh24h(high24h);
+        setLow24h(low24h);
+        setChange24hPercent(change24h);
+      } catch (err) {
+        console.error("Unexpected error fetching SOL price:", err);
+      }
+    };
+
+    // Initial fetch
+    fetchPrice();
+
+    // Refresh every 30 seconds
+    const interval = setInterval(fetchPrice, 30000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
   }, []);
 
   const markets: Market[] = [
