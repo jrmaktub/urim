@@ -258,9 +258,6 @@ const QuantumPythPrices = () => {
                 <div className="text-6xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent glow-primary">
                   ${currentPrice.toFixed(2)}
                 </div>
-                <Badge variant="outline" className="border-primary/50 text-primary">
-                  Simulated Pyth-style feed · Demo only
-                </Badge>
               </div>
 
               <div className="grid grid-cols-3 gap-4 pt-4 border-t border-border/30">
