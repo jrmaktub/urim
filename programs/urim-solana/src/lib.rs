@@ -1,8 +1,8 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token::{self, Token, TokenAccount, Mint, Transfer};
+use anchor_spl::token::{self, Token, TokenAccount, Transfer};
 use pyth_solana_receiver_sdk::price_update::{get_feed_id_from_hex, PriceUpdateV2};
 
-declare_id!("FdbThb8m8S3wcqowZwXxQGcunGM8pr5ib3i5mt3jKZbB");
+declare_id!("6MWu89uSo4RiFNaVRcuEd2PqzyQRoGdG91Unyd5Aj5kM");
 
 // URIM token on Solana
 pub const URIM_MINT: Pubkey = pubkey!("F8W15WcpXHDthW2TyyiZJ2wMLazGc8CQ4poMNpXQpump");
@@ -55,6 +55,8 @@ pub mod urim_solana {
         ctx: Context<StartRound>,
         duration_type: DurationType,
         boundary_type: BoundaryType,
+        vault_urim_bump: u8,
+        vault_usdc_bump: u8,
     ) -> Result<()> {
         let config = &mut ctx.accounts.config;
         require!(!config.paused, ErrorCode::PlatformPaused);
@@ -111,6 +113,8 @@ pub mod urim_solana {
         round.duration_type = duration_type;
         round.boundary_type = boundary_type;
         round.bump = ctx.bumps.round;
+        round.vault_urim_bump = vault_urim_bump;
+        round.vault_usdc_bump = vault_usdc_bump;
 
         // Increment round counter
         config.current_round_id += 1;
@@ -306,11 +310,16 @@ pub mod urim_solana {
 
         // Transfer winnings to user
         let round_id_bytes = round.round_id.to_le_bytes();
-        let token_seed = if user_bet.use_urim { b"vault_urim" } else { b"vault_usdc" };
+        let (token_seed, vault_bump) = if user_bet.use_urim {
+            (b"vault_urim" as &[u8], round.vault_urim_bump)
+        } else {
+            (b"vault_usdc" as &[u8], round.vault_usdc_bump)
+        };
+
         let seeds = &[
-            token_seed.as_ref(),
+            token_seed,
             round_id_bytes.as_ref(),
-            &[round.vault_bump()],
+            &[vault_bump],
         ];
         let signer = &[&seeds[..]];
 
@@ -365,11 +374,16 @@ pub mod urim_solana {
 
         // Transfer fees to treasury
         let round_id_bytes = round.round_id.to_le_bytes();
-        let token_seed = if collect_urim { b"vault_urim" } else { b"vault_usdc" };
+        let (token_seed, vault_bump) = if collect_urim {
+            (b"vault_urim" as &[u8], round.vault_urim_bump)
+        } else {
+            (b"vault_usdc" as &[u8], round.vault_usdc_bump)
+        };
+
         let seeds = &[
-            token_seed.as_ref(),
+            token_seed,
             round_id_bytes.as_ref(),
-            &[round.vault_bump()],
+            &[vault_bump],
         ];
         let signer = &[&seeds[..]];
 
@@ -432,11 +446,16 @@ pub mod urim_solana {
         require!(ctx.accounts.vault.mint == expected_mint, ErrorCode::InvalidToken);
 
         let round_id_bytes = round.round_id.to_le_bytes();
-        let token_seed = if withdraw_urim { b"vault_urim" } else { b"vault_usdc" };
+        let (token_seed, vault_bump) = if withdraw_urim {
+            (b"vault_urim" as &[u8], round.vault_urim_bump)
+        } else {
+            (b"vault_usdc" as &[u8], round.vault_usdc_bump)
+        };
+
         let seeds = &[
-            token_seed.as_ref(),
+            token_seed,
             round_id_bytes.as_ref(),
-            &[round.vault_bump()],
+            &[vault_bump],
         ];
         let signer = &[&seeds[..]];
 
@@ -522,7 +541,7 @@ pub struct PlaceBet<'info> {
     pub round: Account<'info, Round>,
 
     #[account(
-        init_if_needed,
+        init,
         payer = user,
         space = 8 + UserBet::SIZE,
         seeds = [b"bet", round.key().as_ref(), user.key().as_ref()],
@@ -684,14 +703,12 @@ pub struct Round {
     pub duration_type: DurationType,
     pub boundary_type: BoundaryType,
     pub bump: u8,
+    pub vault_urim_bump: u8,
+    pub vault_usdc_bump: u8,
 }
 
 impl Round {
-    pub const SIZE: usize = 8 + 8 + 8 + 8 + 8 + 8 + 8 + 8 + 8 + 1 + 1 + 8 + 8 + 8 + 1 + 1 + 1;
-
-    pub fn vault_bump(&self) -> u8 {
-        self.bump
-    }
+    pub const SIZE: usize = 8 + 8 + 8 + 8 + 8 + 8 + 8 + 8 + 8 + 1 + 1 + 8 + 8 + 8 + 1 + 1 + 1 + 1 + 1;
 }
 
 #[account]
