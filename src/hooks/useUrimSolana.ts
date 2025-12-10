@@ -20,11 +20,18 @@ export async function getUserUsdcBalance(userPublicKey: string): Promise<number>
     const usdcMint = new PublicKey(DEVNET_USDC_MINT);
     const userTokenAccount = await getAssociatedTokenAddress(usdcMint, userPubkey);
     
+    console.log("=== USDC Balance Check ===");
+    console.log("User wallet:", userPublicKey);
+    console.log("USDC mint:", DEVNET_USDC_MINT);
+    console.log("Token account (ATA):", userTokenAccount.toString());
+    
     const accountInfo = await getAccount(connection, userTokenAccount);
-    // USDC has 6 decimals
-    return Number(accountInfo.amount) / 1_000_000;
+    const balance = Number(accountInfo.amount) / 1_000_000;
+    console.log("Raw amount:", accountInfo.amount.toString());
+    console.log("USDC balance:", balance);
+    return balance;
   } catch (err) {
-    console.log("No USDC account or error fetching balance:", err);
+    console.error("=== USDC Balance Error ===", err);
     return 0;
   }
 }
@@ -307,6 +314,12 @@ export function useUrimSolana(userPublicKey: string | null) {
     const userPubkey = new PublicKey(userPublicKey);
     const amountLamports = BigInt(Math.floor(amount * 1_000_000)); // USDC has 6 decimals
     
+    console.log("=== PlaceBet Debug ===");
+    console.log("Bet amount (USD):", amount);
+    console.log("Bet amount (lamports):", amountLamports.toString());
+    console.log("User pubkey:", userPubkey.toString());
+    console.log("USDC mint being used:", DEVNET_USDC_MINT);
+    
     const configPda = getConfigPda();
     const roundPda = getRoundPda(currentRound.roundId);
     const vaultPda = getVaultPda(currentRound.roundId);
@@ -315,6 +328,9 @@ export function useUrimSolana(userPublicKey: string | null) {
     // Get user's USDC token account
     const usdcMint = new PublicKey(DEVNET_USDC_MINT);
     const userTokenAccount = await getAssociatedTokenAddress(usdcMint, userPubkey);
+    
+    console.log("User token account (ATA):", userTokenAccount.toString());
+    console.log("Vault PDA:", vaultPda.toString());
 
     // Build instruction data
     const amountBuffer = Buffer.alloc(8);
