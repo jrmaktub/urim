@@ -1,23 +1,8 @@
-import { Sparkles, History } from "lucide-react";
+import { Sparkles } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
-import WalletButton from "./WalletButton";
-import { Button } from "./ui/button";
-// import { useState } from 'react';
-import { useAccount } from 'wagmi';
-// import DeinitButton from '@/components/de-init-button';
-// import { isInitialized } from '@/lib/nexus';
-import { useTransactionPopup } from "@blockscout/app-sdk";
 
 const Navigation = () => {
   const location = useLocation();
-  const { isConnected, address } = useAccount();
-  const { openPopup } = useTransactionPopup();
-  // const [initialized, setInitialized] = useState(isInitialized());
-  // const [balances, setBalances] = useState<any>(null);
-  
-  const btn =
-    'px-4 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-700 ' +
-    'disabled:opacity-50 disabled:cursor-not-allowed';
   
   const navLinks = [
     { name: "Elections", path: "/" },
@@ -28,15 +13,6 @@ const Navigation = () => {
     { name: "Tournaments", path: "/tournaments" },
     { name: "Liquidity Provider", path: "/liquidity-provider" },
   ];
-
-  const handleOpenTransactionHistory = () => {
-    if (address) {
-      openPopup({
-        chainId: "84532", // Base Sepolia
-        address: address,
-      });
-    }
-  };
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-background/70 backdrop-blur-xl border-b border-border/50">
@@ -72,24 +48,6 @@ const Navigation = () => {
               );
             })}
           </div>
-        </div>
-
-        {/* Right Side Actions */}
-        <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
-          {/* Transaction History Button - Only shown when wallet is connected */}
-          {isConnected && address && (
-            <Button
-              onClick={handleOpenTransactionHistory}
-              variant="outline"
-              size="sm"
-              className="gap-2 border-primary/30 hover:border-primary/50 hover:bg-primary/10 transition-all"
-            >
-              <History className="w-4 h-4" />
-              <span className="hidden sm:inline">Transactions</span>
-            </Button>
-          )}
-          
-          <WalletButton />
         </div>
       </div>
     </nav>
