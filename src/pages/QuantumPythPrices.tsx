@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useSolanaWallet } from "@/hooks/useSolanaWallet";
 import { useUrimSolana, RoundData, UserBetData } from "@/hooks/useUrimSolana";
+import { CopyableError, parseSolanaError } from "@/components/CopyableErrorToast";
 
 const BASE_PRICE = 131.96;
 
@@ -398,8 +399,13 @@ const QuantumPythPrices = () => {
       });
     } catch (err: unknown) {
       console.error("Bet error:", err);
-      const errorMessage = err instanceof Error ? err.message : "Failed to place bet";
-      toast({ title: "Error", description: errorMessage, variant: "destructive" });
+      const { userMessage, fullError } = parseSolanaError(err);
+      toast({ 
+        title: "Error", 
+        description: <CopyableError message={fullError} />,
+        variant: "destructive",
+        duration: 15000,
+      });
     } finally {
       setPlacing(false);
     }
@@ -417,8 +423,13 @@ const QuantumPythPrices = () => {
       });
     } catch (err: unknown) {
       console.error("Claim error:", err);
-      const errorMessage = err instanceof Error ? err.message : "Failed to claim";
-      toast({ title: "Error", description: errorMessage, variant: "destructive" });
+      const { userMessage, fullError } = parseSolanaError(err);
+      toast({ 
+        title: "Error", 
+        description: <CopyableError message={fullError} />,
+        variant: "destructive",
+        duration: 15000,
+      });
     } finally {
       setPlacing(false);
     }
