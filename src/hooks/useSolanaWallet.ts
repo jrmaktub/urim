@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 
 // Devnet configuration
-export const DEVNET_USDC_MINT = "Gy14YZoxhfzo6ar857tUJVErx8RAjgFrZxoHDadhFsRr";
+export const DEVNET_USDC_MINT = "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU";
 export const DEVNET_URIM_MINT = "z9hasbeeaPU4JVb1Np9oqNbpe984J8cr5THSEGCWwpR";
 export const PYTH_SOL_USD_FEED = "J83w4HKfqxwcq3BEMMkPFSppX3gqekLyLJBexebFVkix";
 export const PROGRAM_ID = "5KqMaQLoKhBYcHD1qWZVcQqu5pmTvMitDUEqmKsqBTQg";
