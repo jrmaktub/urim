@@ -52,9 +52,9 @@ export function parseSolanaError(error: unknown): { userMessage: string; fullErr
     };
   }
   
-  if (fullError.includes("InsufficientFunds") || fullError.includes("insufficient")) {
+  if (fullError.includes("InsufficientFunds") || fullError.includes("insufficient funds") || fullError.includes("0x1")) {
     return {
-      userMessage: "Insufficient funds in your wallet. Make sure you have enough USDC and SOL for gas.",
+      userMessage: "Insufficient USDC balance. Get devnet USDC from a faucet: https://faucet.circle.com/ (select Solana Devnet)",
       fullError
     };
   }
