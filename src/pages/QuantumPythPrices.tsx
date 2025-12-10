@@ -227,12 +227,13 @@ const BettingCard = ({ round, userBet, connected, onPlaceBet, onClaim, placing }
   }
 
   const canBet = !round.resolved && !userBet;
-  const canClaim = round.resolved && userBet && !userBet.claimedUsdc;
   const isWinner = round.resolved && userBet && (
     (round.outcome === "Up" && userBet.betUp) ||
     (round.outcome === "Down" && !userBet.betUp) ||
     round.outcome === "Draw"
   );
+  // Can claim if winner and hasn't claimed both token types yet
+  const canClaim = isWinner && userBet && (!userBet.claimedUsdc || !userBet.claimedUrim);
 
   return (
     <Card className="p-6 border-2 border-border/50 bg-card/50 backdrop-blur-sm space-y-5">
