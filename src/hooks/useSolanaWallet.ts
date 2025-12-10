@@ -1,12 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
 
-// Devnet USDC mint address
-export const DEVNET_USDC_MINT = "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU";
-
-// Program ID
+// Devnet configuration
+export const DEVNET_USDC_MINT = "Gy14YZoxhfzo6ar857tUJVErx8RAjgFrZxoHDadhFsRr";
+export const DEVNET_URIM_MINT = "z9hasbeeaPU4JVb1Np9oqNbpe984J8cr5THSEGCWwpR";
+export const PYTH_SOL_USD_FEED = "J83w4HKfqxwcq3BEMMkPFSppX3gqekLyLJBexebFVkix";
 export const PROGRAM_ID = "5KqMaQLoKhBYcHD1qWZVcQqu5pmTvMitDUEqmKsqBTQg";
-
-// Devnet RPC
 export const SOLANA_DEVNET_RPC = "https://api.devnet.solana.com";
 
 interface PhantomProvider {
@@ -15,7 +13,8 @@ interface PhantomProvider {
   disconnect: () => Promise<void>;
   signTransaction: (transaction: unknown) => Promise<unknown>;
   signAllTransactions: (transactions: unknown[]) => Promise<unknown[]>;
-  publicKey: { toString: () => string } | null;
+  signAndSendTransaction: (transaction: unknown, options?: unknown) => Promise<{ signature: string }>;
+  publicKey: { toString: () => string; toBytes: () => Uint8Array } | null;
   isConnected: boolean;
   on: (event: string, callback: (...args: unknown[]) => void) => void;
   off: (event: string, callback: (...args: unknown[]) => void) => void;
