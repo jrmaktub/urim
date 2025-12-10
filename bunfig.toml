@@ -1,7 +1,11 @@
 [install]
-# Prevent native module compilation failures
-optional = true
+# Bun install configuration to avoid native module issues
+auto = "fallback"
 
 [install.scopes]
-# Override usb with an empty stub
-"@solana" = { optional = true }
+# Make all Trezor packages optional
+"@trezor" = "optional"
+"@ledgerhq" = "optional"
+
+[install.trustedDependencies]
+# Don't trust any packages to run lifecycle scripts
