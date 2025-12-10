@@ -1,8 +1,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { Connection, PublicKey, SystemProgram, Transaction, TransactionInstruction } from "@solana/web3.js";
-import { PROGRAM_ID, SOLANA_DEVNET_RPC, DEVNET_USDC_MINT } from "./useSolanaWallet";
+import { PROGRAM_ID, SOLANA_DEVNET_RPC, DEVNET_USDC_MINT, DEVNET_URIM_MINT } from "./useSolanaWallet";
 import { TOKEN_PROGRAM_ID, getAssociatedTokenAddress } from "@solana/spl-token";
-import * as anchor from "@coral-xyz/anchor";
 
 // Account discriminators from IDL
 const CONFIG_DISCRIMINATOR = Buffer.from([155, 12, 170, 224, 30, 250, 204, 130]);
@@ -15,14 +14,18 @@ const CLAIM_ALL_DISCRIMINATOR = Buffer.from([194, 194, 80, 194, 234, 210, 217, 9
 
 export interface RoundData {
   roundId: bigint;
-  lockedPrice: bigint;
+  lockedPrice: bigint;       // Price in CENTS (divide by 100 for dollars)
   finalPrice: bigint;
-  createdAt: bigint;
-  lockTime: bigint;
-  endTime: bigint;
-  upPool: bigint;
-  downPool: bigint;
+  startTime: bigint;
+  endTime: bigint;           // USE THIS FOR TIMER
+  upPool: bigint;            // USDC in UP pool (6 decimals)
+  downPool: bigint;          // USDC in DOWN pool (6 decimals)
+  upPoolUrim: bigint;        // URIM in UP pool (6 decimals)
+  downPoolUrim: bigint;      // URIM in DOWN pool (6 decimals)
+  upPoolUsd: bigint;         // Total UP USD value in CENTS
+  downPoolUsd: bigint;       // Total DOWN USD value in CENTS
   totalFees: bigint;
+  totalFeesUrim: bigint;
   resolved: boolean;
   outcome: "Pending" | "Up" | "Down" | "Draw";
 }
@@ -30,12 +33,13 @@ export interface RoundData {
 export interface UserBetData {
   user: string;
   roundId: bigint;
-  amount: bigint;
-  usdValue: bigint;
+  amount: bigint;            // Amount in tokens (6 decimals)
+  usdValue: bigint;          // USD value in cents
   betUp: boolean;
   claimedUsdc: boolean;
   claimedUrim: boolean;
   tokenType: "USDC" | "URIM";
+  urimPriceAtBet: bigint;
 }
 
 export interface ConfigData {
@@ -114,18 +118,22 @@ function parseRoundData(data: Buffer): RoundData | null {
   try {
     if (!data.subarray(0, 8).equals(ROUND_DISCRIMINATOR)) return null;
     let offset = 8;
+    
     const roundId = data.readBigUInt64LE(offset); offset += 8;
-    const lockedPrice = data.readBigUInt64LE(offset); offset += 8;
+    const lockedPrice = data.readBigUInt64LE(offset); offset += 8;  // Price in CENTS
     const finalPrice = data.readBigUInt64LE(offset); offset += 8;
-    const createdAt = data.readBigInt64LE(offset); offset += 8;
-    const lockTime = data.readBigInt64LE(offset); offset += 8;
-    const endTime = data.readBigInt64LE(offset); offset += 8;
-    const upPool = data.readBigUInt64LE(offset); offset += 8;
-    const downPool = data.readBigUInt64LE(offset); offset += 8;
+    const startTime = data.readBigInt64LE(offset); offset += 8;
+    const endTime = data.readBigInt64LE(offset); offset += 8;      // For timer
+    
+    const upPool = data.readBigUInt64LE(offset); offset += 8;      // USDC (6 decimals)
+    const downPool = data.readBigUInt64LE(offset); offset += 8;    // USDC (6 decimals)
+    const upPoolUrim = data.readBigUInt64LE(offset); offset += 8;  // URIM (6 decimals)
+    const downPoolUrim = data.readBigUInt64LE(offset); offset += 8;
+    const upPoolUsd = data.readBigUInt64LE(offset); offset += 8;   // USD value in cents
+    const downPoolUsd = data.readBigUInt64LE(offset); offset += 8;
     const totalFees = data.readBigUInt64LE(offset); offset += 8;
-    // Skip URIM pools for now
-    offset += 24; // upPoolUrim, downPoolUrim, totalFeesUrim
-    offset += 24; // upPoolUsd, downPoolUsd, totalFeesUsd
+    const totalFeesUrim = data.readBigUInt64LE(offset); offset += 8;
+    
     const resolved = data[offset] === 1; offset += 1;
     const outcomeVal = data[offset];
     const outcomes: Record<number, "Pending" | "Up" | "Down" | "Draw"> = {
@@ -134,10 +142,12 @@ function parseRoundData(data: Buffer): RoundData | null {
     const outcome = outcomes[outcomeVal] || "Pending";
     
     return {
-      roundId, lockedPrice, finalPrice, createdAt, lockTime, endTime,
-      upPool, downPool, totalFees, resolved, outcome
+      roundId, lockedPrice, finalPrice, startTime, endTime,
+      upPool, downPool, upPoolUrim, downPoolUrim, upPoolUsd, downPoolUsd,
+      totalFees, totalFeesUrim, resolved, outcome
     };
-  } catch {
+  } catch (err) {
+    console.error("Error parsing round data:", err);
     return null;
   }
 }
@@ -153,10 +163,11 @@ function parseUserBetData(data: Buffer): UserBetData | null {
     const betUp = data[offset] === 1; offset += 1;
     const claimedUsdc = data[offset] === 1; offset += 1;
     const claimedUrim = data[offset] === 1; offset += 1;
-    const tokenTypeVal = data[offset];
+    const tokenTypeVal = data[offset]; offset += 1;
     const tokenType = tokenTypeVal === 0 ? "USDC" : "URIM";
+    const urimPriceAtBet = data.readBigUInt64LE(offset);
     
-    return { user, roundId, amount, usdValue, betUp, claimedUsdc, claimedUrim, tokenType };
+    return { user, roundId, amount, usdValue, betUp, claimedUsdc, claimedUrim, tokenType, urimPriceAtBet };
   } catch {
     return null;
   }
@@ -183,7 +194,7 @@ export function useUrimSolana(userPublicKey: string | null) {
         setConfig(configData);
 
         if (configData && configData.currentRoundId > 0n) {
-          // Fetch current round (currentRoundId - 1 since it's incremented after creation)
+          // Fetch current LIVE round (currentRoundId - 1)
           const activeRoundId = configData.currentRoundId - 1n;
           const roundPda = getRoundPda(activeRoundId);
           const roundAccount = await connection.getAccountInfo(roundPda);
@@ -224,7 +235,7 @@ export function useUrimSolana(userPublicKey: string | null) {
     return () => clearInterval(interval);
   }, [fetchData]);
 
-  // Place bet function
+  // Place bet function (USDC)
   const placeBet = useCallback(async (
     amount: number, // USDC amount in dollars
     betUp: boolean,
@@ -303,10 +314,9 @@ export function useUrimSolana(userPublicKey: string | null) {
     const urimVaultPda = getUrimVaultPda(currentRound.roundId);
     const userBetPda = getUserBetPda(roundPda, userPubkey);
 
-    // Get token accounts
+    // Get token accounts with proper mints
     const usdcMint = new PublicKey(DEVNET_USDC_MINT);
-    // For URIM, we'd need the actual mint address - using placeholder
-    const urimMint = new PublicKey("11111111111111111111111111111111"); // Placeholder
+    const urimMint = new PublicKey(DEVNET_URIM_MINT);
     const userUsdcAccount = await getAssociatedTokenAddress(usdcMint, userPubkey);
     const userUrimAccount = await getAssociatedTokenAddress(urimMint, userPubkey);
 

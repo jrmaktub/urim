@@ -23,31 +23,37 @@ interface RoundCardProps {
   error: string | null;
 }
 
-function formatPrice(lamports: bigint): string {
-  // Pyth prices are typically scaled - adjust based on actual format
-  const price = Number(lamports) / 100_000_000;
+// Price is stored in CENTS - divide by 100 for dollars
+function formatPrice(cents: bigint): string {
+  const price = Number(cents) / 100;
   return `$${price.toFixed(2)}`;
 }
 
-function formatUsdcPool(lamports: bigint): string {
-  const amount = Number(lamports) / 1_000_000;
-  return `$${amount.toFixed(2)}`;
+// Token amounts have 6 decimals
+function formatUsdcPool(amount: bigint): string {
+  const value = Number(amount) / 1_000_000;
+  return `$${value.toFixed(2)}`;
 }
 
-function formatTimeRemaining(endTime: bigint): string {
+// USD value pools are in cents
+function formatUsdValue(cents: bigint): string {
+  const value = Number(cents) / 100;
+  return `$${value.toFixed(2)}`;
+}
+
+function formatTimeRemaining(endTime: bigint, resolved: boolean): string {
   const now = Math.floor(Date.now() / 1000);
   const end = Number(endTime);
-  const diff = end - now;
+  const secondsLeft = end - now;
 
-  if (diff <= 0) return "Ended";
-
-  const hours = Math.floor(diff / 3600);
-  const minutes = Math.floor((diff % 3600) / 60);
-  const seconds = diff % 60;
-
-  if (hours > 0) return `${hours}h ${minutes}m`;
-  if (minutes > 0) return `${minutes}m ${seconds}s`;
-  return `${seconds}s`;
+  if (secondsLeft > 0) {
+    const minutes = Math.floor(secondsLeft / 60);
+    const seconds = secondsLeft % 60;
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  } else if (!resolved) {
+    return "Awaiting Resolution";
+  }
+  return "Ended";
 }
 
 const RoundInfoCard = ({ round, currentPrice, loading, error }: RoundCardProps) => {
@@ -57,7 +63,7 @@ const RoundInfoCard = ({ round, currentPrice, loading, error }: RoundCardProps) 
     if (!round) return;
     
     const updateTime = () => {
-      setTimeRemaining(formatTimeRemaining(round.endTime));
+      setTimeRemaining(formatTimeRemaining(round.endTime, round.resolved));
     };
     
     updateTime();
