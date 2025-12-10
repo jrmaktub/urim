@@ -34,6 +34,22 @@ export default defineConfig(({ mode }) => ({
     // This alias is good practice for imports
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      // Stub out native modules that can't run in browser
+      "usb": path.resolve(__dirname, "./src/lib/empty-module.ts"),
+      "node-hid": path.resolve(__dirname, "./src/lib/empty-module.ts"),
+    },
+  },
+  optimizeDeps: {
+    exclude: ['usb', 'node-hid', '@ledgerhq/hw-transport-node-hid'],
+    esbuildOptions: {
+      define: {
+        global: 'globalThis',
+      },
+    },
+  },
+  build: {
+    rollupOptions: {
+      external: ['usb', 'node-hid'],
     },
   },
 }))
