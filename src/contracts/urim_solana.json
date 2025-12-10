@@ -1,0 +1,195 @@
+{
+  "address": "5KqMaQLoKhBYcHD1qWZVcQqu5pmTvMitDUEqmKsqBTQg",
+  "metadata": {
+    "name": "urim_solana",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Created with Anchor"
+  },
+  "instructions": [
+    {
+      "name": "claim",
+      "discriminator": [62, 198, 214, 193, 213, 159, 108, 210],
+      "accounts": [
+        { "name": "round" },
+        { "name": "user_bet", "writable": true },
+        { "name": "vault", "writable": true, "pda": { "seeds": [{ "kind": "const", "value": [118, 97, 117, 108, 116] }, { "kind": "account", "path": "round.round_id", "account": "Round" }] } },
+        { "name": "user_token_account", "writable": true },
+        { "name": "user", "signer": true },
+        { "name": "token_program", "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" }
+      ],
+      "args": []
+    },
+    {
+      "name": "claim_all",
+      "discriminator": [194, 194, 80, 194, 234, 210, 217, 90],
+      "accounts": [
+        { "name": "round" },
+        { "name": "user_bet", "writable": true },
+        { "name": "vault", "writable": true, "pda": { "seeds": [{ "kind": "const", "value": [118, 97, 117, 108, 116] }, { "kind": "account", "path": "round.round_id", "account": "Round" }] } },
+        { "name": "urim_vault", "writable": true, "pda": { "seeds": [{ "kind": "const", "value": [117, 114, 105, 109, 95, 118, 97, 117, 108, 116] }, { "kind": "account", "path": "round.round_id", "account": "Round" }] } },
+        { "name": "user_usdc_account", "writable": true },
+        { "name": "user_urim_account", "writable": true },
+        { "name": "user", "signer": true },
+        { "name": "token_program", "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" }
+      ],
+      "args": []
+    },
+    {
+      "name": "claim_urim",
+      "discriminator": [167, 148, 183, 24, 39, 75, 201, 18],
+      "accounts": [
+        { "name": "round" },
+        { "name": "user_bet", "writable": true },
+        { "name": "urim_vault", "writable": true, "pda": { "seeds": [{ "kind": "const", "value": [117, 114, 105, 109, 95, 118, 97, 117, 108, 116] }, { "kind": "account", "path": "round.round_id", "account": "Round" }] } },
+        { "name": "user_token_account", "writable": true },
+        { "name": "user", "signer": true },
+        { "name": "token_program", "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" }
+      ],
+      "args": []
+    },
+    {
+      "name": "place_bet",
+      "discriminator": [222, 62, 67, 220, 63, 166, 126, 33],
+      "accounts": [
+        { "name": "config", "pda": { "seeds": [{ "kind": "const", "value": [99, 111, 110, 102, 105, 103] }] } },
+        { "name": "round", "writable": true },
+        { "name": "user_bet", "writable": true, "pda": { "seeds": [{ "kind": "const", "value": [98, 101, 116] }, { "kind": "account", "path": "round" }, { "kind": "account", "path": "user" }] } },
+        { "name": "vault", "writable": true, "pda": { "seeds": [{ "kind": "const", "value": [118, 97, 117, 108, 116] }, { "kind": "account", "path": "round.round_id", "account": "Round" }] } },
+        { "name": "user_token_account", "writable": true },
+        { "name": "user", "writable": true, "signer": true },
+        { "name": "token_program", "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" },
+        { "name": "system_program", "address": "11111111111111111111111111111111" }
+      ],
+      "args": [
+        { "name": "amount", "type": "u64" },
+        { "name": "bet_up", "type": "bool" }
+      ]
+    },
+    {
+      "name": "place_bet_urim",
+      "discriminator": [163, 243, 255, 163, 97, 48, 58, 31],
+      "accounts": [
+        { "name": "config", "pda": { "seeds": [{ "kind": "const", "value": [99, 111, 110, 102, 105, 103] }] } },
+        { "name": "round", "writable": true },
+        { "name": "user_bet", "writable": true, "pda": { "seeds": [{ "kind": "const", "value": [98, 101, 116] }, { "kind": "account", "path": "round" }, { "kind": "account", "path": "user" }] } },
+        { "name": "urim_vault", "writable": true, "pda": { "seeds": [{ "kind": "const", "value": [117, 114, 105, 109, 95, 118, 97, 117, 108, 116] }, { "kind": "account", "path": "round.round_id", "account": "Round" }] } },
+        { "name": "user_token_account", "writable": true },
+        { "name": "user", "writable": true, "signer": true },
+        { "name": "token_program", "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" },
+        { "name": "system_program", "address": "11111111111111111111111111111111" }
+      ],
+      "args": [
+        { "name": "amount", "type": "u64" },
+        { "name": "bet_up", "type": "bool" },
+        { "name": "urim_price_cents", "type": "u64" }
+      ]
+    }
+  ],
+  "accounts": [
+    { "name": "Config", "discriminator": [155, 12, 170, 224, 30, 250, 204, 130] },
+    { "name": "Round", "discriminator": [87, 127, 165, 51, 73, 78, 116, 174] },
+    { "name": "UserBet", "discriminator": [180, 131, 8, 241, 60, 243, 46, 63] }
+  ],
+  "errors": [
+    { "code": 6000, "name": "PlatformPaused", "msg": "Platform is paused" },
+    { "code": 6001, "name": "RoundResolved", "msg": "Round already resolved" },
+    { "code": 6002, "name": "RoundNotEnded", "msg": "Round not yet ended" },
+    { "code": 6003, "name": "BettingClosed", "msg": "Betting is closed" },
+    { "code": 6004, "name": "RoundNotResolved", "msg": "Round not resolved yet" },
+    { "code": 6005, "name": "BetTooSmall", "msg": "Bet amount too small (min $1.00 USD value)" },
+    { "code": 6006, "name": "AlreadyClaimed", "msg": "Already claimed" },
+    { "code": 6007, "name": "NoPayout", "msg": "No payout available" },
+    { "code": 6008, "name": "CannotSwitchSides", "msg": "Cannot switch bet sides" },
+    { "code": 6009, "name": "CannotMixTokens", "msg": "Cannot mix token types - use same token for additional bets" },
+    { "code": 6010, "name": "NoFeesToCollect", "msg": "No fees to collect" },
+    { "code": 6011, "name": "InvalidPrice", "msg": "Invalid price" },
+    { "code": 6012, "name": "NotYourBet", "msg": "Not your bet" },
+    { "code": 6013, "name": "NoFundsToWithdraw", "msg": "No funds to withdraw" },
+    { "code": 6014, "name": "PythPriceStale", "msg": "Pyth price is stale or unavailable" },
+    { "code": 6015, "name": "WrongClaimInstruction", "msg": "Wrong claim instruction - use claim() for USDC or claim_urim() for URIM" }
+  ],
+  "types": [
+    {
+      "name": "Config",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          { "name": "admin", "type": "pubkey" },
+          { "name": "treasury", "type": "pubkey" },
+          { "name": "paused", "type": "bool" },
+          { "name": "current_round_id", "type": "u64" },
+          { "name": "bump", "type": "u8" }
+        ]
+      }
+    },
+    {
+      "name": "Outcome",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          { "name": "Pending" },
+          { "name": "Up" },
+          { "name": "Down" },
+          { "name": "Draw" }
+        ]
+      }
+    },
+    {
+      "name": "Round",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          { "name": "round_id", "type": "u64" },
+          { "name": "locked_price", "type": "u64" },
+          { "name": "final_price", "type": "u64" },
+          { "name": "created_at", "type": "i64" },
+          { "name": "lock_time", "type": "i64" },
+          { "name": "end_time", "type": "i64" },
+          { "name": "up_pool", "type": "u64" },
+          { "name": "down_pool", "type": "u64" },
+          { "name": "total_fees", "type": "u64" },
+          { "name": "up_pool_urim", "type": "u64" },
+          { "name": "down_pool_urim", "type": "u64" },
+          { "name": "total_fees_urim", "type": "u64" },
+          { "name": "up_pool_usd", "type": "u64" },
+          { "name": "down_pool_usd", "type": "u64" },
+          { "name": "total_fees_usd", "type": "u64" },
+          { "name": "resolved", "type": "bool" },
+          { "name": "outcome", "type": { "defined": { "name": "Outcome" } } },
+          { "name": "bump", "type": "u8" },
+          { "name": "vault_bump", "type": "u8" },
+          { "name": "urim_vault_bump", "type": "u8" }
+        ]
+      }
+    },
+    {
+      "name": "TokenType",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          { "name": "USDC" },
+          { "name": "URIM" }
+        ]
+      }
+    },
+    {
+      "name": "UserBet",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          { "name": "user", "type": "pubkey" },
+          { "name": "round_id", "type": "u64" },
+          { "name": "amount", "type": "u64" },
+          { "name": "usd_value", "type": "u64" },
+          { "name": "bet_up", "type": "bool" },
+          { "name": "claimed_usdc", "type": "bool" },
+          { "name": "claimed_urim", "type": "bool" },
+          { "name": "token_type", "type": { "defined": { "name": "TokenType" } } },
+          { "name": "urim_price_at_bet", "type": "u64" },
+          { "name": "bump", "type": "u8" }
+        ]
+      }
+    }
+  ]
+}
