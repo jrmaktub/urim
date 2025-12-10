@@ -1,0 +1,7 @@
+[install]
+# Prevent native module compilation failures
+optional = true
+
+[install.scopes]
+# Override usb with an empty stub
+"@solana" = { optional = true }
