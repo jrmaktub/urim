@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { Connection, PublicKey, SystemProgram, Transaction, TransactionInstruction } from "@solana/web3.js";
 import { PROGRAM_ID, SOLANA_DEVNET_RPC, DEVNET_USDC_MINT, DEVNET_URIM_MINT } from "./useSolanaWallet";
-import { TOKEN_PROGRAM_ID, getAssociatedTokenAddress } from "@solana/spl-token";
+import { TOKEN_PROGRAM_ID, getAssociatedTokenAddress, getAccount } from "@solana/spl-token";
 
 // Account discriminators from IDL
 const CONFIG_DISCRIMINATOR = Buffer.from([155, 12, 170, 224, 30, 250, 204, 130]);
@@ -11,6 +11,23 @@ const USER_BET_DISCRIMINATOR = Buffer.from([180, 131, 8, 241, 60, 243, 46, 63]);
 // Instruction discriminators
 const PLACE_BET_DISCRIMINATOR = Buffer.from([222, 62, 67, 220, 63, 166, 126, 33]);
 const CLAIM_ALL_DISCRIMINATOR = Buffer.from([194, 194, 80, 194, 234, 210, 217, 90]);
+
+// Export function to get user's USDC balance
+export async function getUserUsdcBalance(userPublicKey: string): Promise<number> {
+  try {
+    const connection = new Connection(SOLANA_DEVNET_RPC, "confirmed");
+    const userPubkey = new PublicKey(userPublicKey);
+    const usdcMint = new PublicKey(DEVNET_USDC_MINT);
+    const userTokenAccount = await getAssociatedTokenAddress(usdcMint, userPubkey);
+    
+    const accountInfo = await getAccount(connection, userTokenAccount);
+    // USDC has 6 decimals
+    return Number(accountInfo.amount) / 1_000_000;
+  } catch (err) {
+    console.log("No USDC account or error fetching balance:", err);
+    return 0;
+  }
+}
 
 export interface RoundData {
   roundId: bigint;
