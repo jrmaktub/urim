@@ -195,6 +195,22 @@ interface BettingCardProps {
 
 const BettingCard = ({ round, userBet, connected, onPlaceBet, onClaim, placing, usdcBalance }: BettingCardProps) => {
   const [amount, setAmount] = useState("");
+  const [timeLeft, setTimeLeft] = useState<number>(0);
+
+  // Calculate time remaining
+  useEffect(() => {
+    if (!round) return;
+    
+    const updateTime = () => {
+      const now = Math.floor(Date.now() / 1000);
+      const end = Number(round.endTime);
+      setTimeLeft(end - now);
+    };
+    
+    updateTime();
+    const interval = setInterval(updateTime, 1000);
+    return () => clearInterval(interval);
+  }, [round]);
 
   const handleBet = async (betUp: boolean) => {
     const numericAmount = parseFloat(amount);
@@ -206,6 +222,15 @@ const BettingCard = ({ round, userBet, connected, onPlaceBet, onClaim, placing, 
       toast({ 
         title: "Insufficient USDC balance", 
         description: `You have ${usdcBalance.toFixed(2)} USDC. Get more from the Circle faucet.`,
+        variant: "destructive" 
+      });
+      return;
+    }
+    // Check if betting window is still open
+    if (timeLeft <= 0) {
+      toast({ 
+        title: "Betting closed", 
+        description: "This round has ended. Wait for a new round.",
         variant: "destructive" 
       });
       return;
@@ -235,7 +260,9 @@ const BettingCard = ({ round, userBet, connected, onPlaceBet, onClaim, placing, 
     );
   }
 
-  const canBet = !round.resolved && !userBet;
+  // Check if betting is still open (time remaining > 0 AND not resolved AND no existing bet)
+  const bettingOpen = timeLeft > 0 && !round.resolved;
+  const canBet = bettingOpen && !userBet;
   const isWinner = round.resolved && userBet && (
     (round.outcome === "Up" && userBet.betUp) ||
     (round.outcome === "Down" && !userBet.betUp) ||
@@ -244,8 +271,30 @@ const BettingCard = ({ round, userBet, connected, onPlaceBet, onClaim, placing, 
   // Can claim if winner and hasn't claimed both token types yet
   const canClaim = isWinner && userBet && (!userBet.claimedUsdc || !userBet.claimedUrim);
 
+  // Format time for display
+  const formatTime = (seconds: number) => {
+    if (seconds <= 0) return "CLOSED";
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
   return (
     <Card className="p-6 border-2 border-border/50 bg-card/50 backdrop-blur-sm space-y-5">
+      {/* Timer Banner */}
+      <div className={cn(
+        "flex items-center justify-center gap-2 p-3 rounded-lg font-mono text-lg",
+        bettingOpen 
+          ? "bg-green-500/20 border border-green-500/50 text-green-400" 
+          : "bg-red-500/20 border border-red-500/50 text-red-400"
+      )}>
+        <Clock className="w-5 h-5" />
+        <span className="font-bold">{formatTime(timeLeft)}</span>
+        <span className="text-sm opacity-75">
+          {bettingOpen ? "until close" : "- Betting Closed"}
+        </span>
+      </div>
+
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold">Place Your Bet</h3>
         <div className="flex items-center gap-2">
