@@ -52,7 +52,15 @@ export function parseSolanaError(error: unknown): { userMessage: string; fullErr
     };
   }
   
-  if (fullError.includes("InsufficientFunds") || fullError.includes("insufficient funds") || fullError.includes("0x1")) {
+  // Check for BettingClosed error first (0x1773 = 6003)
+  if (fullError.includes("BettingClosed") || fullError.includes("0x1773") || fullError.includes("6003")) {
+    return {
+      userMessage: "Betting is closed for this round. Wait for a new round to start.",
+      fullError
+    };
+  }
+
+  if (fullError.includes("InsufficientFunds") || fullError.includes("insufficient funds") || fullError.includes("custom program error: 0x1")) {
     return {
       userMessage: "Insufficient USDC balance. Get devnet USDC from a faucet: https://faucet.circle.com/ (select Solana Devnet)",
       fullError
