@@ -190,15 +190,24 @@ interface BettingCardProps {
   onPlaceBet: (amount: number, betUp: boolean) => Promise<void>;
   onClaim: () => Promise<void>;
   placing: boolean;
+  usdcBalance: number;
 }
 
-const BettingCard = ({ round, userBet, connected, onPlaceBet, onClaim, placing }: BettingCardProps) => {
+const BettingCard = ({ round, userBet, connected, onPlaceBet, onClaim, placing, usdcBalance }: BettingCardProps) => {
   const [amount, setAmount] = useState("");
 
   const handleBet = async (betUp: boolean) => {
     const numericAmount = parseFloat(amount);
     if (!amount || isNaN(numericAmount) || numericAmount < 1) {
       toast({ title: "Minimum bet is $1 USDC", variant: "destructive" });
+      return;
+    }
+    if (numericAmount > usdcBalance) {
+      toast({ 
+        title: "Insufficient USDC balance", 
+        description: `You have ${usdcBalance.toFixed(2)} USDC. Get more from the Circle faucet.`,
+        variant: "destructive" 
+      });
       return;
     }
     await onPlaceBet(numericAmount, betUp);
@@ -239,7 +248,10 @@ const BettingCard = ({ round, userBet, connected, onPlaceBet, onClaim, placing }
     <Card className="p-6 border-2 border-border/50 bg-card/50 backdrop-blur-sm space-y-5">
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold">Place Your Bet</h3>
-        <Badge variant="outline">USDC</Badge>
+        <div className="flex items-center gap-2">
+          <Badge variant="outline" className="text-xs">Balance: ${usdcBalance.toFixed(2)}</Badge>
+          <Badge variant="outline">USDC</Badge>
+        </div>
       </div>
 
       {userBet ? (
@@ -348,9 +360,28 @@ const QuantumPythPrices = () => {
   const [low24h, setLow24h] = useState<number>(BASE_PRICE);
   const [change24hPercent, setChange24hPercent] = useState<number>(0);
   const [placing, setPlacing] = useState(false);
+  const [usdcBalance, setUsdcBalance] = useState<number>(0);
 
   const { connected, publicKey, connect, disconnect, provider, isPhantomInstalled } = useSolanaWallet();
   const { config, currentRound, userBet, loading, error, placeBet, claimAll, refetch } = useUrimSolana(publicKey);
+
+  // Fetch user's USDC balance
+  useEffect(() => {
+    if (!publicKey) {
+      setUsdcBalance(0);
+      return;
+    }
+
+    const fetchBalance = async () => {
+      const { getUserUsdcBalance } = await import("@/hooks/useUrimSolana");
+      const balance = await getUserUsdcBalance(publicKey);
+      setUsdcBalance(balance);
+    };
+
+    fetchBalance();
+    const interval = setInterval(fetchBalance, 10000);
+    return () => clearInterval(interval);
+  }, [publicKey]);
 
   // Fetch live price
   useEffect(() => {
@@ -458,6 +489,9 @@ const QuantumPythPrices = () => {
 
             {/* Wallet Connection */}
             <div className="flex items-center gap-3">
+              <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/50">
+                DEVNET
+              </Badge>
               {connected && publicKey ? (
                 <div className="flex items-center gap-2">
                   <Badge variant="outline" className="border-green-500/50 text-green-400 py-2 px-3">
@@ -529,6 +563,7 @@ const QuantumPythPrices = () => {
               onPlaceBet={handlePlaceBet}
               onClaim={handleClaim}
               placing={placing}
+              usdcBalance={usdcBalance}
             />
           </div>
 
@@ -539,7 +574,7 @@ const QuantumPythPrices = () => {
                 Solana Devnet Testing
               </h3>
               <p className="text-sm text-muted-foreground">
-                This is running on Solana Devnet. Use{" "}
+                Get test SOL from{" "}
                 <a 
                   href="https://faucet.solana.com/" 
                   target="_blank" 
@@ -548,11 +583,23 @@ const QuantumPythPrices = () => {
                 >
                   Solana Faucet
                 </a>
-                {" "}to get test SOL. USDC devnet tokens required for betting.
+                {" "}and devnet USDC from{" "}
+                <a 
+                  href="https://faucet.circle.com/" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-primary hover:underline"
+                >
+                  Circle Faucet
+                </a>
+                {" "}(select Solana Devnet, mint: 4zMMC9...ncDU).
               </p>
               <div className="flex items-center justify-center gap-2 pt-2">
                 <Badge variant="outline" className="text-xs">
                   Program: 5KqMa...BTQG
+                </Badge>
+                <Badge variant="outline" className="text-xs">
+                  USDC: 4zMMC9...ncDU
                 </Badge>
                 <Button variant="ghost" size="sm" onClick={refetch}>
                   Refresh Data
