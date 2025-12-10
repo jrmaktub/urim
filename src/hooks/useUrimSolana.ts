@@ -118,50 +118,60 @@ function parseRoundData(data: Buffer): RoundData | null {
   try {
     if (!data.subarray(0, 8).equals(ROUND_DISCRIMINATOR)) return null;
     
-    // Correct byte layout from on-chain:
+    // Correct byte layout from IDL (urim_solana.json):
     // - 8 bytes: discriminator (0-7)
     // - 8 bytes: round_id (8-15)
-    // - 8 bytes: locked_price in CENTS (16-23)
-    // - 8 bytes: final_price in CENTS (24-31)
-    // - 8 bytes: start_time (32-39)
-    // - 8 bytes: end_time (40-47)
-    // - 8 bytes: up_pool USDC (48-55)
-    // - 8 bytes: down_pool USDC (56-63)
-    // - 8 bytes: total_fees (64-71)
-    // - 8 bytes: up_pool_urim (72-79)
-    // - 8 bytes: down_pool_urim (80-87)
-    // - 8 bytes: total_fees_urim (88-95)
-    // - 8 bytes: up_pool_usd in CENTS (96-103)
-    // - 8 bytes: down_pool_usd in CENTS (104-111)
-    // - 8 bytes: total_fees_usd (112-119)
-    // - 1 byte: resolved (120)
-    // - 1 byte: outcome enum (121)
+    // - 8 bytes: locked_price (16-23) - in CENTS
+    // - 8 bytes: final_price (24-31) - in CENTS
+    // - 8 bytes: created_at (32-39)
+    // - 8 bytes: lock_time (40-47)
+    // - 8 bytes: end_time (48-55) <- USE THIS FOR TIMER
+    // - 8 bytes: up_pool (56-63) - USDC raw amount (6 decimals)
+    // - 8 bytes: down_pool (64-71)
+    // - 8 bytes: total_fees (72-79)
+    // - 8 bytes: up_pool_urim (80-87)
+    // - 8 bytes: down_pool_urim (88-95)
+    // - 8 bytes: total_fees_urim (96-103)
+    // - 8 bytes: up_pool_usd (104-111) - in CENTS
+    // - 8 bytes: down_pool_usd (112-119) - in CENTS
+    // - 8 bytes: total_fees_usd (120-127)
+    // - 1 byte: resolved (128)
+    // - 1 byte: outcome enum (129)
+    // - 1 byte: bump (130)
+    // - 1 byte: vault_bump (131)
+    // - 1 byte: urim_vault_bump (132)
     
     const roundId = data.readBigUInt64LE(8);
     const lockedPrice = data.readBigUInt64LE(16);      // CENTS
     const finalPrice = data.readBigUInt64LE(24);       // CENTS
-    const startTime = data.readBigInt64LE(32);
-    const endTime = data.readBigInt64LE(40);           // For timer
-    const upPool = data.readBigUInt64LE(48);           // USDC (6 decimals)
-    const downPool = data.readBigUInt64LE(56);         // USDC (6 decimals)
-    const totalFees = data.readBigUInt64LE(64);
-    const upPoolUrim = data.readBigUInt64LE(72);       // URIM (6 decimals)
-    const downPoolUrim = data.readBigUInt64LE(80);     // URIM (6 decimals)
-    const totalFeesUrim = data.readBigUInt64LE(88);
-    const upPoolUsd = data.readBigUInt64LE(96);        // USD value in CENTS
-    const downPoolUsd = data.readBigUInt64LE(104);     // USD value in CENTS
+    const startTime = data.readBigInt64LE(32);         // created_at
+    const endTime = data.readBigInt64LE(48);           // For timer (offset 48!)
+    const upPool = data.readBigUInt64LE(56);           // USDC (6 decimals)
+    const downPool = data.readBigUInt64LE(64);         // USDC (6 decimals)
+    const totalFees = data.readBigUInt64LE(72);
+    const upPoolUrim = data.readBigUInt64LE(80);       // URIM (6 decimals)
+    const downPoolUrim = data.readBigUInt64LE(88);     // URIM (6 decimals)
+    const totalFeesUrim = data.readBigUInt64LE(96);
+    const upPoolUsd = data.readBigUInt64LE(104);       // USD value in CENTS
+    const downPoolUsd = data.readBigUInt64LE(112);     // USD value in CENTS
     
-    const resolved = data[120] === 1;
-    const outcomeVal = data[121];
+    const resolved = data[128] === 1;
+    const outcomeVal = data[129];
     const outcomes: Record<number, "Pending" | "Up" | "Down" | "Draw"> = {
       0: "Pending", 1: "Up", 2: "Down", 3: "Draw"
     };
     const outcome = outcomes[outcomeVal] || "Pending";
     
+    const now = Math.floor(Date.now() / 1000);
+    const endTimeNum = Number(endTime);
+    const secondsLeft = endTimeNum - now;
+    
     console.log("Parsed round data:", {
       roundId: roundId.toString(),
       lockedPrice: Number(lockedPrice) / 100,
-      endTime: Number(endTime),
+      endTime: endTimeNum,
+      endTimeDate: new Date(endTimeNum * 1000).toISOString(),
+      secondsLeft,
       upPool: Number(upPool) / 1_000_000,
       downPool: Number(downPool) / 1_000_000,
       resolved,
