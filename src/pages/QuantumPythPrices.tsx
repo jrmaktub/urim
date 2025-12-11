@@ -7,12 +7,12 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Activity, TrendingUp, TrendingDown, Wallet, Clock, Trophy, Loader2 } from "lucide-react";
+import { Activity, TrendingUp, TrendingDown, Wallet, Clock, Trophy, Loader2, History } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useSolanaWallet } from "@/hooks/useSolanaWallet";
-import { useUrimSolana, RoundData, UserBetData } from "@/hooks/useUrimSolana";
+import { useUrimSolana, RoundData, UserBetData, HistoricalRound } from "@/hooks/useUrimSolana";
 import { CopyableError, parseSolanaError } from "@/components/CopyableErrorToast";
 
 const BASE_PRICE = 131.96;
@@ -439,6 +439,66 @@ const BettingCard = ({ round, userBet, connected, onPlaceBet, onClaim, placing, 
   );
 };
 
+// Results History Component
+interface ResultsHistoryProps {
+  historicalRounds: HistoricalRound[];
+}
+
+const ResultsHistory = ({ historicalRounds }: ResultsHistoryProps) => {
+  if (historicalRounds.length === 0) {
+    return null;
+  }
+
+  const last10 = historicalRounds.slice(0, 10);
+  const upCount = last10.filter(r => r.outcome === "Up").length;
+  const downCount = last10.filter(r => r.outcome === "Down").length;
+  const drawCount = last10.filter(r => r.outcome === "Draw").length;
+
+  return (
+    <Card className="p-6 border-2 border-border/50 bg-card/50 backdrop-blur-sm">
+      <div className="flex items-center gap-2 mb-4">
+        <History className="w-5 h-5 text-primary" />
+        <h3 className="text-lg font-semibold">Results History</h3>
+      </div>
+
+      {/* Outcome badges row */}
+      <div className="flex flex-wrap gap-2 mb-4">
+        {historicalRounds.slice(0, 15).map((round) => (
+          <Badge
+            key={round.roundId.toString()}
+            className={cn(
+              "px-3 py-1 font-semibold text-xs",
+              round.outcome === "Up" && "bg-green-500/20 text-green-400 border-green-500/50",
+              round.outcome === "Down" && "bg-pink-500/20 text-pink-400 border-pink-500/50",
+              round.outcome === "Draw" && "bg-yellow-500/20 text-yellow-400 border-yellow-500/50"
+            )}
+          >
+            {round.outcome === "Up" && <TrendingUp className="w-3 h-3 mr-1" />}
+            {round.outcome === "Down" && <TrendingDown className="w-3 h-3 mr-1" />}
+            {round.outcome}
+          </Badge>
+        ))}
+      </div>
+
+      {/* Stats */}
+      <div className="flex items-center justify-center gap-4 pt-4 border-t border-border/30">
+        <span className="text-sm text-muted-foreground">Last {last10.length} rounds:</span>
+        <Badge className="bg-green-500/20 text-green-400 border-green-500/50">
+          {upCount} UP
+        </Badge>
+        <Badge className="bg-pink-500/20 text-pink-400 border-pink-500/50">
+          {downCount} DOWN
+        </Badge>
+        {drawCount > 0 && (
+          <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/50">
+            {drawCount} DRAW
+          </Badge>
+        )}
+      </div>
+    </Card>
+  );
+};
+
 const QuantumPythPrices = () => {
   const [currentPrice, setCurrentPrice] = useState<number>(BASE_PRICE);
   const [high24h, setHigh24h] = useState<number>(BASE_PRICE);
@@ -449,7 +509,7 @@ const QuantumPythPrices = () => {
   const [urimBalance, setUrimBalance] = useState<number>(0);
 
   const { connected, publicKey, connect, disconnect, provider, isPhantomInstalled } = useSolanaWallet();
-  const { config, currentRound, userBet, loading, error, placeBet, placeBetUrim, claimAll, refetch } = useUrimSolana(publicKey);
+  const { config, currentRound, userBet, historicalRounds, loading, error, placeBet, placeBetUrim, claimAll, refetch } = useUrimSolana(publicKey);
 
   // Fetch user's token balances
   useEffect(() => {
@@ -666,6 +726,9 @@ const QuantumPythPrices = () => {
               urimBalance={urimBalance}
             />
           </div>
+
+          {/* Results History */}
+          <ResultsHistory historicalRounds={historicalRounds} />
 
           {/* Info */}
           <Card className="p-6 border-2 border-accent/30 bg-accent/5">
