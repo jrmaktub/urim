@@ -244,10 +244,48 @@ function parseUserBetData(data: Buffer): UserBetData | null {
   }
 }
 
+// Export for use in components
+export { getRoundPda, getVaultPda, getUrimVaultPda, getUserBetPda, parseRoundData, connection };
+
+export interface HistoricalRound {
+  roundId: bigint;
+  outcome: "Pending" | "Up" | "Down" | "Draw";
+  resolved: boolean;
+}
+
+// Fetch historical rounds
+export async function fetchHistoricalRounds(currentRoundId: bigint, limit: number = 20): Promise<HistoricalRound[]> {
+  const results: HistoricalRound[] = [];
+  const startId = currentRoundId > BigInt(limit) ? currentRoundId - BigInt(limit) : 0n;
+  
+  for (let i = currentRoundId - 1n; i >= startId && i >= 0n; i--) {
+    try {
+      const roundPda = getRoundPda(i);
+      const roundAccount = await connection.getAccountInfo(roundPda);
+      if (roundAccount) {
+        const roundData = parseRoundData(Buffer.from(roundAccount.data));
+        if (roundData && roundData.resolved) {
+          results.push({
+            roundId: roundData.roundId,
+            outcome: roundData.outcome,
+            resolved: roundData.resolved
+          });
+        }
+      }
+    } catch {
+      // Skip failed rounds
+    }
+    if (results.length >= limit) break;
+  }
+  
+  return results;
+}
+
 export function useUrimSolana(userPublicKey: string | null) {
   const [config, setConfig] = useState<ConfigData | null>(null);
   const [currentRound, setCurrentRound] = useState<RoundData | null>(null);
   const [userBet, setUserBet] = useState<UserBetData | null>(null);
+  const [historicalRounds, setHistoricalRounds] = useState<HistoricalRound[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -288,6 +326,10 @@ export function useUrimSolana(userPublicKey: string | null) {
               }
             }
           }
+          
+          // Fetch historical rounds
+          const history = await fetchHistoricalRounds(configData.currentRoundId, 15);
+          setHistoricalRounds(history);
         }
       } else {
         setError("Program not initialized. No active rounds yet.");
@@ -497,6 +539,7 @@ export function useUrimSolana(userPublicKey: string | null) {
     config,
     currentRound,
     userBet,
+    historicalRounds,
     loading,
     error,
     placeBet,
