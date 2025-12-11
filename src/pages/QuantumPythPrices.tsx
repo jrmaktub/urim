@@ -7,12 +7,12 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Activity, TrendingUp, TrendingDown, Wallet, Clock, Trophy, Loader2, History } from "lucide-react";
+import { Activity, TrendingUp, TrendingDown, Wallet, Clock, Trophy, Loader2, History, Gift } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useSolanaWallet } from "@/hooks/useSolanaWallet";
-import { useUrimSolana, RoundData, UserBetData, HistoricalRound } from "@/hooks/useUrimSolana";
+import { useUrimSolana, RoundData, UserBetData, HistoricalRound, ClaimableRound } from "@/hooks/useUrimSolana";
 import { CopyableError, parseSolanaError } from "@/components/CopyableErrorToast";
 
 const BASE_PRICE = 131.96;
@@ -499,6 +499,66 @@ const ResultsHistory = ({ historicalRounds }: ResultsHistoryProps) => {
   );
 };
 
+// Claimable Rounds Component
+interface ClaimableRoundsProps {
+  claimableRounds: ClaimableRound[];
+  onClaim: (roundId: bigint) => Promise<void>;
+  claiming: boolean;
+}
+
+const ClaimableRounds = ({ claimableRounds, onClaim, claiming }: ClaimableRoundsProps) => {
+  if (claimableRounds.length === 0) {
+    return null;
+  }
+
+  return (
+    <Card className="p-6 border-2 border-green-500/30 bg-green-500/5 backdrop-blur-sm">
+      <div className="flex items-center gap-2 mb-4">
+        <Gift className="w-5 h-5 text-green-400" />
+        <h3 className="text-lg font-semibold text-green-400">Claimable Winnings</h3>
+        <Badge className="bg-green-500/20 text-green-400 border-green-500/50 ml-auto">
+          {claimableRounds.length} {claimableRounds.length === 1 ? 'round' : 'rounds'}
+        </Badge>
+      </div>
+
+      <div className="space-y-3">
+        {claimableRounds.map((round) => (
+          <div 
+            key={round.roundId.toString()} 
+            className="flex items-center justify-between p-3 rounded-lg bg-background/50 border border-green-500/20"
+          >
+            <div className="flex items-center gap-3">
+              <Badge className={cn(
+                "px-2 py-1",
+                round.outcome === "Up" && "bg-green-500/20 text-green-400",
+                round.outcome === "Down" && "bg-pink-500/20 text-pink-400",
+                round.outcome === "Draw" && "bg-yellow-500/20 text-yellow-400"
+              )}>
+                {round.outcome === "Up" && <TrendingUp className="w-3 h-3 mr-1" />}
+                {round.outcome === "Down" && <TrendingDown className="w-3 h-3 mr-1" />}
+                {round.outcome}
+              </Badge>
+              <span className="text-sm text-muted-foreground">Round #{round.roundId.toString()}</span>
+              <span className="text-sm font-medium">
+                You bet {round.userBet.betUp ? "UP" : "DOWN"} - Won!
+              </span>
+            </div>
+            <Button
+              size="sm"
+              onClick={() => onClaim(round.roundId)}
+              disabled={claiming}
+              className="bg-green-600 hover:bg-green-700"
+            >
+              {claiming ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trophy className="w-3 h-3 mr-1" />}
+              Claim
+            </Button>
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+};
+
 const QuantumPythPrices = () => {
   const [currentPrice, setCurrentPrice] = useState<number>(BASE_PRICE);
   const [high24h, setHigh24h] = useState<number>(BASE_PRICE);
@@ -509,7 +569,7 @@ const QuantumPythPrices = () => {
   const [urimBalance, setUrimBalance] = useState<number>(0);
 
   const { connected, publicKey, connect, disconnect, provider, isPhantomInstalled } = useSolanaWallet();
-  const { config, currentRound, userBet, historicalRounds, loading, error, placeBet, placeBetUrim, claimAll, refetch } = useUrimSolana(publicKey);
+  const { config, currentRound, userBet, historicalRounds, claimableRounds, loading, error, placeBet, placeBetUrim, claimAll, claimForRound, refetch } = useUrimSolana(publicKey);
 
   // Fetch user's token balances
   useEffect(() => {
@@ -626,6 +686,30 @@ const QuantumPythPrices = () => {
     }
   };
 
+  const handleClaimForRound = async (roundId: bigint) => {
+    if (!provider) return;
+
+    setPlacing(true);
+    try {
+      const signature = await claimForRound(roundId, provider);
+      toast({
+        title: "Claimed successfully!",
+        description: `Round #${roundId.toString()} - Transaction: ${signature.slice(0, 8)}...`,
+      });
+    } catch (err: unknown) {
+      console.error("Claim error:", err);
+      const { fullError } = parseSolanaError(err);
+      toast({ 
+        title: "Error", 
+        description: <CopyableError message={fullError} />,
+        variant: "destructive",
+        duration: 15000,
+      });
+    } finally {
+      setPlacing(false);
+    }
+  };
+
   const isChangePositive = change24hPercent > 0.05;
   const isChangeNegative = change24hPercent < -0.05;
 
@@ -726,6 +810,15 @@ const QuantumPythPrices = () => {
               urimBalance={urimBalance}
             />
           </div>
+
+          {/* Claimable Winnings */}
+          {connected && (
+            <ClaimableRounds 
+              claimableRounds={claimableRounds} 
+              onClaim={handleClaimForRound} 
+              claiming={placing} 
+            />
+          )}
 
           {/* Results History */}
           <ResultsHistory historicalRounds={historicalRounds} />
