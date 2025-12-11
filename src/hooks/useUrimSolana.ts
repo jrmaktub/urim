@@ -123,10 +123,11 @@ function getUrimVaultPda(roundId: bigint): PublicKey {
 }
 
 function getUserBetPda(roundId: bigint, userPubkey: PublicKey): PublicKey {
-  const roundIdBuffer = Buffer.alloc(8);
-  roundIdBuffer.writeBigUInt64LE(roundId);
+  // First derive the round PDA
+  const roundPda = getRoundPda(roundId);
+  // Then use roundPDA.toBuffer() for user_bet (NOT roundIdBuffer!)
   const [pda] = PublicKey.findProgramAddressSync(
-    [Buffer.from("user_bet"), roundIdBuffer, userPubkey.toBuffer()],
+    [Buffer.from("bet"), roundPda.toBuffer(), userPubkey.toBuffer()],
     programId
   );
   return pda;
