@@ -122,9 +122,11 @@ function getUrimVaultPda(roundId: bigint): PublicKey {
   return pda;
 }
 
-function getUserBetPda(roundPda: PublicKey, userPubkey: PublicKey): PublicKey {
+function getUserBetPda(roundId: bigint, userPubkey: PublicKey): PublicKey {
+  const roundIdBuffer = Buffer.alloc(8);
+  roundIdBuffer.writeBigUInt64LE(roundId);
   const [pda] = PublicKey.findProgramAddressSync(
-    [Buffer.from("bet"), roundPda.toBuffer(), userPubkey.toBuffer()],
+    [Buffer.from("user_bet"), roundIdBuffer, userPubkey.toBuffer()],
     programId
   );
   return pda;
@@ -274,7 +276,7 @@ export function useUrimSolana(userPublicKey: string | null) {
             // Fetch user bet if connected
             if (userPublicKey && roundData) {
               const userPubkey = new PublicKey(userPublicKey);
-              const userBetPda = getUserBetPda(roundPda, userPubkey);
+              const userBetPda = getUserBetPda(activeRoundId, userPubkey);
               const userBetAccount = await connection.getAccountInfo(userBetPda);
               
               if (userBetAccount) {
@@ -299,7 +301,7 @@ export function useUrimSolana(userPublicKey: string | null) {
 
   useEffect(() => {
     fetchData();
-    const interval = setInterval(fetchData, 15000); // Refresh every 15s
+    const interval = setInterval(fetchData, 10000); // Refresh every 10s
     return () => clearInterval(interval);
   }, [fetchData]);
 
@@ -330,7 +332,7 @@ export function useUrimSolana(userPublicKey: string | null) {
     const configPda = getConfigPda();
     const roundPda = getRoundPda(currentRound.roundId);
     const vaultPda = getVaultPda(currentRound.roundId);
-    const userBetPda = getUserBetPda(roundPda, userPubkey);
+    const userBetPda = getUserBetPda(currentRound.roundId, userPubkey);
     
     // Get user's USDC token account
     const usdcMint = new PublicKey(DEVNET_USDC_MINT);
@@ -397,7 +399,7 @@ export function useUrimSolana(userPublicKey: string | null) {
     const configPda = getConfigPda();
     const roundPda = getRoundPda(currentRound.roundId);
     const urimVaultPda = getUrimVaultPda(currentRound.roundId);
-    const userBetPda = getUserBetPda(roundPda, userPubkey);
+    const userBetPda = getUserBetPda(currentRound.roundId, userPubkey);
     
     // Get user's URIM token account
     const urimMint = new PublicKey(DEVNET_URIM_MINT);
@@ -454,7 +456,7 @@ export function useUrimSolana(userPublicKey: string | null) {
     const roundPda = getRoundPda(currentRound.roundId);
     const vaultPda = getVaultPda(currentRound.roundId);
     const urimVaultPda = getUrimVaultPda(currentRound.roundId);
-    const userBetPda = getUserBetPda(roundPda, userPubkey);
+    const userBetPda = getUserBetPda(currentRound.roundId, userPubkey);
 
     // Get token accounts with proper mints
     const usdcMint = new PublicKey(DEVNET_USDC_MINT);
