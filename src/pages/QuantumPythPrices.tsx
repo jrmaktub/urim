@@ -36,6 +36,11 @@ function formatUsdcPool(amount: bigint): string {
   return `$${value.toFixed(2)}`;
 }
 
+function formatUrimPool(amount: bigint): string {
+  const value = Number(amount) / 1_000_000;
+  return `${value.toFixed(2)} URIM`;
+}
+
 // USD value pools are in cents
 function formatUsdValue(cents: bigint): string {
   const value = Number(cents) / 100;
@@ -108,6 +113,7 @@ const RoundInfoCard = ({ round, currentPrice, loading, error }: RoundCardProps) 
   }
 
   const totalPool = round.upPool + round.downPool;
+  const totalPoolUrim = round.upPoolUrim + round.downPoolUrim;
   const upPercent = totalPool > 0n ? Number(round.upPool * 100n / totalPool) : 50;
   const downPercent = 100 - upPercent;
 
@@ -156,6 +162,7 @@ const RoundInfoCard = ({ round, currentPrice, loading, error }: RoundCardProps) 
             <TrendingUp className="w-5 h-5 mx-auto text-green-500 mb-1" />
             <p className="text-xs text-muted-foreground">UP Pool</p>
             <p className="font-semibold text-green-500">{formatUsdcPool(round.upPool)}</p>
+            <p className="text-xs text-green-400/70">{formatUrimPool(round.upPoolUrim)}</p>
             <p className="text-xs text-green-400">{upPercent}%</p>
           </div>
           <div className="text-center p-3 rounded-lg bg-primary/10 border border-primary/30">
@@ -167,6 +174,7 @@ const RoundInfoCard = ({ round, currentPrice, loading, error }: RoundCardProps) 
             <TrendingDown className="w-5 h-5 mx-auto text-red-500 mb-1" />
             <p className="text-xs text-muted-foreground">DOWN Pool</p>
             <p className="font-semibold text-red-500">{formatUsdcPool(round.downPool)}</p>
+            <p className="text-xs text-red-400/70">{formatUrimPool(round.downPoolUrim)}</p>
             <p className="text-xs text-red-400">{downPercent}%</p>
           </div>
         </div>
@@ -177,24 +185,29 @@ const RoundInfoCard = ({ round, currentPrice, loading, error }: RoundCardProps) 
           <p className="text-3xl font-bold bg-gradient-to-r from-green-400 via-primary to-red-400 bg-clip-text text-transparent">
             {formatUsdcPool(totalPool)}
           </p>
+          <p className="text-sm text-muted-foreground">{formatUrimPool(totalPoolUrim)}</p>
         </div>
       </div>
     </Card>
   );
 };
 
+type TokenType = "USDC" | "URIM";
+
 interface BettingCardProps {
   round: RoundData | null;
   userBet: UserBetData | null;
   connected: boolean;
-  onPlaceBet: (amount: number, betUp: boolean) => Promise<void>;
+  onPlaceBet: (amount: number, betUp: boolean, tokenType: TokenType) => Promise<void>;
   onClaim: () => Promise<void>;
   placing: boolean;
   usdcBalance: number;
+  urimBalance: number;
 }
 
-const BettingCard = ({ round, userBet, connected, onPlaceBet, onClaim, placing, usdcBalance }: BettingCardProps) => {
+const BettingCard = ({ round, userBet, connected, onPlaceBet, onClaim, placing, usdcBalance, urimBalance }: BettingCardProps) => {
   const [amount, setAmount] = useState("");
+  const [selectedToken, setSelectedToken] = useState<TokenType>("USDC");
   const [timeLeft, setTimeLeft] = useState<number>(0);
 
   // Calculate time remaining
@@ -214,14 +227,17 @@ const BettingCard = ({ round, userBet, connected, onPlaceBet, onClaim, placing, 
 
   const handleBet = async (betUp: boolean) => {
     const numericAmount = parseFloat(amount);
-    if (!amount || isNaN(numericAmount) || numericAmount < 1) {
-      toast({ title: "Minimum bet is $1 USDC", variant: "destructive" });
+    const balance = selectedToken === "USDC" ? usdcBalance : urimBalance;
+    const minBet = selectedToken === "USDC" ? 1 : 1; // Min $1 value
+    
+    if (!amount || isNaN(numericAmount) || numericAmount < minBet) {
+      toast({ title: `Minimum bet is ${minBet} ${selectedToken}`, variant: "destructive" });
       return;
     }
-    if (numericAmount > usdcBalance) {
+    if (numericAmount > balance) {
       toast({ 
-        title: "Insufficient USDC balance", 
-        description: `You have ${usdcBalance.toFixed(2)} USDC. Get more from the Circle faucet.`,
+        title: `Insufficient ${selectedToken} balance`, 
+        description: `You have ${balance.toFixed(2)} ${selectedToken}.`,
         variant: "destructive" 
       });
       return;
@@ -235,7 +251,7 @@ const BettingCard = ({ round, userBet, connected, onPlaceBet, onClaim, placing, 
       });
       return;
     }
-    await onPlaceBet(numericAmount, betUp);
+    await onPlaceBet(numericAmount, betUp, selectedToken);
     setAmount("");
   };
 
@@ -298,9 +314,29 @@ const BettingCard = ({ round, userBet, connected, onPlaceBet, onClaim, placing, 
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold">Place Your Bet</h3>
         <div className="flex items-center gap-2">
-          <Badge variant="outline" className="text-xs">Balance: ${usdcBalance.toFixed(2)}</Badge>
-          <Badge variant="outline">USDC</Badge>
+          <Badge variant="outline" className="text-xs">USDC: ${usdcBalance.toFixed(2)}</Badge>
+          <Badge variant="outline" className="text-xs">URIM: {urimBalance.toFixed(2)}</Badge>
         </div>
+      </div>
+
+      {/* Token Selector */}
+      <div className="flex gap-2">
+        <Button
+          variant={selectedToken === "USDC" ? "default" : "outline"}
+          size="sm"
+          onClick={() => setSelectedToken("USDC")}
+          className="flex-1"
+        >
+          USDC
+        </Button>
+        <Button
+          variant={selectedToken === "URIM" ? "default" : "outline"}
+          size="sm"
+          onClick={() => setSelectedToken("URIM")}
+          className="flex-1"
+        >
+          URIM
+        </Button>
       </div>
 
       {userBet ? (
@@ -345,10 +381,10 @@ const BettingCard = ({ round, userBet, connected, onPlaceBet, onClaim, placing, 
       ) : canBet ? (
         <div className="space-y-4">
           <div>
-            <label className="text-sm text-muted-foreground mb-2 block">Amount (USDC)</label>
+            <label className="text-sm text-muted-foreground mb-2 block">Amount ({selectedToken})</label>
             <Input
               type="number"
-              placeholder="Min $1.00"
+              placeholder={`Min 1 ${selectedToken}`}
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
               className="bg-background/50"
@@ -391,7 +427,7 @@ const BettingCard = ({ round, userBet, connected, onPlaceBet, onClaim, placing, 
           </div>
 
           <p className="text-xs text-muted-foreground text-center">
-            0.5% fee on all bets · Min $1.00 USDC
+            0.5% fee on all bets · Min 1 {selectedToken}
           </p>
         </div>
       ) : (
@@ -410,25 +446,31 @@ const QuantumPythPrices = () => {
   const [change24hPercent, setChange24hPercent] = useState<number>(0);
   const [placing, setPlacing] = useState(false);
   const [usdcBalance, setUsdcBalance] = useState<number>(0);
+  const [urimBalance, setUrimBalance] = useState<number>(0);
 
   const { connected, publicKey, connect, disconnect, provider, isPhantomInstalled } = useSolanaWallet();
-  const { config, currentRound, userBet, loading, error, placeBet, claimAll, refetch } = useUrimSolana(publicKey);
+  const { config, currentRound, userBet, loading, error, placeBet, placeBetUrim, claimAll, refetch } = useUrimSolana(publicKey);
 
-  // Fetch user's USDC balance
+  // Fetch user's token balances
   useEffect(() => {
     if (!publicKey) {
       setUsdcBalance(0);
+      setUrimBalance(0);
       return;
     }
 
-    const fetchBalance = async () => {
-      const { getUserUsdcBalance } = await import("@/hooks/useUrimSolana");
-      const balance = await getUserUsdcBalance(publicKey);
-      setUsdcBalance(balance);
+    const fetchBalances = async () => {
+      const { getUserUsdcBalance, getUserUrimBalance } = await import("@/hooks/useUrimSolana");
+      const [usdc, urim] = await Promise.all([
+        getUserUsdcBalance(publicKey),
+        getUserUrimBalance(publicKey)
+      ]);
+      setUsdcBalance(usdc);
+      setUrimBalance(urim);
     };
 
-    fetchBalance();
-    const interval = setInterval(fetchBalance, 10000);
+    fetchBalances();
+    const interval = setInterval(fetchBalances, 10000);
     return () => clearInterval(interval);
   }, [publicKey]);
 
@@ -465,7 +507,7 @@ const QuantumPythPrices = () => {
     };
   }, []);
 
-  const handlePlaceBet = async (amount: number, betUp: boolean) => {
+  const handlePlaceBet = async (amount: number, betUp: boolean, tokenType: TokenType) => {
     if (!provider) {
       toast({ title: "Wallet not connected", variant: "destructive" });
       return;
@@ -473,7 +515,15 @@ const QuantumPythPrices = () => {
 
     setPlacing(true);
     try {
-      const signature = await placeBet(amount, betUp, provider);
+      let signature: string;
+      if (tokenType === "USDC") {
+        signature = await placeBet(amount, betUp, provider);
+      } else {
+        // For URIM, we need to pass the URIM price in cents
+        // Using a placeholder price - in production this should come from an oracle
+        const urimPriceCents = 100; // $1.00 per URIM - adjust as needed
+        signature = await placeBetUrim(amount, betUp, urimPriceCents, provider);
+      }
       toast({
         title: "Bet placed successfully!",
         description: `Transaction: ${signature.slice(0, 8)}...`,
@@ -613,6 +663,7 @@ const QuantumPythPrices = () => {
               onClaim={handleClaim}
               placing={placing}
               usdcBalance={usdcBalance}
+              urimBalance={urimBalance}
             />
           </div>
 

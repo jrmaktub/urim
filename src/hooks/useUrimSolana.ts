@@ -10,6 +10,7 @@ const USER_BET_DISCRIMINATOR = Buffer.from([180, 131, 8, 241, 60, 243, 46, 63]);
 
 // Instruction discriminators
 const PLACE_BET_DISCRIMINATOR = Buffer.from([222, 62, 67, 220, 63, 166, 126, 33]);
+const PLACE_BET_URIM_DISCRIMINATOR = Buffer.from([63, 108, 194, 164, 246, 144, 74, 249]);
 const CLAIM_ALL_DISCRIMINATOR = Buffer.from([194, 194, 80, 194, 234, 210, 217, 90]);
 
 // Export function to get user's USDC balance
@@ -20,18 +21,24 @@ export async function getUserUsdcBalance(userPublicKey: string): Promise<number>
     const usdcMint = new PublicKey(DEVNET_USDC_MINT);
     const userTokenAccount = await getAssociatedTokenAddress(usdcMint, userPubkey);
     
-    console.log("=== USDC Balance Check ===");
-    console.log("User wallet:", userPublicKey);
-    console.log("USDC mint:", DEVNET_USDC_MINT);
-    console.log("Token account (ATA):", userTokenAccount.toString());
+    const accountInfo = await getAccount(connection, userTokenAccount);
+    return Number(accountInfo.amount) / 1_000_000;
+  } catch {
+    return 0;
+  }
+}
+
+// Export function to get user's URIM balance
+export async function getUserUrimBalance(userPublicKey: string): Promise<number> {
+  try {
+    const connection = new Connection(SOLANA_DEVNET_RPC, "confirmed");
+    const userPubkey = new PublicKey(userPublicKey);
+    const urimMint = new PublicKey(DEVNET_URIM_MINT);
+    const userTokenAccount = await getAssociatedTokenAddress(urimMint, userPubkey);
     
     const accountInfo = await getAccount(connection, userTokenAccount);
-    const balance = Number(accountInfo.amount) / 1_000_000;
-    console.log("Raw amount:", accountInfo.amount.toString());
-    console.log("USDC balance:", balance);
-    return balance;
-  } catch (err) {
-    console.error("=== USDC Balance Error ===", err);
+    return Number(accountInfo.amount) / 1_000_000;
+  } catch {
     return 0;
   }
 }
@@ -367,6 +374,71 @@ export function useUrimSolana(userPublicKey: string | null) {
     return signature;
   }, [userPublicKey, currentRound, config, fetchData]);
 
+  // Place bet function (URIM)
+  const placeBetUrim = useCallback(async (
+    amount: number, // URIM amount
+    betUp: boolean,
+    urimPriceCents: number, // URIM price in cents for USD value calculation
+    provider: unknown
+  ) => {
+    if (!userPublicKey || !currentRound || !config) {
+      throw new Error("Not connected or no active round");
+    }
+
+    const phantomProvider = provider as {
+      signTransaction: (tx: Transaction) => Promise<Transaction>;
+      publicKey: PublicKey;
+    };
+
+    const userPubkey = new PublicKey(userPublicKey);
+    const amountLamports = BigInt(Math.floor(amount * 1_000_000)); // URIM has 6 decimals
+    const urimPriceCentsBigInt = BigInt(Math.floor(urimPriceCents));
+    
+    const configPda = getConfigPda();
+    const roundPda = getRoundPda(currentRound.roundId);
+    const urimVaultPda = getUrimVaultPda(currentRound.roundId);
+    const userBetPda = getUserBetPda(roundPda, userPubkey);
+    
+    // Get user's URIM token account
+    const urimMint = new PublicKey(DEVNET_URIM_MINT);
+    const userTokenAccount = await getAssociatedTokenAddress(urimMint, userPubkey);
+
+    // Build instruction data: amount (u64) + bet_up (bool) + urim_price_cents (u64)
+    const amountBuffer = Buffer.alloc(8);
+    amountBuffer.writeBigUInt64LE(amountLamports);
+    const betUpBuffer = Buffer.from([betUp ? 1 : 0]);
+    const urimPriceBuffer = Buffer.alloc(8);
+    urimPriceBuffer.writeBigUInt64LE(urimPriceCentsBigInt);
+    const instructionData = Buffer.concat([PLACE_BET_URIM_DISCRIMINATOR, amountBuffer, betUpBuffer, urimPriceBuffer]);
+
+    const instruction = new TransactionInstruction({
+      keys: [
+        { pubkey: configPda, isSigner: false, isWritable: false },
+        { pubkey: roundPda, isSigner: false, isWritable: true },
+        { pubkey: userBetPda, isSigner: false, isWritable: true },
+        { pubkey: urimVaultPda, isSigner: false, isWritable: true },
+        { pubkey: userTokenAccount, isSigner: false, isWritable: true },
+        { pubkey: userPubkey, isSigner: true, isWritable: true },
+        { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+        { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+      ],
+      programId,
+      data: instructionData,
+    });
+
+    const transaction = new Transaction().add(instruction);
+    transaction.feePayer = userPubkey;
+    transaction.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+
+    const signedTx = await phantomProvider.signTransaction(transaction);
+    const signature = await connection.sendRawTransaction(signedTx.serialize());
+    await connection.confirmTransaction(signature, "confirmed");
+
+    await fetchData();
+
+    return signature;
+  }, [userPublicKey, currentRound, config, fetchData]);
+
   // Claim winnings
   const claimAll = useCallback(async (provider: unknown) => {
     if (!userPublicKey || !currentRound || !userBet) {
@@ -425,6 +497,7 @@ export function useUrimSolana(userPublicKey: string | null) {
     loading,
     error,
     placeBet,
+    placeBetUrim,
     claimAll,
     refetch: fetchData,
   };
