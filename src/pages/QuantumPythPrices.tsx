@@ -507,54 +507,59 @@ interface ClaimableRoundsProps {
 }
 
 const ClaimableRounds = ({ claimableRounds, onClaim, claiming }: ClaimableRoundsProps) => {
-  if (claimableRounds.length === 0) {
-    return null;
-  }
-
   return (
     <Card className="p-6 border-2 border-green-500/30 bg-green-500/5 backdrop-blur-sm">
       <div className="flex items-center gap-2 mb-4">
         <Gift className="w-5 h-5 text-green-400" />
         <h3 className="text-lg font-semibold text-green-400">Claimable Winnings</h3>
-        <Badge className="bg-green-500/20 text-green-400 border-green-500/50 ml-auto">
-          {claimableRounds.length} {claimableRounds.length === 1 ? 'round' : 'rounds'}
-        </Badge>
+        {claimableRounds.length > 0 && (
+          <Badge className="bg-green-500/20 text-green-400 border-green-500/50 ml-auto">
+            {claimableRounds.length} {claimableRounds.length === 1 ? 'round' : 'rounds'}
+          </Badge>
+        )}
       </div>
 
-      <div className="space-y-3">
-        {claimableRounds.map((round) => (
-          <div 
-            key={round.roundId.toString()} 
-            className="flex items-center justify-between p-3 rounded-lg bg-background/50 border border-green-500/20"
-          >
-            <div className="flex items-center gap-3">
-              <Badge className={cn(
-                "px-2 py-1",
-                round.outcome === "Up" && "bg-green-500/20 text-green-400",
-                round.outcome === "Down" && "bg-pink-500/20 text-pink-400",
-                round.outcome === "Draw" && "bg-yellow-500/20 text-yellow-400"
-              )}>
-                {round.outcome === "Up" && <TrendingUp className="w-3 h-3 mr-1" />}
-                {round.outcome === "Down" && <TrendingDown className="w-3 h-3 mr-1" />}
-                {round.outcome}
-              </Badge>
-              <span className="text-sm text-muted-foreground">Round #{round.roundId.toString()}</span>
-              <span className="text-sm font-medium">
-                You bet {round.userBet.betUp ? "UP" : "DOWN"} - Won!
-              </span>
-            </div>
-            <Button
-              size="sm"
-              onClick={() => onClaim(round.roundId)}
-              disabled={claiming}
-              className="bg-green-600 hover:bg-green-700"
+      {claimableRounds.length === 0 ? (
+        <div className="text-center py-4 text-muted-foreground">
+          <p className="text-sm">No unclaimed winnings found.</p>
+          <p className="text-xs mt-1">Win a round to see claimable rewards here!</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {claimableRounds.map((round) => (
+            <div 
+              key={round.roundId.toString()} 
+              className="flex items-center justify-between p-3 rounded-lg bg-background/50 border border-green-500/20"
             >
-              {claiming ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trophy className="w-3 h-3 mr-1" />}
-              Claim
-            </Button>
-          </div>
-        ))}
-      </div>
+              <div className="flex items-center gap-3">
+                <Badge className={cn(
+                  "px-2 py-1",
+                  round.outcome === "Up" && "bg-green-500/20 text-green-400",
+                  round.outcome === "Down" && "bg-pink-500/20 text-pink-400",
+                  round.outcome === "Draw" && "bg-yellow-500/20 text-yellow-400"
+                )}>
+                  {round.outcome === "Up" && <TrendingUp className="w-3 h-3 mr-1" />}
+                  {round.outcome === "Down" && <TrendingDown className="w-3 h-3 mr-1" />}
+                  {round.outcome}
+                </Badge>
+                <span className="text-sm text-muted-foreground">Round #{round.roundId.toString()}</span>
+                <span className="text-sm font-medium">
+                  You bet {round.userBet.betUp ? "UP" : "DOWN"} - Won!
+                </span>
+              </div>
+              <Button
+                size="sm"
+                onClick={() => onClaim(round.roundId)}
+                disabled={claiming}
+                className="bg-green-600 hover:bg-green-700"
+              >
+                {claiming ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trophy className="w-3 h-3 mr-1" />}
+                Claim
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
     </Card>
   );
 };
