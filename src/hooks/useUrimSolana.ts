@@ -245,12 +245,19 @@ function parseUserBetData(data: Buffer): UserBetData | null {
 }
 
 // Export for use in components
-export { getRoundPda, getVaultPda, getUrimVaultPda, getUserBetPda, parseRoundData, connection };
+export { getRoundPda, getVaultPda, getUrimVaultPda, getUserBetPda, parseRoundData, parseUserBetData, connection };
 
 export interface HistoricalRound {
   roundId: bigint;
   outcome: "Pending" | "Up" | "Down" | "Draw";
   resolved: boolean;
+}
+
+export interface ClaimableRound {
+  roundId: bigint;
+  outcome: "Up" | "Down" | "Draw";
+  userBet: UserBetData;
+  isWinner: boolean;
 }
 
 // Fetch historical rounds
@@ -286,6 +293,7 @@ export function useUrimSolana(userPublicKey: string | null) {
   const [currentRound, setCurrentRound] = useState<RoundData | null>(null);
   const [userBet, setUserBet] = useState<UserBetData | null>(null);
   const [historicalRounds, setHistoricalRounds] = useState<HistoricalRound[]>([]);
+  const [claimableRounds, setClaimableRounds] = useState<ClaimableRound[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -330,6 +338,41 @@ export function useUrimSolana(userPublicKey: string | null) {
           // Fetch historical rounds
           const history = await fetchHistoricalRounds(configData.currentRoundId, 15);
           setHistoricalRounds(history);
+          
+          // Find claimable rounds for user
+          if (userPublicKey) {
+            const userPubkey = new PublicKey(userPublicKey);
+            const claimable: ClaimableRound[] = [];
+            
+            for (const round of history) {
+              if (round.outcome === "Pending") continue;
+              
+              const userBetPda = getUserBetPda(round.roundId, userPubkey);
+              const userBetAccount = await connection.getAccountInfo(userBetPda);
+              
+              if (userBetAccount) {
+                const betData = parseUserBetData(Buffer.from(userBetAccount.data));
+                if (betData && (!betData.claimedUsdc || !betData.claimedUrim)) {
+                  const isWinner = 
+                    (round.outcome === "Up" && betData.betUp) ||
+                    (round.outcome === "Down" && !betData.betUp) ||
+                    round.outcome === "Draw";
+                  
+                  if (isWinner) {
+                    claimable.push({
+                      roundId: round.roundId,
+                      outcome: round.outcome as "Up" | "Down" | "Draw",
+                      userBet: betData,
+                      isWinner
+                    });
+                  }
+                }
+              }
+            }
+            setClaimableRounds(claimable);
+          } else {
+            setClaimableRounds([]);
+          }
         }
       } else {
         setError("Program not initialized. No active rounds yet.");
@@ -535,16 +578,68 @@ export function useUrimSolana(userPublicKey: string | null) {
     return signature;
   }, [userPublicKey, currentRound, userBet, fetchData]);
 
+  // Claim for specific round
+  const claimForRound = useCallback(async (roundId: bigint, provider: unknown) => {
+    if (!userPublicKey) {
+      throw new Error("Not connected");
+    }
+
+    const phantomProvider = provider as {
+      signTransaction: (tx: Transaction) => Promise<Transaction>;
+      publicKey: PublicKey;
+    };
+
+    const userPubkey = new PublicKey(userPublicKey);
+    const roundPda = getRoundPda(roundId);
+    const vaultPda = getVaultPda(roundId);
+    const urimVaultPda = getUrimVaultPda(roundId);
+    const userBetPda = getUserBetPda(roundId, userPubkey);
+
+    const usdcMint = new PublicKey(DEVNET_USDC_MINT);
+    const urimMint = new PublicKey(DEVNET_URIM_MINT);
+    const userUsdcAccount = await getAssociatedTokenAddress(usdcMint, userPubkey);
+    const userUrimAccount = await getAssociatedTokenAddress(urimMint, userPubkey);
+
+    const instruction = new TransactionInstruction({
+      keys: [
+        { pubkey: roundPda, isSigner: false, isWritable: false },
+        { pubkey: userBetPda, isSigner: false, isWritable: true },
+        { pubkey: vaultPda, isSigner: false, isWritable: true },
+        { pubkey: urimVaultPda, isSigner: false, isWritable: true },
+        { pubkey: userUsdcAccount, isSigner: false, isWritable: true },
+        { pubkey: userUrimAccount, isSigner: false, isWritable: true },
+        { pubkey: userPubkey, isSigner: true, isWritable: false },
+        { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+      ],
+      programId,
+      data: CLAIM_ALL_DISCRIMINATOR,
+    });
+
+    const transaction = new Transaction().add(instruction);
+    transaction.feePayer = userPubkey;
+    transaction.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+
+    const signedTx = await phantomProvider.signTransaction(transaction);
+    const signature = await connection.sendRawTransaction(signedTx.serialize());
+    await connection.confirmTransaction(signature, "confirmed");
+
+    await fetchData();
+
+    return signature;
+  }, [userPublicKey, fetchData]);
+
   return {
     config,
     currentRound,
     userBet,
     historicalRounds,
+    claimableRounds,
     loading,
     error,
     placeBet,
     placeBetUrim,
     claimAll,
+    claimForRound,
     refetch: fetchData,
   };
 }
