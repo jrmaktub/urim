@@ -504,9 +504,12 @@ interface ClaimableRoundsProps {
   claimableRounds: ClaimableRound[];
   onClaim: (roundId: bigint) => Promise<void>;
   claiming: boolean;
+  connected: boolean;
 }
 
-const ClaimableRounds = ({ claimableRounds, onClaim, claiming }: ClaimableRoundsProps) => {
+const ClaimableRounds = ({ claimableRounds, onClaim, claiming, connected }: ClaimableRoundsProps) => {
+  console.log("[ClaimableRounds] Rendering with:", { connected, claimableRoundsCount: claimableRounds.length, claimableRounds });
+  
   return (
     <Card className="p-6 border-2 border-green-500/30 bg-green-500/5 backdrop-blur-sm">
       <div className="flex items-center gap-2 mb-4">
@@ -519,7 +522,12 @@ const ClaimableRounds = ({ claimableRounds, onClaim, claiming }: ClaimableRounds
         )}
       </div>
 
-      {claimableRounds.length === 0 ? (
+      {!connected ? (
+        <div className="text-center py-4 text-muted-foreground">
+          <Wallet className="w-8 h-8 mx-auto mb-2 opacity-50" />
+          <p className="text-sm">Connect your wallet to see claimable winnings</p>
+        </div>
+      ) : claimableRounds.length === 0 ? (
         <div className="text-center py-4 text-muted-foreground">
           <p className="text-sm">No unclaimed winnings found.</p>
           <p className="text-xs mt-1">Win a round to see claimable rewards here!</p>
@@ -816,14 +824,13 @@ const QuantumPythPrices = () => {
             />
           </div>
 
-          {/* Claimable Winnings */}
-          {connected && (
-            <ClaimableRounds 
-              claimableRounds={claimableRounds} 
-              onClaim={handleClaimForRound} 
-              claiming={placing} 
-            />
-          )}
+          {/* Claimable Winnings - Always show when connected */}
+          <ClaimableRounds 
+            claimableRounds={claimableRounds} 
+            onClaim={handleClaimForRound} 
+            claiming={placing}
+            connected={connected}
+          />
 
           {/* Results History */}
           <ResultsHistory historicalRounds={historicalRounds} />
