@@ -344,19 +344,28 @@ export function useUrimSolana(userPublicKey: string | null) {
             const userPubkey = new PublicKey(userPublicKey);
             const claimable: ClaimableRound[] = [];
             
+            console.log("[useUrimSolana] Checking claimable rounds, history count:", history.length);
+            
             for (const round of history) {
+              console.log(`[useUrimSolana] Checking round ${round.roundId.toString()}, outcome: ${round.outcome}`);
               if (round.outcome === "Pending") continue;
               
               const userBetPda = getUserBetPda(round.roundId, userPubkey);
               const userBetAccount = await connection.getAccountInfo(userBetPda);
               
+              console.log(`[useUrimSolana] Round ${round.roundId.toString()} userBet exists:`, !!userBetAccount);
+              
               if (userBetAccount) {
                 const betData = parseUserBetData(Buffer.from(userBetAccount.data));
+                console.log(`[useUrimSolana] Round ${round.roundId.toString()} betData:`, betData);
+                
                 if (betData && (!betData.claimedUsdc || !betData.claimedUrim)) {
                   const isWinner = 
                     (round.outcome === "Up" && betData.betUp) ||
                     (round.outcome === "Down" && !betData.betUp) ||
                     round.outcome === "Draw";
+                  
+                  console.log(`[useUrimSolana] Round ${round.roundId.toString()} isWinner:`, isWinner, "betUp:", betData.betUp, "claimedUsdc:", betData.claimedUsdc, "claimedUrim:", betData.claimedUrim);
                   
                   if (isWinner) {
                     claimable.push({
@@ -369,6 +378,7 @@ export function useUrimSolana(userPublicKey: string | null) {
                 }
               }
             }
+            console.log("[useUrimSolana] Claimable rounds found:", claimable.length, claimable);
             setClaimableRounds(claimable);
           } else {
             setClaimableRounds([]);
