@@ -652,10 +652,21 @@ const QuantumPythPrices = () => {
       if (tokenType === "USDC") {
         signature = await placeBet(amount, betUp, provider);
       } else {
-        // For URIM, we need to pass the URIM price in cents
-        // Using a placeholder price - in production this should come from an oracle
-        const urimPriceCents = 100; // $1.00 per URIM - adjust as needed
-        signature = await placeBetUrim(amount, betUp, urimPriceCents, provider);
+        // Fetch current URIM price from DexScreener
+        // Contract expects urim_price_scaled = price_usd * 100_000_000
+        let urimPriceScaled = 1251; // Default fallback: ~$0.00001251
+        try {
+          const resp = await fetch('https://api.dexscreener.com/latest/dex/pairs/solana/DjNhU15XfeZC5eU3Bmp1LM1VZAA4wUFs5P4nd8JbEaHS');
+          const data = await resp.json();
+          if (data?.pair?.priceUsd) {
+            const priceUsd = parseFloat(data.pair.priceUsd);
+            urimPriceScaled = Math.floor(priceUsd * 100_000_000);
+            console.log("URIM price from DexScreener:", priceUsd, "scaled:", urimPriceScaled);
+          }
+        } catch (e) {
+          console.warn("Failed to fetch URIM price, using fallback:", e);
+        }
+        signature = await placeBetUrim(amount, betUp, urimPriceScaled, provider);
       }
       toast({
         title: "Bet placed successfully!",
