@@ -8,9 +8,9 @@ const CONFIG_DISCRIMINATOR = Buffer.from([155, 12, 170, 224, 30, 250, 204, 130])
 const ROUND_DISCRIMINATOR = Buffer.from([87, 127, 165, 51, 73, 78, 116, 174]);
 const USER_BET_DISCRIMINATOR = Buffer.from([180, 131, 8, 241, 60, 243, 46, 63]);
 
-// Instruction discriminators
+// Instruction discriminators from IDL
 const PLACE_BET_DISCRIMINATOR = Buffer.from([222, 62, 67, 220, 63, 166, 126, 33]);
-const PLACE_BET_URIM_DISCRIMINATOR = Buffer.from([63, 108, 194, 164, 246, 144, 74, 249]);
+const PLACE_BET_URIM_DISCRIMINATOR = Buffer.from([163, 243, 255, 163, 97, 48, 58, 31]); // Fixed from IDL
 const CLAIM_ALL_DISCRIMINATOR = Buffer.from([194, 194, 80, 194, 234, 210, 217, 90]);
 
 // Export function to get user's USDC balance
