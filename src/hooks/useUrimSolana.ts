@@ -474,9 +474,9 @@ export function useUrimSolana(userPublicKey: string | null) {
 
   // Place bet function (URIM)
   const placeBetUrim = useCallback(async (
-    amount: number, // URIM amount
+    amount: number, // URIM amount (in whole tokens)
     betUp: boolean,
-    urimPriceCents: number, // URIM price in cents for USD value calculation
+    urimPriceScaled: number, // URIM price scaled: price_usd * 100_000_000
     provider: unknown
   ) => {
     if (!userPublicKey || !currentRound || !config) {
@@ -490,7 +490,13 @@ export function useUrimSolana(userPublicKey: string | null) {
 
     const userPubkey = new PublicKey(userPublicKey);
     const amountLamports = BigInt(Math.floor(amount * 1_000_000)); // URIM has 6 decimals
-    const urimPriceCentsBigInt = BigInt(Math.floor(urimPriceCents));
+    const urimPriceScaledBigInt = BigInt(Math.floor(urimPriceScaled));
+    
+    console.log("=== PlaceBetUrim Debug ===");
+    console.log("URIM amount:", amount);
+    console.log("URIM amount (micro-units):", amountLamports.toString());
+    console.log("URIM price scaled (price * 10^8):", urimPriceScaled);
+    console.log("Estimated USD value:", (Number(amountLamports) * urimPriceScaled / 100_000_000 / 1_000_000).toFixed(4));
     
     const configPda = getConfigPda();
     const roundPda = getRoundPda(currentRound.roundId);
@@ -506,7 +512,7 @@ export function useUrimSolana(userPublicKey: string | null) {
     amountBuffer.writeBigUInt64LE(amountLamports);
     const betUpBuffer = Buffer.from([betUp ? 1 : 0]);
     const urimPriceBuffer = Buffer.alloc(8);
-    urimPriceBuffer.writeBigUInt64LE(urimPriceCentsBigInt);
+    urimPriceBuffer.writeBigUInt64LE(urimPriceScaledBigInt);
     const instructionData = Buffer.concat([PLACE_BET_URIM_DISCRIMINATOR, amountBuffer, betUpBuffer, urimPriceBuffer]);
 
     const instruction = new TransactionInstruction({
