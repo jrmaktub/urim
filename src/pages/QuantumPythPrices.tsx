@@ -12,7 +12,7 @@ import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useSolanaWallet } from "@/hooks/useSolanaWallet";
-import { useUrimSolana, RoundData, UserBetData, HistoricalRound, ClaimableRound } from "@/hooks/useUrimSolana";
+import { useUrimSolana, RoundData, UserBetData, HistoricalRound, ClaimableRound, UserBetHistory } from "@/hooks/useUrimSolana";
 import { CopyableError, parseSolanaError } from "@/components/CopyableErrorToast";
 
 const BASE_PRICE = 131.96;
@@ -572,6 +572,169 @@ const ClaimableRounds = ({ claimableRounds, onClaim, claiming, connected }: Clai
   );
 };
 
+// User Bet History Component
+interface UserBetHistoryProps {
+  betHistory: UserBetHistory[];
+  connected: boolean;
+}
+
+const UserBetHistoryComponent = ({ betHistory, connected }: UserBetHistoryProps) => {
+  if (!connected) {
+    return (
+      <Card className="p-6 border-2 border-primary/30 bg-primary/5 backdrop-blur-sm">
+        <div className="flex items-center gap-2 mb-4">
+          <History className="w-5 h-5 text-primary" />
+          <h3 className="text-lg font-semibold text-primary">Your Bet History</h3>
+        </div>
+        <div className="text-center py-4 text-muted-foreground">
+          <Wallet className="w-8 h-8 mx-auto mb-2 opacity-50" />
+          <p className="text-sm">Connect your wallet to see your betting history</p>
+        </div>
+      </Card>
+    );
+  }
+
+  if (betHistory.length === 0) {
+    return (
+      <Card className="p-6 border-2 border-primary/30 bg-primary/5 backdrop-blur-sm">
+        <div className="flex items-center gap-2 mb-4">
+          <History className="w-5 h-5 text-primary" />
+          <h3 className="text-lg font-semibold text-primary">Your Bet History</h3>
+        </div>
+        <div className="text-center py-4 text-muted-foreground">
+          <p className="text-sm">No bets placed yet.</p>
+          <p className="text-xs mt-1">Place your first bet to see your history here!</p>
+        </div>
+      </Card>
+    );
+  }
+
+  return (
+    <Card className="p-6 border-2 border-primary/30 bg-primary/5 backdrop-blur-sm">
+      <div className="flex items-center gap-2 mb-4">
+        <History className="w-5 h-5 text-primary" />
+        <h3 className="text-lg font-semibold text-primary">Your Bet History</h3>
+        <Badge className="bg-primary/20 text-primary border-primary/50 ml-auto">
+          {betHistory.length} {betHistory.length === 1 ? 'bet' : 'bets'}
+        </Badge>
+      </div>
+
+      <div className="space-y-3">
+        {betHistory.map((bet) => {
+          const betAmount = Number(bet.userBet.amount) / 1_000_000;
+          const payout = Number(bet.estimatedPayout) / 1_000_000;
+          const lockedPrice = Number(bet.lockedPrice) / 100;
+          const finalPrice = Number(bet.finalPrice) / 100;
+          const winningsAmount = payout - betAmount;
+          const multiplier = betAmount > 0 ? payout / betAmount : 0;
+          
+          return (
+            <div 
+              key={bet.roundId.toString()} 
+              className={cn(
+                "p-4 rounded-lg border",
+                !bet.resolved && "bg-yellow-500/5 border-yellow-500/20",
+                bet.resolved && bet.isWinner && "bg-green-500/5 border-green-500/20",
+                bet.resolved && !bet.isWinner && "bg-red-500/5 border-red-500/20"
+              )}
+            >
+              {/* Header Row */}
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold">Round #{bet.roundId.toString()}</span>
+                  <Badge className={cn(
+                    "px-2 py-0.5 text-xs",
+                    bet.userBet.betUp ? "bg-green-500/20 text-green-400" : "bg-red-500/20 text-red-400"
+                  )}>
+                    {bet.userBet.betUp ? "↑ UP" : "↓ DOWN"}
+                  </Badge>
+                </div>
+                <Badge className={cn(
+                  "px-2 py-0.5",
+                  !bet.resolved && "bg-yellow-500/20 text-yellow-400 border-yellow-500/50",
+                  bet.outcome === "Up" && "bg-green-500/20 text-green-400 border-green-500/50",
+                  bet.outcome === "Down" && "bg-red-500/20 text-red-400 border-red-500/50",
+                  bet.outcome === "Draw" && "bg-gray-500/20 text-gray-400 border-gray-500/50"
+                )}>
+                  {!bet.resolved ? (
+                    <>
+                      <Clock className="w-3 h-3 mr-1 inline" />
+                      Pending
+                    </>
+                  ) : (
+                    <>
+                      {bet.outcome === "Up" && <TrendingUp className="w-3 h-3 mr-1 inline" />}
+                      {bet.outcome === "Down" && <TrendingDown className="w-3 h-3 mr-1 inline" />}
+                      {bet.outcome}
+                    </>
+                  )}
+                </Badge>
+              </div>
+
+              {/* Price Info */}
+              <div className="grid grid-cols-2 gap-4 mb-3 text-sm">
+                <div>
+                  <span className="text-muted-foreground">Locked Price: </span>
+                  <span className="font-medium">${lockedPrice.toFixed(2)}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Final Price: </span>
+                  <span className={cn(
+                    "font-medium",
+                    bet.resolved && finalPrice > lockedPrice && "text-green-400",
+                    bet.resolved && finalPrice < lockedPrice && "text-red-400"
+                  )}>
+                    {bet.resolved ? `$${finalPrice.toFixed(2)}` : "—"}
+                  </span>
+                </div>
+              </div>
+
+              {/* Bet Details */}
+              <div className="flex items-center justify-between pt-3 border-t border-border/30">
+                <div>
+                  <span className="text-sm text-muted-foreground">Bet: </span>
+                  <span className="font-semibold">
+                    {betAmount.toFixed(2)} {bet.userBet.tokenType}
+                  </span>
+                </div>
+                
+                {bet.resolved && (
+                  <div className="text-right">
+                    {bet.isWinner ? (
+                      <div className="flex items-center gap-2">
+                        <Trophy className="w-4 h-4 text-green-400" />
+                        <div>
+                          <span className="text-green-400 font-bold">
+                            +{winningsAmount.toFixed(2)} {bet.userBet.tokenType}
+                          </span>
+                          <span className="text-xs text-muted-foreground ml-2">
+                            ({multiplier.toFixed(2)}x)
+                          </span>
+                        </div>
+                      </div>
+                    ) : bet.outcome === "Draw" ? (
+                      <span className="text-yellow-400 font-medium">Refund</span>
+                    ) : (
+                      <span className="text-red-400 font-medium">-{betAmount.toFixed(2)}</span>
+                    )}
+                  </div>
+                )}
+                
+                {!bet.resolved && (
+                  <span className="text-sm text-yellow-400 flex items-center gap-1">
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                    Awaiting result
+                  </span>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </Card>
+  );
+};
+
 const QuantumPythPrices = () => {
   const [currentPrice, setCurrentPrice] = useState<number>(BASE_PRICE);
   const [high24h, setHigh24h] = useState<number>(BASE_PRICE);
@@ -582,7 +745,7 @@ const QuantumPythPrices = () => {
   const [urimBalance, setUrimBalance] = useState<number>(0);
 
   const { connected, publicKey, connect, disconnect, provider, isPhantomInstalled } = useSolanaWallet();
-  const { config, currentRound, userBet, historicalRounds, claimableRounds, loading, error, placeBet, placeBetUrim, claimAll, claimForRound, refetch } = useUrimSolana(publicKey);
+  const { config, currentRound, userBet, historicalRounds, claimableRounds, userBetHistory, loading, error, placeBet, placeBetUrim, claimAll, claimForRound, refetch } = useUrimSolana(publicKey);
 
   // Fetch user's token balances
   useEffect(() => {
@@ -830,6 +993,12 @@ const QuantumPythPrices = () => {
             claimableRounds={claimableRounds} 
             onClaim={handleClaimForRound} 
             claiming={placing}
+            connected={connected}
+          />
+
+          {/* User Bet History */}
+          <UserBetHistoryComponent 
+            betHistory={userBetHistory} 
             connected={connected}
           />
 

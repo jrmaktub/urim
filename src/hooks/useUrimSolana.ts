@@ -260,6 +260,18 @@ export interface ClaimableRound {
   isWinner: boolean;
 }
 
+// User's complete bet history entry
+export interface UserBetHistory {
+  roundId: bigint;
+  outcome: "Pending" | "Up" | "Down" | "Draw";
+  resolved: boolean;
+  userBet: UserBetData;
+  isWinner: boolean;
+  estimatedPayout: bigint; // Estimated winnings in tokens (6 decimals)
+  lockedPrice: bigint;
+  finalPrice: bigint;
+}
+
 // Fetch historical rounds
 export async function fetchHistoricalRounds(currentRoundId: bigint, limit: number = 20): Promise<HistoricalRound[]> {
   const results: HistoricalRound[] = [];
@@ -294,6 +306,7 @@ export function useUrimSolana(userPublicKey: string | null) {
   const [userBet, setUserBet] = useState<UserBetData | null>(null);
   const [historicalRounds, setHistoricalRounds] = useState<HistoricalRound[]>([]);
   const [claimableRounds, setClaimableRounds] = useState<ClaimableRound[]>([]);
+  const [userBetHistory, setUserBetHistory] = useState<UserBetHistory[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -316,12 +329,13 @@ export function useUrimSolana(userPublicKey: string | null) {
           const roundPda = getRoundPda(activeRoundId);
           const roundAccount = await connection.getAccountInfo(roundPda);
           
+          let currentRoundData: RoundData | null = null;
           if (roundAccount) {
-            const roundData = parseRoundData(Buffer.from(roundAccount.data));
-            setCurrentRound(roundData);
+            currentRoundData = parseRoundData(Buffer.from(roundAccount.data));
+            setCurrentRound(currentRoundData);
 
             // Fetch user bet if connected
-            if (userPublicKey && roundData) {
+            if (userPublicKey && currentRoundData) {
               const userPubkey = new PublicKey(userPublicKey);
               const userBetPda = getUserBetPda(activeRoundId, userPubkey);
               const userBetAccount = await connection.getAccountInfo(userBetPda);
@@ -339,35 +353,75 @@ export function useUrimSolana(userPublicKey: string | null) {
           const history = await fetchHistoricalRounds(configData.currentRoundId, 15);
           setHistoricalRounds(history);
           
-          // Find claimable rounds for user
+          // Find claimable rounds and build bet history for user
           if (userPublicKey) {
             const userPubkey = new PublicKey(userPublicKey);
             const claimable: ClaimableRound[] = [];
+            const betHistory: UserBetHistory[] = [];
             
-            console.log("[useUrimSolana] Checking claimable rounds, history count:", history.length);
+            console.log("[useUrimSolana] Checking user bets, history count:", history.length);
             
-            for (const round of history) {
-              console.log(`[useUrimSolana] Checking round ${round.roundId.toString()}, outcome: ${round.outcome}`);
-              if (round.outcome === "Pending") continue;
-              
+            // Also check current round for user bet
+            const allRoundsToCheck = [
+              ...history,
+              ...(currentRoundData ? [{ roundId: currentRoundData.roundId, outcome: currentRoundData.outcome, resolved: currentRoundData.resolved }] : [])
+            ];
+            
+            for (const round of allRoundsToCheck) {
               const userBetPda = getUserBetPda(round.roundId, userPubkey);
               const userBetAccount = await connection.getAccountInfo(userBetPda);
               
-              console.log(`[useUrimSolana] Round ${round.roundId.toString()} userBet exists:`, !!userBetAccount);
-              
               if (userBetAccount) {
                 const betData = parseUserBetData(Buffer.from(userBetAccount.data));
-                console.log(`[useUrimSolana] Round ${round.roundId.toString()} betData:`, betData);
                 
-                if (betData && (!betData.claimedUsdc || !betData.claimedUrim)) {
-                  const isWinner = 
+                if (betData) {
+                  // Get full round data for this round
+                  let fullRoundData: RoundData | null = null;
+                  if (currentRoundData && currentRoundData.roundId === round.roundId) {
+                    fullRoundData = currentRoundData;
+                  } else {
+                    try {
+                      const histRoundPda = getRoundPda(round.roundId);
+                      const histRoundAccount = await connection.getAccountInfo(histRoundPda);
+                      if (histRoundAccount) {
+                        fullRoundData = parseRoundData(Buffer.from(histRoundAccount.data));
+                      }
+                    } catch { /* ignore */ }
+                  }
+                  
+                  const isWinner = round.resolved && (
                     (round.outcome === "Up" && betData.betUp) ||
                     (round.outcome === "Down" && !betData.betUp) ||
-                    round.outcome === "Draw";
+                    round.outcome === "Draw"
+                  );
                   
-                  console.log(`[useUrimSolana] Round ${round.roundId.toString()} isWinner:`, isWinner, "betUp:", betData.betUp, "claimedUsdc:", betData.claimedUsdc, "claimedUrim:", betData.claimedUrim);
+                  // Calculate estimated payout (simplified - actual payout depends on pool shares)
+                  let estimatedPayout = 0n;
+                  if (fullRoundData && isWinner && round.outcome !== "Draw") {
+                    const userPool = betData.betUp ? fullRoundData.upPool : fullRoundData.downPool;
+                    const loserPool = betData.betUp ? fullRoundData.downPool : fullRoundData.upPool;
+                    if (userPool > 0n) {
+                      // User's share of winnings = (bet / winning pool) * losing pool
+                      estimatedPayout = betData.amount + (betData.amount * loserPool / userPool);
+                    }
+                  } else if (round.outcome === "Draw") {
+                    estimatedPayout = betData.amount; // Refund on draw
+                  }
                   
-                  if (isWinner) {
+                  // Add to bet history
+                  betHistory.push({
+                    roundId: round.roundId,
+                    outcome: round.outcome,
+                    resolved: round.resolved,
+                    userBet: betData,
+                    isWinner,
+                    estimatedPayout,
+                    lockedPrice: fullRoundData?.lockedPrice ?? 0n,
+                    finalPrice: fullRoundData?.finalPrice ?? 0n,
+                  });
+                  
+                  // Add to claimable if eligible
+                  if (round.resolved && round.outcome !== "Pending" && isWinner && (!betData.claimedUsdc || !betData.claimedUrim)) {
                     claimable.push({
                       roundId: round.roundId,
                       outcome: round.outcome as "Up" | "Down" | "Draw",
@@ -378,10 +432,17 @@ export function useUrimSolana(userPublicKey: string | null) {
                 }
               }
             }
-            console.log("[useUrimSolana] Claimable rounds found:", claimable.length, claimable);
+            
+            // Sort by round ID descending (newest first)
+            betHistory.sort((a, b) => Number(b.roundId - a.roundId));
+            
+            console.log("[useUrimSolana] User bet history:", betHistory.length);
+            console.log("[useUrimSolana] Claimable rounds:", claimable.length);
+            setUserBetHistory(betHistory);
             setClaimableRounds(claimable);
           } else {
             setClaimableRounds([]);
+            setUserBetHistory([]);
           }
         }
       } else {
@@ -650,6 +711,7 @@ export function useUrimSolana(userPublicKey: string | null) {
     userBet,
     historicalRounds,
     claimableRounds,
+    userBetHistory,
     loading,
     error,
     placeBet,
