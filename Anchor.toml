@@ -6,10 +6,10 @@ resolution = true
 skip-lint = false
 
 [programs.devnet]
-urim_solana = "6MWu89uSo4RiFNaVRcuEd2PqzyQRoGdG91Unyd5Aj5kM"
+urim_solana = "5KqMaQLoKhBYcHD1qWZVcQqu5pmTvMitDUEqmKsqBTQg"
 
 [programs.localnet]
-urim_solana = "5pPjWJ1b27MPXWPphP6diVW1HkZ3tJmMkcGovKEa4H8R"
+urim_solana = "5KqMaQLoKhBYcHD1qWZVcQqu5pmTvMitDUEqmKsqBTQg"
 
 [registry]
 url = "https://api.apr.dev"

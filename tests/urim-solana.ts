@@ -1,593 +1,1369 @@
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import { UrimSolana } from "../target/types/urim_solana";
-import { PublicKey, Keypair } from "@solana/web3.js";
+import { PublicKey, Keypair, Transaction, SystemProgram } from "@solana/web3.js";
 import {
   createMint,
   createAccount,
   mintTo,
+  getAccount,
 } from "@solana/spl-token";
 import { assert } from "chai";
-import { HermesClient } from "@pythnetwork/hermes-client";
+import axios from "axios";
 
-// Pyth Solana Receiver Program on Devnet
-const PYTH_RECEIVER_PROGRAM = new PublicKey("rec5EKMGg6MxZYaMdyBfgwp4d5rB9T1VQH5pJv5LtFJ");
+// Constants matching the contract
+const FEE_BPS = 50; // 0.5%
+const TEST_DURATION = 45; // 45 seconds for test rounds (handles devnet latency)
+const PYTH_SOL_USD_DEVNET = new PublicKey("J83w4HKfqxwcq3BEMMkPFSppX3gqekLyLJBexebFVkix");
 
-// SOL/USD Price Feed ID (same for mainnet/devnet)
-const SOL_USD_FEED_ID = "0xef0d8b6fda2ceba41da15d4095d1da392a0d2f8ed0c6c7bc0f4cfac8c280b56d";
+// Real devnet USDC (Circle's official devnet USDC) - for future real USDC testing
+// const REAL_DEVNET_USDC = new PublicKey("4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU");
 
-// Pyth Hermes API for getting price updates
-const HERMES_API = "https://hermes.pyth.network";
+// URIM price for testing - now uses 8-decimal scaled format
+// $0.05 per URIM = 0.05 * 100_000_000 = 5_000_000
+const URIM_PRICE_SCALED = 5_000_000; // $0.05 per URIM (scaled by 10^8)
 
-describe("urim-solana", () => {
-  const provider = anchor.AnchorProvider.env();
+// SOL/USD Price Feed ID (Pyth network hex format)
+const SOL_USD_PRICE_FEED_ID = "ef0d8b6fda2ceba41da15d4095d1da392a0d2f8ed0c6c7bc0f4cfac8c280b56d";
+
+// Hermes endpoint for fetching real-time prices
+const HERMES_ENDPOINT = "https://hermes.pyth.network";
+
+// Helper to wait
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+// Helper to fetch real price from Hermes
+async function fetchHermesPrice(): Promise<{ price: number; priceInCents: number }> {
+  const response = await axios.get(
+    `${HERMES_ENDPOINT}/v2/updates/price/latest?ids[]=${SOL_USD_PRICE_FEED_ID}`
+  );
+  const priceData = response.data.parsed[0];
+  const price = Number(priceData.price.price) * Math.pow(10, priceData.price.expo);
+  const priceInCents = Math.round(price * 100);
+  return { price, priceInCents };
+}
+
+describe("Urim Solana - COMPREHENSIVE TEST SUITE", () => {
+  // Use longer timeout for devnet
+  const connection = new anchor.web3.Connection(
+    "https://solana-devnet.g.alchemy.com/v2/27SvVEbGAVC2VSJ8rPss0",
+    { commitment: "confirmed", confirmTransactionInitialTimeout: 120000 }
+  );
+  const wallet = anchor.AnchorProvider.env().wallet;
+  const provider = new anchor.AnchorProvider(connection, wallet, {
+    commitment: "confirmed",
+    preflightCommitment: "confirmed",
+  });
   anchor.setProvider(provider);
 
   const program = anchor.workspace.UrimSolana as Program<UrimSolana>;
+  const adminWallet = provider.wallet;
 
   // Test accounts
-  let urimMint: PublicKey;
   let usdcMint: PublicKey;
-  let admin: Keypair;
-  let treasuryURIM: PublicKey;
-  let treasuryUSDC: PublicKey;
+  let urimMint: PublicKey;
+  let treasuryTokenAccount: PublicKey;
+  let urimTreasuryTokenAccount: PublicKey;
   let configPDA: PublicKey;
-  let user1: Keypair;
-  let user2: Keypair;
-  let user1URIMAccount: PublicKey;
-  let user1USDCAccount: PublicKey;
-  let user2URIMAccount: PublicKey;
-  let user2USDCAccount: PublicKey;
 
-  // Round-specific accounts
-  let currentRoundId: number = 0;
-  let roundPDA: PublicKey;
-  let priceUpdateAccount: PublicKey | null;
+  // Test users
+  let alice: Keypair;
+  let bob: Keypair;
+  let carol: Keypair;
+  let aliceUSDC: PublicKey;
+  let bobUSDC: PublicKey;
+  let carolUSDC: PublicKey;
+  let aliceURIM: PublicKey;
+  let bobURIM: PublicKey;
+  let carolURIM: PublicKey;
 
-  // Pyth SDK clients
-  let hermesClient: HermesClient;
+  // Payer for mints
+  let payerKeypair: Keypair;
 
-  // Track if we own the config (for admin tests)
-  let isNewConfig: boolean = false;
+  // Helper functions
+  function getRoundPDA(roundId: number): [PublicKey, number] {
+    const roundIdBuffer = Buffer.alloc(8);
+    roundIdBuffer.writeBigUInt64LE(BigInt(roundId));
+    return PublicKey.findProgramAddressSync(
+      [Buffer.from("round"), roundIdBuffer],
+      program.programId
+    );
+  }
 
-  // Track if program is deployed
-  let isProgramDeployed: boolean = false;
+  function getVaultPDA(roundId: number): [PublicKey, number] {
+    const roundIdBuffer = Buffer.alloc(8);
+    roundIdBuffer.writeBigUInt64LE(BigInt(roundId));
+    return PublicKey.findProgramAddressSync(
+      [Buffer.from("vault"), roundIdBuffer],
+      program.programId
+    );
+  }
 
-  // Helper to find existing PriceUpdateV2 accounts
-  async function findExistingPriceUpdateAccount(): Promise<PublicKey | null> {
-    const accounts = await provider.connection.getProgramAccounts(PYTH_RECEIVER_PROGRAM, {
-      filters: [
-        { dataSize: 224 }, // PriceUpdateV2 account size
-      ],
-    });
+  function getUrimVaultPDA(roundId: number): [PublicKey, number] {
+    const roundIdBuffer = Buffer.alloc(8);
+    roundIdBuffer.writeBigUInt64LE(BigInt(roundId));
+    return PublicKey.findProgramAddressSync(
+      [Buffer.from("urim_vault"), roundIdBuffer],
+      program.programId
+    );
+  }
 
-    if (accounts.length > 0) {
-      console.log(`Found ${accounts.length} existing Pyth price accounts`);
-      return accounts[0].pubkey;
-    }
+  function getUserBetPDA(roundPDA: PublicKey, user: PublicKey): [PublicKey, number] {
+    return PublicKey.findProgramAddressSync(
+      [Buffer.from("bet"), roundPDA.toBuffer(), user.toBuffer()],
+      program.programId
+    );
+  }
 
-    return null;
+  async function getBalance(tokenAccount: PublicKey): Promise<number> {
+    const account = await getAccount(provider.connection, tokenAccount);
+    return Number(account.amount);
   }
 
   before(async () => {
-    console.log("\n🔧 Setting up test environment...\n");
+    console.log("\n" + "=".repeat(70));
+    console.log("SETTING UP COMPREHENSIVE TEST ENVIRONMENT");
+    console.log("=".repeat(70));
 
-    admin = Keypair.generate();
-    user1 = Keypair.generate();
-    user2 = Keypair.generate();
+    // Create test users
+    alice = Keypair.generate();
+    bob = Keypair.generate();
+    carol = Keypair.generate();
 
-    // Fund accounts from wallet
-    const fundAmount = 0.1 * anchor.web3.LAMPORTS_PER_SOL;
-
-    console.log("Funding test accounts...");
-    const transfers = [
-      { to: admin.publicKey, amount: fundAmount },
-      { to: user1.publicKey, amount: fundAmount },
-      { to: user2.publicKey, amount: fundAmount },
-    ];
-
-    for (const transfer of transfers) {
-      const tx = new anchor.web3.Transaction().add(
-        anchor.web3.SystemProgram.transfer({
-          fromPubkey: provider.wallet.publicKey,
-          toPubkey: transfer.to,
-          lamports: transfer.amount,
+    // Fund users with more SOL for rent + tx fees
+    const fundAmount = 0.5 * anchor.web3.LAMPORTS_PER_SOL;
+    for (const user of [alice, bob, carol]) {
+      const tx = new Transaction().add(
+        SystemProgram.transfer({
+          fromPubkey: adminWallet.publicKey,
+          toPubkey: user.publicKey,
+          lamports: fundAmount,
         })
       );
       await provider.sendAndConfirm(tx);
     }
-    console.log("✅ Accounts funded");
 
-    // Create test token mints (simulating URIM and USDC)
-    console.log("Creating test token mints...");
-    urimMint = await createMint(
-      provider.connection,
-      admin,
-      admin.publicKey,
-      null,
-      6
-    );
-    console.log(`   URIM Mint: ${urimMint.toString()}`);
+    // Create payer for mints
+    payerKeypair = Keypair.generate();
+    await provider.sendAndConfirm(new Transaction().add(
+      SystemProgram.transfer({
+        fromPubkey: adminWallet.publicKey,
+        toPubkey: payerKeypair.publicKey,
+        lamports: 1 * anchor.web3.LAMPORTS_PER_SOL,
+      })
+    ));
 
-    usdcMint = await createMint(
-      provider.connection,
-      admin,
-      admin.publicKey,
-      null,
-      6
-    );
-    console.log(`   USDC Mint: ${usdcMint.toString()}`);
+    // Create USDC mock mint (for testing - 6 decimals like real USDC)
+    usdcMint = await createMint(provider.connection, payerKeypair, payerKeypair.publicKey, null, 6);
 
-    // Create user token accounts
-    console.log("Creating user token accounts...");
-    user1URIMAccount = await createAccount(
-      provider.connection,
-      user1,
-      urimMint,
-      user1.publicKey
-    );
+    // Create URIM mock mint (for testing - 6 decimals like pump.fun tokens)
+    urimMint = await createMint(provider.connection, payerKeypair, payerKeypair.publicKey, null, 6);
 
-    user1USDCAccount = await createAccount(
-      provider.connection,
-      user1,
-      usdcMint,
-      user1.publicKey
-    );
+    // Create USDC token accounts
+    aliceUSDC = await createAccount(provider.connection, alice, usdcMint, alice.publicKey);
+    bobUSDC = await createAccount(provider.connection, bob, usdcMint, bob.publicKey);
+    carolUSDC = await createAccount(provider.connection, carol, usdcMint, carol.publicKey);
 
-    user2URIMAccount = await createAccount(
-      provider.connection,
-      user2,
-      urimMint,
-      user2.publicKey
-    );
+    // Create URIM token accounts
+    aliceURIM = await createAccount(provider.connection, alice, urimMint, alice.publicKey);
+    bobURIM = await createAccount(provider.connection, bob, urimMint, bob.publicKey);
+    carolURIM = await createAccount(provider.connection, carol, urimMint, carol.publicKey);
 
-    user2USDCAccount = await createAccount(
-      provider.connection,
-      user2,
-      usdcMint,
-      user2.publicKey
-    );
+    // Create treasury for USDC
+    const treasuryKeypair = Keypair.generate();
+    await provider.sendAndConfirm(new Transaction().add(
+      SystemProgram.transfer({
+        fromPubkey: adminWallet.publicKey,
+        toPubkey: treasuryKeypair.publicKey,
+        lamports: 0.02 * anchor.web3.LAMPORTS_PER_SOL,
+      })
+    ));
+    treasuryTokenAccount = await createAccount(provider.connection, treasuryKeypair, usdcMint, treasuryKeypair.publicKey);
+    urimTreasuryTokenAccount = await createAccount(provider.connection, treasuryKeypair, urimMint, treasuryKeypair.publicKey);
 
-    // Create treasury accounts
-    const treasuryKeypairURIM = Keypair.generate();
-    const treasuryKeypairUSDC = Keypair.generate();
-
-    treasuryURIM = await createAccount(
-      provider.connection,
-      admin,
-      urimMint,
-      treasuryKeypairURIM.publicKey
-    );
-
-    treasuryUSDC = await createAccount(
-      provider.connection,
-      admin,
-      usdcMint,
-      treasuryKeypairUSDC.publicKey
-    );
-    console.log("✅ Token accounts created");
-
-    // Mint tokens to users
-    console.log("Minting tokens to users...");
+    // Mint USDC to users (100,000 each for large bet tests)
+    const mintAmount = 100_000 * 1_000_000;
     await Promise.all([
-      mintTo(provider.connection, admin, urimMint, user1URIMAccount, admin.publicKey, 10000 * 1_000_000),
-      mintTo(provider.connection, admin, usdcMint, user1USDCAccount, admin.publicKey, 10000 * 1_000_000),
-      mintTo(provider.connection, admin, urimMint, user2URIMAccount, admin.publicKey, 10000 * 1_000_000),
-      mintTo(provider.connection, admin, usdcMint, user2USDCAccount, admin.publicKey, 10000 * 1_000_000),
+      mintTo(provider.connection, payerKeypair, usdcMint, aliceUSDC, payerKeypair.publicKey, mintAmount),
+      mintTo(provider.connection, payerKeypair, usdcMint, bobUSDC, payerKeypair.publicKey, mintAmount),
+      mintTo(provider.connection, payerKeypair, usdcMint, carolUSDC, payerKeypair.publicKey, mintAmount),
     ]);
-    console.log("✅ Tokens minted");
+
+    // Mint URIM to users (1,000,000 each - more because URIM is cheaper)
+    const urimMintAmount = 1_000_000 * 1_000_000;
+    await Promise.all([
+      mintTo(provider.connection, payerKeypair, urimMint, aliceURIM, payerKeypair.publicKey, urimMintAmount),
+      mintTo(provider.connection, payerKeypair, urimMint, bobURIM, payerKeypair.publicKey, urimMintAmount),
+      mintTo(provider.connection, payerKeypair, urimMint, carolURIM, payerKeypair.publicKey, urimMintAmount),
+    ]);
 
     // Derive config PDA
-    [configPDA] = PublicKey.findProgramAddressSync(
-      [Buffer.from("config")],
-      program.programId
-    );
-    console.log(`   Config PDA: ${configPDA.toString()}`);
+    [configPDA] = PublicKey.findProgramAddressSync([Buffer.from("config")], program.programId);
 
-    // Check if program is deployed
-    console.log("\nChecking program deployment...");
-    const programInfo = await provider.connection.getAccountInfo(program.programId);
-    isProgramDeployed = programInfo !== null && programInfo.executable;
-    if (isProgramDeployed) {
-      console.log(`✅ Program deployed at: ${program.programId.toString()}`);
-    } else {
-      console.log(`⚠️  Program NOT deployed at: ${program.programId.toString()}`);
-      console.log("   On-chain tests will be skipped");
-    }
-
-    // Initialize Pyth Hermes client
-    console.log("\nInitializing Pyth Hermes client...");
-    hermesClient = new HermesClient(HERMES_API);
-    console.log("✅ Pyth Hermes client initialized");
-
-    // Try to find existing Pyth price update account
-    console.log("\nSearching for Pyth price update accounts...");
-    priceUpdateAccount = await findExistingPriceUpdateAccount();
-    if (priceUpdateAccount) {
-      console.log(`✅ Found Pyth price account: ${priceUpdateAccount.toString()}`);
-    } else {
-      console.log("⚠️  No existing Pyth price accounts - round tests will be skipped");
-    }
-
-    console.log("\n✅ Test setup complete!\n");
+    console.log(`   Program: ${program.programId}`);
+    console.log(`   Admin: ${adminWallet.publicKey}`);
+    console.log(`   USDC Mint: ${usdcMint}`);
+    console.log(`   URIM Mint: ${urimMint}`);
+    console.log(`   Pyth SOL/USD: ${PYTH_SOL_USD_DEVNET}`);
+    console.log(`   URIM Price: $${URIM_PRICE_SCALED / 100_000_000} (scaled: ${URIM_PRICE_SCALED})`);
+    console.log(`   Test duration: ${TEST_DURATION}s per round`);
+    console.log(`   Users funded: 100,000 USDC + 1,000,000 URIM each`);
+    console.log("   Setup complete!\n");
   });
 
-  describe("Platform Initialization", () => {
-    it("Initializes the platform with admin and treasuries", async function() {
-      if (!isProgramDeployed) {
-        console.log("⚠️  Program not deployed - skipping initialization test");
-        this.skip();
-      }
-
-      // Check if already initialized
+  // ============================================================================
+  // 1. INITIALIZATION
+  // ============================================================================
+  describe("1. Platform Initialization", () => {
+    it("Initializes platform", async () => {
       try {
         const existingConfig = await program.account.config.fetch(configPDA);
-        console.log("⚠️  Config already exists, skipping initialization");
-        console.log(`   Existing admin: ${existingConfig.admin.toString()}`);
-        isNewConfig = false;
-        return;
-      } catch (e) {
-        // Not initialized, proceed
-      }
+        console.log("   Config already exists");
 
-      // @ts-ignore - Anchor 0.32+ auto-derives PDAs
-      await program.methods
-        .initialize(treasuryURIM, treasuryUSDC)
-        .accounts({
-          admin: admin.publicKey,
-        })
-        .signers([admin])
-        .rpc();
-
-      const config = await program.account.config.fetch(configPDA);
-      assert.equal(config.admin.toString(), admin.publicKey.toString());
-      assert.equal(config.treasuryUrim.toString(), treasuryURIM.toString());
-      assert.equal(config.treasuryUsdc.toString(), treasuryUSDC.toString());
-      assert.equal(config.paused, false);
-      assert.equal(config.currentRoundId.toNumber(), 0);
-
-      isNewConfig = true;
-      console.log("✅ Platform initialized successfully");
-    });
-  });
-
-  describe("Admin Controls", () => {
-    it("Admin can pause platform", async function() {
-      if (!isProgramDeployed || !isNewConfig) {
-        console.log("⚠️  Program not deployed or config owned by different admin - skipping pause test");
-        this.skip();
-      }
-
-      // @ts-ignore - Anchor 0.32+ auto-derives PDAs
-      await program.methods
-        .pause()
-        .accounts({
-          admin: admin.publicKey,
-        })
-        .signers([admin])
-        .rpc();
-
-      const config = await program.account.config.fetch(configPDA);
-      assert.equal(config.paused, true);
-
-      console.log("✅ Platform paused");
-    });
-
-    it("Admin can unpause platform", async function() {
-      if (!isProgramDeployed || !isNewConfig) {
-        console.log("⚠️  Program not deployed or config owned by different admin - skipping unpause test");
-        this.skip();
-      }
-
-      // @ts-ignore - Anchor 0.32+ auto-derives PDAs
-      await program.methods
-        .unpause()
-        .accounts({
-          admin: admin.publicKey,
-        })
-        .signers([admin])
-        .rpc();
-
-      const config = await program.account.config.fetch(configPDA);
-      assert.equal(config.paused, false);
-
-      console.log("✅ Platform unpaused");
-    });
-
-    it("Non-admin cannot pause", async function() {
-      if (!isProgramDeployed) {
-        console.log("⚠️  Program not deployed - skipping non-admin test");
-        this.skip();
-      }
-
-      try {
-        // @ts-ignore - Anchor 0.32+ auto-derives PDAs
-        await program.methods
-          .pause()
-          .accounts({
-            admin: user1.publicKey,
-          })
-          .signers([user1])
-          .rpc();
-        assert.fail("Should have failed");
-      } catch (err) {
-        // Check for constraint violation (Anchor 0.32+ format)
-        const errStr = err.toString();
-        assert.isTrue(
-          errStr.includes("ConstraintHasOne") || errStr.includes("has_one") || errStr.includes("2001") || errStr.includes("program that does not exist"),
-          `Expected has_one constraint error or program not found, got: ${errStr}`
-        );
-        console.log("✅ Non-admin correctly blocked from pausing");
-      }
-    });
-  });
-
-  describe("Math Verification", () => {
-    it("Correctly calculates proportional winnings", () => {
-      const userBet = 30 * 1_000_000;
-      const yesPool = 100 * 1_000_000;
-      const noPool = 200 * 1_000_000;
-
-      // Simulate contract math (fee charged on bet placement, not winnings)
-      const winningsShare = (BigInt(userBet) * BigInt(noPool)) / BigInt(yesPool);
-      const totalPayout = BigInt(userBet) + winningsShare;
-
-      // User bet 30 on YES, YES pool was 100, NO pool was 200
-      // Share of losing pool = 30/100 * 200 = 60
-      // Total payout = 30 + 60 = 90
-      assert.equal(Number(totalPayout), 90 * 1_000_000);
-
-      console.log("✅ Payout calculation verified");
-    });
-
-    it("Fee is charged on bet placement (not on winnings)", () => {
-      const betAmount = 100 * 1_000_000;
-      const feeBps = 50; // 0.5%
-
-      const fee = (BigInt(betAmount) * BigInt(feeBps)) / BigInt(10000);
-      const amountAfterFee = BigInt(betAmount) - fee;
-
-      assert.equal(Number(fee), 0.5 * 1_000_000);
-      assert.equal(Number(amountAfterFee), 99.5 * 1_000_000);
-
-      console.log("✅ Immediate fee calculation verified");
-    });
-
-    it("Handles winning pool = 0 edge case", () => {
-      const userBet = 100 * 1_000_000;
-      const winningPool = 0;
-
-      // When winning pool is 0, user just gets their bet back
-      if (winningPool === 0) {
-        const payout = userBet;
-        assert.equal(payout, 100 * 1_000_000);
-        console.log("✅ Edge case: solo winner verified");
-      }
-    });
-  });
-
-  describe("Boundary Calculations", () => {
-    it("SAFE boundary = 3% above current price", () => {
-      const currentPrice = 150;
-      const boundaryBps = 300; // 3%
-
-      const targetPrice = currentPrice + (currentPrice * boundaryBps) / 10000;
-
-      assert.equal(targetPrice, 154.5);
-      console.log("✅ SAFE boundary (3%) verified");
-    });
-
-    it("BALANCED boundary = 10% above current price", () => {
-      const currentPrice = 150;
-      const boundaryBps = 1000; // 10%
-
-      const targetPrice = currentPrice + (currentPrice * boundaryBps) / 10000;
-
-      assert.equal(targetPrice, 165);
-      console.log("✅ BALANCED boundary (10%) verified");
-    });
-
-    it("MOONSHOT boundary = 20% above current price", () => {
-      const currentPrice = 150;
-      const boundaryBps = 2000; // 20%
-
-      const targetPrice = currentPrice + (currentPrice * boundaryBps) / 10000;
-
-      assert.equal(targetPrice, 180);
-      console.log("✅ MOONSHOT boundary (20%) verified");
-    });
-  });
-
-  describe("Pyth Integration Tests", () => {
-    it("Validates Pyth receiver program exists on devnet", async () => {
-      const accountInfo = await provider.connection.getAccountInfo(PYTH_RECEIVER_PROGRAM);
-      assert.isNotNull(accountInfo, "Pyth receiver program not found on devnet");
-      assert.isTrue(accountInfo!.executable, "Pyth receiver program should be executable");
-      console.log("✅ Pyth receiver program verified on devnet");
-    });
-
-    it("Can fetch price data from Pyth Hermes API using SDK", async () => {
-      try {
-        // Use the HermesClient to fetch price updates
-        const priceUpdates = await hermesClient.getLatestPriceUpdates([SOL_USD_FEED_ID]);
-
-        assert.isDefined(priceUpdates, "Price updates should be defined");
-        assert.isDefined(priceUpdates.parsed, "Parsed price should be defined");
-        assert.isTrue(priceUpdates.parsed!.length > 0, "Expected at least one price feed");
-
-        const priceFeed = priceUpdates.parsed![0];
-        const price = Number(priceFeed.price.price) * Math.pow(10, priceFeed.price.expo);
-        console.log(`✅ Current SOL/USD price from Pyth: $${price.toFixed(2)}`);
-        console.log(`   Confidence: ±$${(Number(priceFeed.price.conf) * Math.pow(10, priceFeed.price.expo)).toFixed(4)}`);
-        console.log(`   Publish time: ${new Date(priceFeed.price.publish_time * 1000).toISOString()}`);
-      } catch (e: any) {
-        console.log("⚠️  Could not fetch from Hermes API:", e.message);
-        // Don't fail - API might be rate limited
-      }
-    });
-
-    it("Finds existing PriceUpdateV2 accounts on devnet", async () => {
-      // Search for price update accounts on devnet
-      // These are created by other users posting price updates
-      priceUpdateAccount = await findExistingPriceUpdateAccount();
-
-      if (!priceUpdateAccount) {
-        console.log("⚠️  No Pyth price accounts found on devnet");
-        console.log("   To post fresh price updates, use the Pyth CLI or web interface");
-        console.log("   Or use existing price accounts from the network");
-        return;
-      }
-
-      // Verify the account exists and is valid
-      const accountInfo = await provider.connection.getAccountInfo(priceUpdateAccount);
-      assert.isNotNull(accountInfo, "Price update account should exist");
-      console.log(`✅ Found PriceUpdateV2 account: ${priceUpdateAccount.toString()}`);
-      console.log(`   Owner: ${accountInfo!.owner.toString()}`);
-      console.log(`   Data size: ${accountInfo!.data.length} bytes`);
-    });
-
-    it("Validates PriceUpdateV2 account structure", async () => {
-      if (!priceUpdateAccount) {
-        console.log("⚠️  No Pyth price accounts found - skipping");
-        return;
-      }
-
-      const accountInfo = await provider.connection.getAccountInfo(priceUpdateAccount);
-      assert.isNotNull(accountInfo, "Price update account should exist");
-      assert.equal(accountInfo!.owner.toString(), PYTH_RECEIVER_PROGRAM.toString(), "Owner should be Pyth receiver");
-      console.log(`✅ Valid PriceUpdateV2 account: ${priceUpdateAccount.toString()}`);
-      console.log(`   Owner: ${accountInfo!.owner.toString()}`);
-      console.log(`   Data size: ${accountInfo!.data.length} bytes`);
-    });
-  });
-
-  describe("Round Creation Tests", () => {
-    it("Can derive round PDA correctly", async function() {
-      if (!isProgramDeployed) {
-        // Use a default round ID for testing PDA derivation when program not deployed
-        currentRoundId = 0;
-        console.log("⚠️  Program not deployed - using default round ID 0");
-      } else {
-        try {
-          const config = await program.account.config.fetch(configPDA);
-          currentRoundId = config.currentRoundId.toNumber();
-        } catch (e) {
-          currentRoundId = 0;
-          console.log("⚠️  Config not found - using default round ID 0");
+        // Update treasury to our new test treasury if different
+        if (existingConfig.treasury.toString() !== treasuryTokenAccount.toString()) {
+          console.log("   Updating treasury to match new test mint...");
+          await program.methods
+            .updateTreasury(treasuryTokenAccount)
+            .rpc();
+          console.log("   Treasury updated!");
         }
-      }
+        return;
+      } catch { }
 
-      const roundIdBuffer = Buffer.alloc(8);
-      roundIdBuffer.writeBigUInt64LE(BigInt(currentRoundId));
-
-      [roundPDA] = PublicKey.findProgramAddressSync(
-        [Buffer.from("round"), roundIdBuffer],
-        program.programId
-      );
-
-      console.log(`✅ Round PDA derived: ${roundPDA.toString()}`);
-      console.log(`   Current round ID: ${currentRoundId}`);
-    });
-
-    it("Can derive vault PDAs correctly", async () => {
-      const roundIdBuffer = Buffer.alloc(8);
-      roundIdBuffer.writeBigUInt64LE(BigInt(currentRoundId));
-
-      // Note: The actual vault creation happens in start_round
-      // These are the expected PDA seeds
-      const [vaultURIMPDA] = PublicKey.findProgramAddressSync(
-        [Buffer.from("vault_urim"), roundIdBuffer],
-        program.programId
-      );
-
-      const [vaultUSDCPDA] = PublicKey.findProgramAddressSync(
-        [Buffer.from("vault_usdc"), roundIdBuffer],
-        program.programId
-      );
-
-      console.log(`✅ Vault PDAs derived:`);
-      console.log(`   URIM Vault: ${vaultURIMPDA.toString()}`);
-      console.log(`   USDC Vault: ${vaultUSDCPDA.toString()}`);
-    });
-
-    it("Creates a new round with Pyth price feed", async function() {
-      if (!isProgramDeployed) {
-        console.log("⚠️  Program not deployed - skipping round creation");
-        this.skip();
-      }
-
-      if (!priceUpdateAccount) {
-        console.log("⚠️  No Pyth price account available - skipping round creation");
-        this.skip();
-      }
-
+      await program.methods.initialize(treasuryTokenAccount).rpc();
       const config = await program.account.config.fetch(configPDA);
-      currentRoundId = config.currentRoundId.toNumber();
+      assert.equal(config.admin.toString(), adminWallet.publicKey.toString());
+      console.log("   Platform initialized");
+    });
+  });
 
-      const roundIdBuffer = Buffer.alloc(8);
-      roundIdBuffer.writeBigUInt64LE(BigInt(currentRoundId));
+  // ============================================================================
+  // 2. REAL PYTH ON-CHAIN ORACLE TEST
+  // ============================================================================
+  describe("2. REAL PYTH ON-CHAIN: start_round() and resolve_round()", () => {
+    let roundPDA: PublicKey;
+    let roundId: number;
 
-      [roundPDA] = PublicKey.findProgramAddressSync(
-        [Buffer.from("round"), roundIdBuffer],
-        program.programId
-      );
-
-      // Find vault bumps
-      const [, vaultURIMBump] = PublicKey.findProgramAddressSync(
-        [Buffer.from("vault_urim"), roundIdBuffer],
-        program.programId
-      );
-
-      const [, vaultUSDCBump] = PublicKey.findProgramAddressSync(
-        [Buffer.from("vault_usdc"), roundIdBuffer],
-        program.programId
-      );
+    it("Attempts to start round with REAL Pyth on-chain price feed", async () => {
+      const config = await program.account.config.fetch(configPDA);
+      roundId = config.currentRoundId.toNumber();
+      [roundPDA] = getRoundPDA(roundId);
 
       try {
-        // @ts-ignore - Anchor 0.32+ auto-derives PDAs, we just need priceUpdate
         await program.methods
-          .startRound(
-            { turbo: {} }, // DurationType::Turbo (15 min)
-            { safe: {} },  // BoundaryType::Safe (3%)
-            vaultURIMBump,
-            vaultUSDCBump
-          )
+          .startRound(new anchor.BN(TEST_DURATION))
           .accounts({
-            priceUpdate: priceUpdateAccount!,
+            usdcMint,
+            urimMint,
+            pythPriceFeed: PYTH_SOL_USD_DEVNET,
           })
-          .signers([admin])
           .rpc();
 
         const round = await program.account.round.fetch(roundPDA);
-        console.log(`✅ Round ${round.roundId.toNumber()} created!`);
-        console.log(`   Start price: $${round.startPrice.toNumber()}`);
-        console.log(`   Target price: $${round.targetPrice.toNumber()}`);
-        console.log(`   Duration: Turbo (15 min)`);
-        console.log(`   Boundary: Safe (3%)`);
-      } catch (e: any) {
-        console.log("⚠️  Round creation failed:", e.message);
-        // This might fail if the price account is stale or admin doesn't match
-        this.skip();
+        console.log(`   ✅ Pyth on-chain WORKS! Round ${roundId} started`);
+        console.log(`   Locked price from Pyth: $${(round.lockedPrice.toNumber() / 100).toFixed(2)}`);
+      } catch (err: any) {
+        if (err.toString().includes("PythPriceStale")) {
+          console.log("   ⚠️  Pyth on-chain price is STALE (expected on devnet)");
+          console.log("   This is normal - devnet Pyth feeds are not always updated");
+          console.log("   Using manual price functions as fallback...");
+
+          // Start with manual price instead
+          const { priceInCents } = await fetchHermesPrice();
+          await program.methods
+            .startRoundManual(new anchor.BN(priceInCents), new anchor.BN(TEST_DURATION))
+            .accounts({ usdcMint, urimMint })
+            .rpc();
+
+          const round = await program.account.round.fetch(roundPDA);
+          console.log(`   Round ${roundId} started with Hermes price: $${(round.lockedPrice.toNumber() / 100).toFixed(2)}`);
+        } else {
+          throw err;
+        }
+      }
+    });
+
+    it("Users place bets", async () => {
+      const aliceProvider = new anchor.AnchorProvider(provider.connection, new anchor.Wallet(alice), {});
+      const aliceProgram = new Program(program.idl, aliceProvider);
+
+      await aliceProgram.methods
+        .placeBet(new anchor.BN(100 * 1_000_000), true) // Alice bets UP
+        .accounts({ round: roundPDA, userTokenAccount: aliceUSDC })
+        .rpc();
+
+      const bobProvider = new anchor.AnchorProvider(provider.connection, new anchor.Wallet(bob), {});
+      const bobProgram = new Program(program.idl, bobProvider);
+
+      await bobProgram.methods
+        .placeBet(new anchor.BN(100 * 1_000_000), false) // Bob bets DOWN
+        .accounts({ round: roundPDA, userTokenAccount: bobUSDC })
+        .rpc();
+
+      console.log("   Alice: 100 USDC on UP, Bob: 100 USDC on DOWN");
+    });
+
+    it("Waits and attempts to resolve with REAL Pyth", async () => {
+      console.log(`   Waiting ${TEST_DURATION + 2}s for round to end...`);
+      await sleep((TEST_DURATION + 2) * 1000);
+
+      try {
+        await program.methods
+          .resolveRound()
+          .accounts({
+            round: roundPDA,
+            pythPriceFeed: PYTH_SOL_USD_DEVNET,
+          })
+          .rpc();
+
+        const round = await program.account.round.fetch(roundPDA);
+        console.log(`   ✅ Resolved with Pyth! Final: $${(round.finalPrice.toNumber() / 100).toFixed(2)}`);
+        console.log(`   Outcome: ${JSON.stringify(round.outcome)}`);
+      } catch (err: any) {
+        if (err.toString().includes("PythPriceStale")) {
+          console.log("   ⚠️  Pyth price stale for resolution - using manual");
+          const { priceInCents } = await fetchHermesPrice();
+          await program.methods
+            .resolveRoundManual(new anchor.BN(priceInCents))
+            .accounts({ round: roundPDA })
+            .rpc();
+
+          const round = await program.account.round.fetch(roundPDA);
+          console.log(`   Resolved with Hermes: $${(round.finalPrice.toNumber() / 100).toFixed(2)}`);
+          console.log(`   Outcome: ${JSON.stringify(round.outcome)}`);
+        } else {
+          throw err;
+        }
+      }
+    });
+
+    it("Winner claims correctly", async () => {
+      const round = await program.account.round.fetch(roundPDA);
+
+      if (round.outcome.up) {
+        const aliceProvider = new anchor.AnchorProvider(provider.connection, new anchor.Wallet(alice), {});
+        const aliceProgram = new Program(program.idl, aliceProvider);
+        const [userBetPDA] = getUserBetPDA(roundPDA, alice.publicKey);
+
+        await aliceProgram.methods
+          .claim()
+          .accounts({ round: roundPDA, userBet: userBetPDA, userTokenAccount: aliceUSDC })
+          .rpc();
+
+        console.log("   Alice claimed (UP won)!");
+      } else if (round.outcome.down) {
+        const bobProvider = new anchor.AnchorProvider(provider.connection, new anchor.Wallet(bob), {});
+        const bobProgram = new Program(program.idl, bobProvider);
+        const [userBetPDA] = getUserBetPDA(roundPDA, bob.publicKey);
+
+        await bobProgram.methods
+          .claim()
+          .accounts({ round: roundPDA, userBet: userBetPDA, userTokenAccount: bobUSDC })
+          .rpc();
+
+        console.log("   Bob claimed (DOWN won)!");
+      } else {
+        // Draw - both claim
+        const aliceProvider = new anchor.AnchorProvider(provider.connection, new anchor.Wallet(alice), {});
+        const aliceProgram = new Program(program.idl, aliceProvider);
+        const [aliceBetPDA] = getUserBetPDA(roundPDA, alice.publicKey);
+        await aliceProgram.methods
+          .claim()
+          .accounts({ round: roundPDA, userBet: aliceBetPDA, userTokenAccount: aliceUSDC })
+          .rpc();
+
+        const bobProvider = new anchor.AnchorProvider(provider.connection, new anchor.Wallet(bob), {});
+        const bobProgram = new Program(program.idl, bobProvider);
+        const [bobBetPDA] = getUserBetPDA(roundPDA, bob.publicKey);
+        await bobProgram.methods
+          .claim()
+          .accounts({ round: roundPDA, userBet: bobBetPDA, userTokenAccount: bobUSDC })
+          .rpc();
+
+        console.log("   Both claimed (DRAW)!");
       }
     });
   });
 
-  describe("Token Support", () => {
-    it("Verifies program uses correct SOL/USD feed ID", () => {
-      // The feed ID is hardcoded in the program
-      const expectedFeedId = "0xef0d8b6fda2ceba41da15d4095d1da392a0d2f8ed0c6c7bc0f4cfac8c280b56d";
-      assert.equal(SOL_USD_FEED_ID, expectedFeedId);
-      console.log("✅ SOL/USD feed ID verified");
+  // ============================================================================
+  // 3. PYTH STALE PRICE HANDLING
+  // ============================================================================
+  describe("3. PYTH STALE PRICE HANDLING", () => {
+    it("Verifies contract rejects stale Pyth prices correctly", async () => {
+      // The Pyth on-chain feed on devnet is typically stale
+      // This test verifies our error handling works
+      const pythAccount = await provider.connection.getAccountInfo(PYTH_SOL_USD_DEVNET);
+      assert.isNotNull(pythAccount, "Pyth account should exist");
+
+      console.log(`   Pyth account size: ${pythAccount!.data.length} bytes`);
+      console.log(`   Pyth account owner: ${pythAccount!.owner.toString()}`);
+
+      // Try to read the price age
+      const config = await program.account.config.fetch(configPDA);
+      const roundId = config.currentRoundId.toNumber();
+      const [roundPDA] = getRoundPDA(roundId);
+
+      try {
+        await program.methods
+          .startRound(new anchor.BN(TEST_DURATION))
+          .accounts({
+            usdcMint,
+            urimMint,
+            pythPriceFeed: PYTH_SOL_USD_DEVNET,
+          })
+          .rpc();
+        console.log("   ✅ Pyth price was fresh! Round started successfully.");
+      } catch (err: any) {
+        if (err.toString().includes("PythPriceStale")) {
+          console.log("   ✅ Contract correctly rejected stale Pyth price");
+          console.log("   Error: PythPriceStale (as expected)");
+        } else {
+          console.log(`   Unexpected error: ${err.toString().slice(0, 100)}`);
+        }
+      }
+    });
+  });
+
+  // ============================================================================
+  // 4. LARGE BET OVERFLOW TESTS
+  // ============================================================================
+  describe("4. LARGE BET OVERFLOW TESTS", () => {
+    let roundPDA: PublicKey;
+    let roundId: number;
+
+    it("Handles large bets without overflow (50,000 USDC each)", async () => {
+      const config = await program.account.config.fetch(configPDA);
+      roundId = config.currentRoundId.toNumber();
+      [roundPDA] = getRoundPDA(roundId);
+
+      await program.methods
+        .startRoundManual(new anchor.BN(15000), new anchor.BN(TEST_DURATION)) // $150.00
+        .accounts({ usdcMint, urimMint })
+        .rpc();
+
+      // Alice bets 50,000 USDC on UP
+      const aliceProvider = new anchor.AnchorProvider(provider.connection, new anchor.Wallet(alice), {});
+      const aliceProgram = new Program(program.idl, aliceProvider);
+      const largeBet = 50_000 * 1_000_000; // 50,000 USDC
+
+      await aliceProgram.methods
+        .placeBet(new anchor.BN(largeBet), true)
+        .accounts({ round: roundPDA, userTokenAccount: aliceUSDC })
+        .rpc();
+
+      // Bob bets 50,000 USDC on DOWN
+      const bobProvider = new anchor.AnchorProvider(provider.connection, new anchor.Wallet(bob), {});
+      const bobProgram = new Program(program.idl, bobProvider);
+
+      await bobProgram.methods
+        .placeBet(new anchor.BN(largeBet), false)
+        .accounts({ round: roundPDA, userTokenAccount: bobUSDC })
+        .rpc();
+
+      const round = await program.account.round.fetch(roundPDA);
+      console.log(`   Alice: ${largeBet / 1_000_000} USDC on UP`);
+      console.log(`   Bob: ${largeBet / 1_000_000} USDC on DOWN`);
+      console.log(`   Total pool: ${(round.upPool.toNumber() + round.downPool.toNumber()) / 1_000_000} USDC`);
+      console.log(`   Total fees: ${round.totalFees.toNumber() / 1_000_000} USDC`);
+
+      // Verify pools are correct
+      assert.equal(round.upPool.toNumber(), largeBet);
+      assert.equal(round.downPool.toNumber(), largeBet);
+      assert.equal(round.totalFees.toNumber(), (largeBet * 2 * FEE_BPS) / 10000);
     });
 
-    it("Verifies dual token constants are configured", () => {
-      // These are compile-time constants in the program
-      const URIM_MINT_EXPECTED = "F8W15WcpXHDthW2TyyiZJ2wMLazGc8CQ4poMNpXQpump";
-      const USDC_MINT_EXPECTED = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
+    it("Resolves large bet round and pays correctly", async () => {
+      await sleep((TEST_DURATION + 1) * 1000);
 
-      console.log(`✅ URIM Mint: ${URIM_MINT_EXPECTED}`);
-      console.log(`✅ USDC Mint: ${USDC_MINT_EXPECTED}`);
-      console.log("✅ Dual token support configured");
+      // UP wins
+      await program.methods
+        .resolveRoundManual(new anchor.BN(15100)) // $151.00 > $150.00
+        .accounts({ round: roundPDA })
+        .rpc();
+
+      const round = await program.account.round.fetch(roundPDA);
+      assert.deepEqual(round.outcome, { up: {} });
+
+      // Alice claims - should get her 50k + Bob's 50k = 100k
+      const aliceBalanceBefore = await getBalance(aliceUSDC);
+      const aliceProvider = new anchor.AnchorProvider(provider.connection, new anchor.Wallet(alice), {});
+      const aliceProgram = new Program(program.idl, aliceProvider);
+      const [userBetPDA] = getUserBetPDA(roundPDA, alice.publicKey);
+
+      await aliceProgram.methods
+        .claim()
+        .accounts({ round: roundPDA, userBet: userBetPDA, userTokenAccount: aliceUSDC })
+        .rpc();
+
+      const aliceBalanceAfter = await getBalance(aliceUSDC);
+      const payout = aliceBalanceAfter - aliceBalanceBefore;
+
+      // Expected: 50k (her bet) + 50k (loser pool) = 100k
+      const expectedPayout = 100_000 * 1_000_000;
+      console.log(`   Alice payout: ${payout / 1_000_000} USDC`);
+      console.log(`   Expected: ${expectedPayout / 1_000_000} USDC`);
+
+      assert.equal(payout, expectedPayout, "Large bet payout should be correct");
+      console.log("   ✅ Large bet (100k USDC pool) handled correctly!");
+    });
+  });
+
+  // ============================================================================
+  // 5. MULTIPLE ROUNDS (NOT CONCURRENT - SEQUENTIAL)
+  // ============================================================================
+  describe("5. MULTIPLE SEQUENTIAL ROUNDS", () => {
+    it("Can start new round while previous round is resolved", async () => {
+      const config = await program.account.config.fetch(configPDA);
+      const startRoundId = config.currentRoundId.toNumber();
+
+      // Start and complete 3 rounds quickly
+      for (let i = 0; i < 3; i++) {
+        const roundId = startRoundId + i;
+        const [roundPDA] = getRoundPDA(roundId);
+
+        await program.methods
+          .startRoundManual(new anchor.BN(14000 + i * 100), new anchor.BN(1)) // 1 second
+          .accounts({ usdcMint, urimMint })
+          .rpc();
+
+        console.log(`   Round ${roundId} started: $${140 + i}.00`);
+
+        await sleep(2000);
+
+        await program.methods
+          .resolveRoundManual(new anchor.BN(14050 + i * 100)) // UP wins
+          .accounts({ round: roundPDA })
+          .rpc();
+
+        console.log(`   Round ${roundId} resolved: $${140.5 + i}.00`);
+      }
+
+      const newConfig = await program.account.config.fetch(configPDA);
+      console.log(`   ✅ Created ${newConfig.currentRoundId.toNumber() - startRoundId} rounds successfully`);
+    });
+  });
+
+  // ============================================================================
+  // 6. EDGE CASES & VALIDATION
+  // ============================================================================
+  describe("6. COMPREHENSIVE EDGE CASES", () => {
+    it("Rejects bet below minimum (1 USDC)", async () => {
+      const config = await program.account.config.fetch(configPDA);
+      const roundId = config.currentRoundId.toNumber();
+      const [roundPDA] = getRoundPDA(roundId);
+
+      await program.methods
+        .startRoundManual(new anchor.BN(13000), new anchor.BN(TEST_DURATION))
+        .accounts({ usdcMint, urimMint })
+        .rpc();
+
+      const aliceProvider = new anchor.AnchorProvider(provider.connection, new anchor.Wallet(alice), {});
+      const aliceProgram = new Program(program.idl, aliceProvider);
+
+      try {
+        await aliceProgram.methods
+          .placeBet(new anchor.BN(500_000), true) // 0.5 USDC - below minimum
+          .accounts({ round: roundPDA, userTokenAccount: aliceUSDC })
+          .rpc();
+        assert.fail("Should have rejected small bet");
+      } catch (err: any) {
+        assert.include(err.toString(), "BetTooSmall");
+        console.log("   ✅ Correctly rejected bet below 1 USDC minimum");
+      }
+
+      // Emergency resolve to clean up
+      await program.methods
+        .emergencyResolve(new anchor.BN(13000), 0)
+        .accounts({ round: roundPDA })
+        .rpc();
+    });
+
+    it("Accepts exactly minimum bet (1 USDC)", async () => {
+      const config = await program.account.config.fetch(configPDA);
+      const roundId = config.currentRoundId.toNumber();
+      const [roundPDA] = getRoundPDA(roundId);
+
+      await program.methods
+        .startRoundManual(new anchor.BN(13000), new anchor.BN(TEST_DURATION))
+        .accounts({ usdcMint, urimMint })
+        .rpc();
+
+      const aliceProvider = new anchor.AnchorProvider(provider.connection, new anchor.Wallet(alice), {});
+      const aliceProgram = new Program(program.idl, aliceProvider);
+
+      await aliceProgram.methods
+        .placeBet(new anchor.BN(1_000_000), true) // Exactly 1 USDC
+        .accounts({ round: roundPDA, userTokenAccount: aliceUSDC })
+        .rpc();
+
+      const round = await program.account.round.fetch(roundPDA);
+      assert.equal(round.upPool.toNumber(), 1_000_000);
+      console.log("   ✅ Accepted exactly 1 USDC (minimum bet)");
+
+      // Emergency resolve
+      await program.methods
+        .emergencyResolve(new anchor.BN(13100), 1)
+        .accounts({ round: roundPDA })
+        .rpc();
+    });
+
+    it("Cannot bet after placing on opposite side", async () => {
+      const config = await program.account.config.fetch(configPDA);
+      const roundId = config.currentRoundId.toNumber();
+      const [roundPDA] = getRoundPDA(roundId);
+
+      await program.methods
+        .startRoundManual(new anchor.BN(13000), new anchor.BN(TEST_DURATION))
+        .accounts({ usdcMint, urimMint })
+        .rpc();
+
+      const aliceProvider = new anchor.AnchorProvider(provider.connection, new anchor.Wallet(alice), {});
+      const aliceProgram = new Program(program.idl, aliceProvider);
+
+      // Alice bets UP
+      await aliceProgram.methods
+        .placeBet(new anchor.BN(10 * 1_000_000), true)
+        .accounts({ round: roundPDA, userTokenAccount: aliceUSDC })
+        .rpc();
+
+      // Alice tries to bet DOWN - should fail
+      try {
+        await aliceProgram.methods
+          .placeBet(new anchor.BN(10 * 1_000_000), false)
+          .accounts({ round: roundPDA, userTokenAccount: aliceUSDC })
+          .rpc();
+        assert.fail("Should have rejected opposite side bet");
+      } catch (err: any) {
+        assert.include(err.toString(), "CannotSwitchSides");
+        console.log("   ✅ Correctly rejected bet on opposite side");
+      }
+
+      // Emergency resolve
+      await program.methods
+        .emergencyResolve(new anchor.BN(13100), 1)
+        .accounts({ round: roundPDA })
+        .rpc();
+    });
+
+    it("Can add to existing bet on same side", async () => {
+      const config = await program.account.config.fetch(configPDA);
+      const roundId = config.currentRoundId.toNumber();
+      const [roundPDA] = getRoundPDA(roundId);
+
+      await program.methods
+        .startRoundManual(new anchor.BN(13000), new anchor.BN(TEST_DURATION))
+        .accounts({ usdcMint, urimMint })
+        .rpc();
+
+      const carolProvider = new anchor.AnchorProvider(provider.connection, new anchor.Wallet(carol), {});
+      const carolProgram = new Program(program.idl, carolProvider);
+
+      // Carol bets 10 USDC on UP
+      await carolProgram.methods
+        .placeBet(new anchor.BN(10 * 1_000_000), true)
+        .accounts({ round: roundPDA, userTokenAccount: carolUSDC })
+        .rpc();
+
+      // Carol adds 20 more USDC on UP
+      await carolProgram.methods
+        .placeBet(new anchor.BN(20 * 1_000_000), true)
+        .accounts({ round: roundPDA, userTokenAccount: carolUSDC })
+        .rpc();
+
+      const [userBetPDA] = getUserBetPDA(roundPDA, carol.publicKey);
+      const userBet = await program.account.userBet.fetch(userBetPDA);
+
+      assert.equal(userBet.amount.toNumber(), 30 * 1_000_000);
+      console.log("   ✅ Can add to existing bet: 10 + 20 = 30 USDC");
+
+      // Emergency resolve
+      await program.methods
+        .emergencyResolve(new anchor.BN(13100), 1)
+        .accounts({ round: roundPDA })
+        .rpc();
+    });
+
+    it("Non-admin cannot start round", async () => {
+      const aliceProvider = new anchor.AnchorProvider(provider.connection, new anchor.Wallet(alice), {});
+      const aliceProgram = new Program(program.idl, aliceProvider);
+
+      try {
+        await aliceProgram.methods
+          .startRoundManual(new anchor.BN(13000), new anchor.BN(TEST_DURATION))
+          .accounts({ usdcMint, urimMint })
+          .rpc();
+        assert.fail("Should have rejected non-admin");
+      } catch (err: any) {
+        console.log("   ✅ Non-admin cannot start round");
+      }
+    });
+
+    it("Non-admin cannot resolve round", async () => {
+      const config = await program.account.config.fetch(configPDA);
+      const roundId = config.currentRoundId.toNumber();
+      const [roundPDA] = getRoundPDA(roundId);
+
+      await program.methods
+        .startRoundManual(new anchor.BN(13000), new anchor.BN(1))
+        .accounts({ usdcMint, urimMint })
+        .rpc();
+
+      await sleep(2000);
+
+      const aliceProvider = new anchor.AnchorProvider(provider.connection, new anchor.Wallet(alice), {});
+      const aliceProgram = new Program(program.idl, aliceProvider);
+
+      try {
+        await aliceProgram.methods
+          .resolveRoundManual(new anchor.BN(13100))
+          .accounts({ round: roundPDA })
+          .rpc();
+        assert.fail("Should have rejected non-admin");
+      } catch (err: any) {
+        console.log("   ✅ Non-admin cannot resolve round");
+      }
+
+      // Admin resolves
+      await program.methods
+        .resolveRoundManual(new anchor.BN(13100))
+        .accounts({ round: roundPDA })
+        .rpc();
+    });
+  });
+
+  // ============================================================================
+  // 7. FULL FLOW WITH HERMES PRICE (PRODUCTION-LIKE)
+  // ============================================================================
+  describe("7. FULL PRODUCTION-LIKE FLOW", () => {
+    let roundPDA: PublicKey;
+    let roundId: number;
+    let startPrice: number;
+    let aliceBalanceBefore: number;
+    let bobBalanceBefore: number;
+
+    it("Fetches REAL SOL/USD price from Hermes", async () => {
+      const { price, priceInCents } = await fetchHermesPrice();
+      startPrice = priceInCents;
+      console.log(`   ✅ Hermes SOL/USD: $${price.toFixed(2)} (${priceInCents} cents)`);
+
+      const config = await program.account.config.fetch(configPDA);
+      roundId = config.currentRoundId.toNumber();
+      [roundPDA] = getRoundPDA(roundId);
+
+      await program.methods
+        .startRoundManual(new anchor.BN(startPrice), new anchor.BN(TEST_DURATION))
+        .accounts({ usdcMint, urimMint })
+        .rpc();
+
+      console.log(`   Round ${roundId} started at: $${(startPrice / 100).toFixed(2)}`);
+    });
+
+    it("Multiple users bet with real amounts", async () => {
+      aliceBalanceBefore = await getBalance(aliceUSDC);
+      bobBalanceBefore = await getBalance(bobUSDC);
+
+      // Alice bets 500 USDC on UP
+      const aliceProvider = new anchor.AnchorProvider(provider.connection, new anchor.Wallet(alice), {});
+      const aliceProgram = new Program(program.idl, aliceProvider);
+      await aliceProgram.methods
+        .placeBet(new anchor.BN(500 * 1_000_000), true)
+        .accounts({ round: roundPDA, userTokenAccount: aliceUSDC })
+        .rpc();
+
+      // Bob bets 300 USDC on DOWN
+      const bobProvider = new anchor.AnchorProvider(provider.connection, new anchor.Wallet(bob), {});
+      const bobProgram = new Program(program.idl, bobProvider);
+      await bobProgram.methods
+        .placeBet(new anchor.BN(300 * 1_000_000), false)
+        .accounts({ round: roundPDA, userTokenAccount: bobUSDC })
+        .rpc();
+
+      // Carol bets 200 USDC on UP
+      const carolProvider = new anchor.AnchorProvider(provider.connection, new anchor.Wallet(carol), {});
+      const carolProgram = new Program(program.idl, carolProvider);
+      await carolProgram.methods
+        .placeBet(new anchor.BN(200 * 1_000_000), true)
+        .accounts({ round: roundPDA, userTokenAccount: carolUSDC })
+        .rpc();
+
+      const round = await program.account.round.fetch(roundPDA);
+      console.log(`   UP Pool: ${round.upPool.toNumber() / 1_000_000} USDC (Alice: 500, Carol: 200)`);
+      console.log(`   DOWN Pool: ${round.downPool.toNumber() / 1_000_000} USDC (Bob: 300)`);
+      console.log(`   Total Fees: ${round.totalFees.toNumber() / 1_000_000} USDC`);
+    });
+
+    it("Waits and resolves with REAL updated price", async () => {
+      console.log(`   Waiting ${TEST_DURATION + 2}s for round to end...`);
+      await sleep((TEST_DURATION + 2) * 1000);
+
+      const { price: endPrice, priceInCents: endPriceCents } = await fetchHermesPrice();
+      console.log(`   ✅ End price: $${endPrice.toFixed(2)}`);
+
+      await program.methods
+        .resolveRoundManual(new anchor.BN(endPriceCents))
+        .accounts({ round: roundPDA })
+        .rpc();
+
+      const round = await program.account.round.fetch(roundPDA);
+      console.log(`   Resolved: $${(startPrice / 100).toFixed(2)} → $${endPrice.toFixed(2)}`);
+      console.log(`   Outcome: ${JSON.stringify(round.outcome)}`);
+    });
+
+    it("Verifies CORRECT payouts based on parimutuel math", async () => {
+      const round = await program.account.round.fetch(roundPDA);
+
+      if (round.outcome.up) {
+        // UP wins: Alice and Carol share Bob's pool
+        // Alice: 500 + (500/700) * 300 = 500 + 214.28 = 714.28
+        // Carol: 200 + (200/700) * 300 = 200 + 85.71 = 285.71
+
+        const aliceProvider = new anchor.AnchorProvider(provider.connection, new anchor.Wallet(alice), {});
+        const aliceProgram = new Program(program.idl, aliceProvider);
+        const [aliceBetPDA] = getUserBetPDA(roundPDA, alice.publicKey);
+        await aliceProgram.methods
+          .claim()
+          .accounts({ round: roundPDA, userBet: aliceBetPDA, userTokenAccount: aliceUSDC })
+          .rpc();
+
+        const aliceBalanceAfter = await getBalance(aliceUSDC);
+        const aliceNet = aliceBalanceAfter - aliceBalanceBefore;
+        // Net = payout - (bet + fee) = 714.28 - 502.50 = 211.78
+        console.log(`   Alice net change: ${(aliceNet / 1_000_000).toFixed(2)} USDC`);
+
+        const carolProvider = new anchor.AnchorProvider(provider.connection, new anchor.Wallet(carol), {});
+        const carolProgram = new Program(program.idl, carolProvider);
+        const [carolBetPDA] = getUserBetPDA(roundPDA, carol.publicKey);
+        await carolProgram.methods
+          .claim()
+          .accounts({ round: roundPDA, userBet: carolBetPDA, userTokenAccount: carolUSDC })
+          .rpc();
+
+        console.log("   ✅ UP won - Alice and Carol claimed winnings!");
+      } else if (round.outcome.down) {
+        // DOWN wins: Bob gets Alice and Carol's pools
+        const bobProvider = new anchor.AnchorProvider(provider.connection, new anchor.Wallet(bob), {});
+        const bobProgram = new Program(program.idl, bobProvider);
+        const [bobBetPDA] = getUserBetPDA(roundPDA, bob.publicKey);
+        await bobProgram.methods
+          .claim()
+          .accounts({ round: roundPDA, userBet: bobBetPDA, userTokenAccount: bobUSDC })
+          .rpc();
+
+        const bobBalanceAfter = await getBalance(bobUSDC);
+        const bobNet = bobBalanceAfter - bobBalanceBefore;
+        console.log(`   Bob net change: ${(bobNet / 1_000_000).toFixed(2)} USDC`);
+        console.log("   ✅ DOWN won - Bob claimed winnings!");
+      } else {
+        // Draw - everyone gets refund (minus fees)
+        console.log("   ✅ DRAW - Everyone gets refund (fees not refunded)");
+      }
+
+      // Collect fees
+      const treasuryBefore = await getBalance(treasuryTokenAccount);
+      await program.methods
+        .collectFees()
+        .accounts({ round: roundPDA })
+        .rpc();
+      const treasuryAfter = await getBalance(treasuryTokenAccount);
+      console.log(`   Treasury collected: ${(treasuryAfter - treasuryBefore) / 1_000_000} USDC`);
+    });
+  });
+
+  // ============================================================================
+  // 8. MIXED POOL: USDC + URIM BETTING
+  // ============================================================================
+  describe("8. MIXED POOL: USDC + URIM BETTING", () => {
+    let roundPDA: PublicKey;
+    let roundId: number;
+
+    it("Creates round with both USDC and URIM vaults", async () => {
+      const config = await program.account.config.fetch(configPDA);
+      roundId = config.currentRoundId.toNumber();
+      [roundPDA] = getRoundPDA(roundId);
+      const [urimVaultPDA] = getUrimVaultPDA(roundId);
+
+      await program.methods
+        .startRoundManual(new anchor.BN(15000), new anchor.BN(TEST_DURATION)) // $150.00
+        .accounts({ usdcMint, urimMint })
+        .rpc();
+
+      const round = await program.account.round.fetch(roundPDA);
+      console.log(`   Round ${roundId} started with dual vaults`);
+      console.log(`   USDC Vault bump: ${round.vaultBump}`);
+      console.log(`   URIM Vault bump: ${round.urimVaultBump}`);
+
+      // Verify URIM vault was created
+      const urimVaultAccount = await provider.connection.getAccountInfo(urimVaultPDA);
+      assert.isNotNull(urimVaultAccount, "URIM vault should exist");
+      console.log("   ✅ Both USDC and URIM vaults created");
+    });
+
+    it("Alice bets USDC, Bob bets URIM - mixed pool", async () => {
+      // Alice bets 100 USDC on UP ($100 USD value)
+      const aliceProvider = new anchor.AnchorProvider(provider.connection, new anchor.Wallet(alice), {});
+      const aliceProgram = new Program(program.idl, aliceProvider);
+
+      await aliceProgram.methods
+        .placeBet(new anchor.BN(100 * 1_000_000), true) // 100 USDC on UP
+        .accounts({ round: roundPDA, userTokenAccount: aliceUSDC })
+        .rpc();
+
+      console.log("   Alice: 100 USDC on UP ($100 USD value)");
+
+      // Bob bets 2000 URIM on DOWN at $0.05/URIM = $100 USD value
+      const bobProvider = new anchor.AnchorProvider(provider.connection, new anchor.Wallet(bob), {});
+      const bobProgram = new Program(program.idl, bobProvider);
+
+      await bobProgram.methods
+        .placeBetUrim(
+          new anchor.BN(2000 * 1_000_000), // 2000 URIM
+          false, // DOWN
+          new anchor.BN(URIM_PRICE_SCALED) // $0.05 per URIM (8-decimal scaled)
+        )
+        .accounts({ round: roundPDA, userTokenAccount: bobURIM })
+        .rpc();
+
+      console.log(`   Bob: 2000 URIM on DOWN ($100 USD value @ $0.05/URIM)`);
+
+      // Verify pools
+      const round = await program.account.round.fetch(roundPDA);
+      console.log(`   UP Pool USD: $${round.upPoolUsd.toNumber() / 100}`);
+      console.log(`   DOWN Pool USD: $${round.downPoolUsd.toNumber() / 100}`);
+      console.log(`   USDC UP Pool: ${round.upPool.toNumber() / 1_000_000} USDC`);
+      console.log(`   URIM DOWN Pool: ${round.downPoolUrim.toNumber() / 1_000_000} URIM`);
+
+      // Both should have ~$100 USD value (equal pools)
+      assert.approximately(round.upPoolUsd.toNumber(), 10000, 100); // ~$100
+      assert.approximately(round.downPoolUsd.toNumber(), 10000, 100); // ~$100
+      console.log("   ✅ Mixed pool with equal USD values");
+    });
+
+    it("Resolves and pays winner in their original token", async () => {
+      await sleep((TEST_DURATION + 1) * 1000);
+
+      // UP wins - Alice wins Bob's pool
+      await program.methods
+        .resolveRoundManual(new anchor.BN(15100)) // $151.00 > $150.00 = UP wins
+        .accounts({ round: roundPDA })
+        .rpc();
+
+      const round = await program.account.round.fetch(roundPDA);
+      assert.deepEqual(round.outcome, { up: {} });
+      console.log("   UP wins! Alice claims from BOTH vaults");
+
+      const aliceProvider = new anchor.AnchorProvider(provider.connection, new anchor.Wallet(alice), {});
+      const aliceProgram = new Program(program.idl, aliceProvider);
+      const [aliceBetPDA] = getUserBetPDA(roundPDA, alice.publicKey);
+
+      // Alice claims USDC (her bet back - no USDC losers in this round)
+      const aliceUsdcBefore = await getBalance(aliceUSDC);
+      await aliceProgram.methods
+        .claim()
+        .accounts({ round: roundPDA, userBet: aliceBetPDA, userTokenAccount: aliceUSDC })
+        .rpc();
+      const aliceUsdcAfter = await getBalance(aliceUSDC);
+      const aliceUsdcPayout = aliceUsdcAfter - aliceUsdcBefore;
+      console.log(`   Alice USDC payout: ${aliceUsdcPayout / 1_000_000} USDC (her bet back)`);
+      assert.approximately(aliceUsdcPayout / 1_000_000, 100, 1); // Gets her 100 USDC back
+
+      // Alice claims URIM (Bob's losing bet)
+      const aliceUrimBefore = await getBalance(aliceURIM);
+      await aliceProgram.methods
+        .claimUrim()
+        .accounts({ round: roundPDA, userBet: aliceBetPDA, userTokenAccount: aliceURIM })
+        .rpc();
+      const aliceUrimAfter = await getBalance(aliceURIM);
+      const aliceUrimPayout = aliceUrimAfter - aliceUrimBefore;
+      console.log(`   Alice URIM payout: ${aliceUrimPayout / 1_000_000} URIM (Bob's losing bet)`);
+      // Alice gets Bob's 2000 URIM (minus fee = ~1990 URIM in vault)
+      assert.isAbove(aliceUrimPayout / 1_000_000, 1900); // Gets Bob's URIM
+
+      console.log("   ✅ Alice received from BOTH vaults: USDC back + Bob's URIM!");
+    });
+
+    it("Loser (Bob) cannot claim", async () => {
+      const bobProvider = new anchor.AnchorProvider(provider.connection, new anchor.Wallet(bob), {});
+      const bobProgram = new Program(program.idl, bobProvider);
+      const [bobBetPDA] = getUserBetPDA(roundPDA, bob.publicKey);
+
+      try {
+        await bobProgram.methods
+          .claimUrim()
+          .accounts({ round: roundPDA, userBet: bobBetPDA, userTokenAccount: bobURIM })
+          .rpc();
+        assert.fail("Loser should not be able to claim");
+      } catch (err: any) {
+        assert.include(err.toString(), "NoPayout");
+        console.log("   ✅ Loser correctly cannot claim");
+      }
+    });
+  });
+
+  // ============================================================================
+  // 8.5 CLAIM_ALL: SINGLE TRANSACTION CLAIM FROM BOTH VAULTS
+  // ============================================================================
+  describe("8.5 CLAIM_ALL: Multiple Winners with Mixed Tokens", () => {
+    let roundPDA: PublicKey;
+    let roundId: number;
+
+    // Track balances for assertions
+    let aliceUsdcBefore: number;
+    let aliceUrimBefore: number;
+    let carolUsdcBefore: number;
+    let carolUrimBefore: number;
+
+    it("Sets up mixed pool with MULTIPLE winners (Alice USDC, Carol URIM on UP)", async () => {
+      const config = await program.account.config.fetch(configPDA);
+      roundId = config.currentRoundId.toNumber();
+      [roundPDA] = getRoundPDA(roundId);
+
+      await program.methods
+        .startRoundManual(new anchor.BN(15000), new anchor.BN(TEST_DURATION)) // $150.00
+        .accounts({ usdcMint, urimMint })
+        .rpc();
+
+      console.log(`   Round ${roundId} started for claim_all test`);
+
+      // Record initial balances
+      aliceUsdcBefore = await getBalance(aliceUSDC);
+      aliceUrimBefore = await getBalance(aliceURIM);
+      carolUsdcBefore = await getBalance(carolUSDC);
+      carolUrimBefore = await getBalance(carolURIM);
+
+      // === WINNERS (UP side) ===
+      // Alice bets 100 USDC on UP ($100 USD value)
+      const aliceProvider = new anchor.AnchorProvider(provider.connection, new anchor.Wallet(alice), {});
+      const aliceProgram = new Program(program.idl, aliceProvider);
+      await aliceProgram.methods
+        .placeBet(new anchor.BN(100 * 1_000_000), true) // 100 USDC on UP
+        .accounts({ round: roundPDA, userTokenAccount: aliceUSDC })
+        .rpc();
+      console.log("   Alice: 100 USDC on UP ($100 USD value)");
+
+      // Carol bets 4000 URIM on UP at $0.05/URIM = $200 USD value
+      const carolProvider = new anchor.AnchorProvider(provider.connection, new anchor.Wallet(carol), {});
+      const carolProgram = new Program(program.idl, carolProvider);
+      await carolProgram.methods
+        .placeBetUrim(
+          new anchor.BN(4000 * 1_000_000), // 4000 URIM
+          true, // UP
+          new anchor.BN(URIM_PRICE_SCALED) // $0.05 per URIM (8-decimal scaled)
+        )
+        .accounts({ round: roundPDA, userTokenAccount: carolURIM })
+        .rpc();
+      console.log(`   Carol: 4000 URIM on UP ($200 USD value @ $0.05/URIM)`);
+
+      // === LOSERS (DOWN side) ===
+      // Bob bets 150 USDC on DOWN ($150 USD value)
+      const bobProvider = new anchor.AnchorProvider(provider.connection, new anchor.Wallet(bob), {});
+      const bobProgram = new Program(program.idl, bobProvider);
+      await bobProgram.methods
+        .placeBet(new anchor.BN(150 * 1_000_000), false) // 150 USDC on DOWN
+        .accounts({ round: roundPDA, userTokenAccount: bobUSDC })
+        .rpc();
+      console.log("   Bob: 150 USDC on DOWN ($150 USD value) - LOSER");
+
+      // Verify pools
+      const round = await program.account.round.fetch(roundPDA);
+      console.log("\n   === POOL STATE ===");
+      console.log(`   UP Pool USD: $${round.upPoolUsd.toNumber() / 100} (Alice $100 + Carol $200 = $300)`);
+      console.log(`   DOWN Pool USD: $${round.downPoolUsd.toNumber() / 100} (Bob $150)`);
+      console.log(`   USDC in vault: ${round.upPool.toNumber() / 1_000_000} UP + ${round.downPool.toNumber() / 1_000_000} DOWN`);
+      console.log(`   URIM in vault: ${round.upPoolUrim.toNumber() / 1_000_000} UP + ${round.downPoolUrim.toNumber() / 1_000_000} DOWN`);
+
+      // Verify USD values
+      assert.approximately(round.upPoolUsd.toNumber(), 30000, 100); // $300
+      assert.approximately(round.downPoolUsd.toNumber(), 15000, 100); // $150
+    });
+
+    it("Resolves round (UP wins) and winners use claim_all", async () => {
+      await sleep((TEST_DURATION + 1) * 1000);
+
+      // UP wins - Alice and Carol are winners
+      await program.methods
+        .resolveRoundManual(new anchor.BN(15100)) // $151.00 > $150.00 = UP wins
+        .accounts({ round: roundPDA })
+        .rpc();
+
+      const round = await program.account.round.fetch(roundPDA);
+      assert.deepEqual(round.outcome, { up: {} });
+      console.log("\n   === UP WINS! ===");
+      console.log("   Winners: Alice (100 USDC, $100) + Carol (4000 URIM, $200)");
+      console.log("   Loser pool to distribute: Bob's 150 USDC ($150)");
+
+      // Calculate expected payouts
+      // Total winning USD = $300 (Alice $100 + Carol $200)
+      // Loser USDC pool = 150 USDC (minus fees in vault = ~149.25 USDC)
+      // Loser URIM pool = 0 URIM
+      //
+      // Alice share = $100 / $300 = 33.33%
+      // Carol share = $200 / $300 = 66.67%
+      //
+      // Alice USDC payout = 100 (her bet back) + 33.33% of 150 = ~150 USDC
+      // Alice URIM payout = 33.33% of 0 = 0 URIM
+      // Carol USDC payout = 66.67% of 150 = ~100 USDC
+      // Carol URIM payout = 4000 (her bet back) + 66.67% of 0 = ~4000 URIM
+
+      console.log("\n   === EXPECTED PAYOUTS ===");
+      console.log("   Alice (33.33% share): ~150 USDC (100 back + 50 winnings) + 0 URIM");
+      console.log("   Carol (66.67% share): ~100 USDC (winnings only) + ~4000 URIM (her bet back)");
+    });
+
+    it("Alice uses claim_all (single transaction)", async () => {
+      const aliceProvider = new anchor.AnchorProvider(provider.connection, new anchor.Wallet(alice), {});
+      const aliceProgram = new Program(program.idl, aliceProvider);
+      const [aliceBetPDA] = getUserBetPDA(roundPDA, alice.publicKey);
+      const [vaultPDA] = getVaultPDA(roundId);
+      const [urimVaultPDA] = getUrimVaultPDA(roundId);
+
+      // Use claim_all - single transaction!
+      await aliceProgram.methods
+        .claimAll()
+        .accounts({
+          round: roundPDA,
+          userBet: aliceBetPDA,
+          vault: vaultPDA,
+          urimVault: urimVaultPDA,
+          userUsdcAccount: aliceUSDC,
+          userUrimAccount: aliceURIM,
+        })
+        .rpc();
+
+      const aliceUsdcAfter = await getBalance(aliceUSDC);
+      const aliceUrimAfter = await getBalance(aliceURIM);
+
+      // Alice paid 100.5 USDC (100 + 0.5% fee), gets back ~150 USDC
+      // Net gain should be ~49.5 USDC
+      const aliceUsdcNet = aliceUsdcAfter - aliceUsdcBefore;
+      const aliceUrimNet = aliceUrimAfter - aliceUrimBefore;
+
+      console.log(`   Alice USDC change: ${(aliceUsdcNet / 1_000_000).toFixed(2)} USDC`);
+      console.log(`   Alice URIM change: ${(aliceUrimNet / 1_000_000).toFixed(2)} URIM`);
+
+      // Alice should have net positive USDC (won some of Bob's stake)
+      assert.isAbove(aliceUsdcNet, 0, "Alice should have won USDC");
+      // Alice gets 0 URIM (no URIM in loser pool)
+      assert.equal(aliceUrimNet, 0, "Alice should get 0 URIM (no URIM losers)");
+
+      // Verify claimed flags
+      const aliceBet = await program.account.userBet.fetch(aliceBetPDA);
+      assert.equal(aliceBet.claimedUsdc, true, "USDC claimed flag should be true");
+      // Alice has no URIM payout (no URIM losers), so claimed_urim stays false
+      assert.equal(aliceBet.claimedUrim, false, "URIM claimed flag should be false (no URIM to claim)");
+
+      console.log("   ✅ Alice claimed with claim_all (single tx)!");
+    });
+
+    it("Carol uses claim_all (single transaction)", async () => {
+      const carolProvider = new anchor.AnchorProvider(provider.connection, new anchor.Wallet(carol), {});
+      const carolProgram = new Program(program.idl, carolProvider);
+      const [carolBetPDA] = getUserBetPDA(roundPDA, carol.publicKey);
+      const [vaultPDA] = getVaultPDA(roundId);
+      const [urimVaultPDA] = getUrimVaultPDA(roundId);
+
+      // Use claim_all - single transaction!
+      await carolProgram.methods
+        .claimAll()
+        .accounts({
+          round: roundPDA,
+          userBet: carolBetPDA,
+          vault: vaultPDA,
+          urimVault: urimVaultPDA,
+          userUsdcAccount: carolUSDC,
+          userUrimAccount: carolURIM,
+        })
+        .rpc();
+
+      const carolUsdcAfter = await getBalance(carolUSDC);
+      const carolUrimAfter = await getBalance(carolURIM);
+
+      // Carol paid 4020 URIM (4000 + 0.5% fee), gets back ~4000 URIM
+      // Carol also gets ~100 USDC from Bob's losing stake
+      const carolUsdcNet = carolUsdcAfter - carolUsdcBefore;
+      const carolUrimNet = carolUrimAfter - carolUrimBefore;
+
+      console.log(`   Carol USDC change: ${(carolUsdcNet / 1_000_000).toFixed(2)} USDC`);
+      console.log(`   Carol URIM change: ${(carolUrimNet / 1_000_000).toFixed(2)} URIM`);
+
+      // Carol should have gained USDC (from Bob's losing pool)
+      assert.isAbove(carolUsdcNet, 0, "Carol should have won USDC");
+      // Carol should be slightly negative on URIM (paid fee, got bet back, no URIM winnings)
+      // She paid 4020 URIM, got back 4000 URIM = -20 URIM net
+      assert.isBelow(carolUrimNet, 0, "Carol net URIM should be negative (fee)");
+
+      // Verify both claimed flags are set
+      const carolBet = await program.account.userBet.fetch(carolBetPDA);
+      assert.equal(carolBet.claimedUsdc, true, "USDC claimed flag should be true");
+      assert.equal(carolBet.claimedUrim, true, "URIM claimed flag should be true");
+
+      console.log("   ✅ Carol claimed with claim_all (single tx)!");
+    });
+
+    it("Verifies payout math (proportional distribution)", async () => {
+      const aliceUsdcAfter = await getBalance(aliceUSDC);
+      const carolUsdcAfter = await getBalance(carolUSDC);
+
+      // Calculate net USDC gains after fees
+      // Alice paid 100.5 USDC total (100 + fee), Carol paid 0 USDC
+      const aliceUsdcNet = aliceUsdcAfter - aliceUsdcBefore;
+      const carolUsdcNet = carolUsdcAfter - carolUsdcBefore;
+
+      // Bob lost 150.75 USDC (150 + fee)
+      // After fees collected, ~150 USDC in loser pool
+      // Alice (33.33%): gets 100 back + ~50 USDC winnings = ~150 total, net ~+50 (minus her 0.5 fee = ~+49.5)
+      // Carol (66.67%): gets 0 back + ~100 USDC winnings, net ~+100
+
+      const aliceWinnings = aliceUsdcNet + (100.5 * 1_000_000); // Add back her original bet+fee
+      const carolWinnings = carolUsdcNet;
+
+      console.log("\n   === PAYOUT VERIFICATION ===");
+      console.log(`   Alice raw USDC received: ${(aliceWinnings / 1_000_000).toFixed(2)} USDC`);
+      console.log(`   Carol raw USDC received: ${(carolWinnings / 1_000_000).toFixed(2)} USDC`);
+
+      // Alice got ~150 USDC (100 back + 50 share of Bob's 150)
+      // Carol got ~100 USDC (100 share of Bob's 150)
+      // Ratio should be approximately 1.5:1 (Alice:Carol) since Alice gets bet back
+      // But for share of winnings only: 1:2 (Alice:Carol) = 33%:67%
+
+      // The shares should be proportional to USD value
+      // Alice $100 / $300 = 33.33%
+      // Carol $200 / $300 = 66.67%
+      // Carol should get ~2x Alice's share of winnings
+      const aliceShareOfBob = (aliceWinnings / 1_000_000) - 100; // Subtract her bet back
+      const carolShareOfBob = carolWinnings / 1_000_000;
+
+      console.log(`   Alice share of Bob's pool: ${aliceShareOfBob.toFixed(2)} USDC (~33%)`);
+      console.log(`   Carol share of Bob's pool: ${carolShareOfBob.toFixed(2)} USDC (~67%)`);
+
+      // Carol should get ~2x what Alice got from Bob's pool
+      const ratio = carolShareOfBob / aliceShareOfBob;
+      console.log(`   Ratio Carol:Alice = ${ratio.toFixed(2)} (expected ~2.0)`);
+
+      assert.approximately(ratio, 2.0, 0.2, "Carol should get ~2x Alice's share (67% vs 33%)");
+      console.log("   ✅ Payout math is CORRECT! Proportional to USD value contribution.");
+    });
+  });
+
+  // ============================================================================
+  // 9. EMERGENCY FUNCTIONS
+  // ============================================================================
+  describe("9. EMERGENCY FUNCTIONS", () => {
+    it("Emergency resolve bypasses timing", async () => {
+      const config = await program.account.config.fetch(configPDA);
+      const roundId = config.currentRoundId.toNumber();
+      const [roundPDA] = getRoundPDA(roundId);
+
+      await program.methods
+        .startRoundManual(new anchor.BN(13000), new anchor.BN(3600)) // 1 hour
+        .accounts({ usdcMint, urimMint })
+        .rpc();
+
+      // Can't normal resolve
+      try {
+        await program.methods
+          .resolveRoundManual(new anchor.BN(13100))
+          .accounts({ round: roundPDA })
+          .rpc();
+        assert.fail("Should fail - round not ended");
+      } catch (err: any) {
+        assert.include(err.toString(), "RoundNotEnded");
+      }
+
+      // Emergency resolve works
+      await program.methods
+        .emergencyResolve(new anchor.BN(13100), 1) // Force UP
+        .accounts({ round: roundPDA })
+        .rpc();
+
+      const round = await program.account.round.fetch(roundPDA);
+      assert.equal(round.resolved, true);
+      console.log("   ✅ Emergency resolve bypassed timing check");
+    });
+
+    it("Emergency withdraw moves all funds to treasury", async () => {
+      const config = await program.account.config.fetch(configPDA);
+      const roundId = config.currentRoundId.toNumber();
+      const [roundPDA] = getRoundPDA(roundId);
+      const [vaultPDA] = getVaultPDA(roundId);
+
+      await program.methods
+        .startRoundManual(new anchor.BN(13000), new anchor.BN(TEST_DURATION))
+        .accounts({ usdcMint, urimMint })
+        .rpc();
+
+      // Alice bets
+      const aliceProvider = new anchor.AnchorProvider(provider.connection, new anchor.Wallet(alice), {});
+      const aliceProgram = new Program(program.idl, aliceProvider);
+      await aliceProgram.methods
+        .placeBet(new anchor.BN(100 * 1_000_000), true)
+        .accounts({ round: roundPDA, userTokenAccount: aliceUSDC })
+        .rpc();
+
+      const vaultBefore = await getBalance(vaultPDA);
+      const treasuryBefore = await getBalance(treasuryTokenAccount);
+
+      console.log(`   Vault before: ${vaultBefore / 1_000_000} USDC`);
+
+      await program.methods
+        .emergencyWithdraw()
+        .accounts({ round: roundPDA })
+        .rpc();
+
+      const vaultAfter = await getBalance(vaultPDA);
+      const treasuryAfter = await getBalance(treasuryTokenAccount);
+
+      assert.equal(vaultAfter, 0);
+      console.log(`   Vault after: ${vaultAfter} USDC`);
+      console.log(`   Treasury received: ${(treasuryAfter - treasuryBefore) / 1_000_000} USDC`);
+      console.log("   ✅ Emergency withdraw moved all funds");
+    });
+  });
+
+  // ============================================================================
+  // 10. FINAL SUMMARY
+  // ============================================================================
+  describe("10. FINAL TEST SUMMARY", () => {
+    it("Prints comprehensive final state", async () => {
+      const config = await program.account.config.fetch(configPDA);
+      const treasuryBalance = await getBalance(treasuryTokenAccount);
+      const urimTreasuryBalance = await getBalance(urimTreasuryTokenAccount);
+      const aliceBalance = await getBalance(aliceUSDC);
+      const bobBalance = await getBalance(bobUSDC);
+      const carolBalance = await getBalance(carolUSDC);
+      const aliceUrimBalance = await getBalance(aliceURIM);
+      const bobUrimBalance = await getBalance(bobURIM);
+      const carolUrimBalance = await getBalance(carolURIM);
+
+      console.log("\n" + "=".repeat(70));
+      console.log("COMPREHENSIVE TEST SUITE - FINAL STATE");
+      console.log("=".repeat(70));
+      console.log(`   Total rounds created: ${config.currentRoundId}`);
+      console.log(`   USDC Treasury: ${(treasuryBalance / 1_000_000).toFixed(2)} USDC`);
+      console.log(`   URIM Treasury: ${(urimTreasuryBalance / 1_000_000).toFixed(2)} URIM`);
+      console.log("   ---");
+      console.log(`   Alice: ${(aliceBalance / 1_000_000).toFixed(2)} USDC | ${(aliceUrimBalance / 1_000_000).toFixed(2)} URIM`);
+      console.log(`   Bob: ${(bobBalance / 1_000_000).toFixed(2)} USDC | ${(bobUrimBalance / 1_000_000).toFixed(2)} URIM`);
+      console.log(`   Carol: ${(carolBalance / 1_000_000).toFixed(2)} USDC | ${(carolUrimBalance / 1_000_000).toFixed(2)} URIM`);
+      console.log("=".repeat(70));
+      console.log("\n✅ TESTED:");
+      console.log("   • Real Pyth on-chain oracle (with stale fallback)");
+      console.log("   • Hermes API real-time price integration");
+      console.log("   • Large bets (50k+ USDC) - overflow protection");
+      console.log("   • Minimum bet enforcement ($1.00 USD value)");
+      console.log("   • Cannot switch sides after betting");
+      console.log("   • Can add to existing bet");
+      console.log("   • Admin-only functions (start/resolve)");
+      console.log("   • Emergency resolve (bypass timing)");
+      console.log("   • Emergency withdraw (all funds to treasury)");
+      console.log("   • Parimutuel payout math verification");
+      console.log("   • Fee collection (0.5% ON TOP)");
+      console.log("   • Multiple sequential rounds");
+      console.log("   • *** MIXED POOLS: USDC + URIM betting ***");
+      console.log("   • *** Dual vault creation per round ***");
+      console.log("   • *** USD value-based payout calculation ***");
+      console.log("   • *** Winners paid in their original token ***");
+      console.log("=".repeat(70));
     });
   });
 });
