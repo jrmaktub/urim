@@ -34,8 +34,8 @@ pub const FEE_BPS: u64 = 50; // 0.5% = 50 basis points
 // URIM users get 10% discount on fees (0.45% instead of 0.5%)
 pub const URIM_FEE_BPS: u64 = 45; // FEE_BPS * 90% = 45 basis points
 
-// Default round duration: 15 minutes
-pub const DEFAULT_ROUND_DURATION: i64 = 900; // 15 * 60 seconds
+// Default round duration: 3 minutes
+pub const DEFAULT_ROUND_DURATION: i64 = 180; // 3 * 60 seconds
 
 // Minimum bet in USD cents (1 USD = 100 cents)
 pub const MIN_BET_USD_CENTS: u64 = 100; // $1.00 minimum
@@ -47,6 +47,13 @@ pub const URIM_DECIMALS: u8 = 6;
 
 // Maximum staleness for Pyth price (5 minutes for production safety)
 pub const MAX_PRICE_AGE_SECS: u64 = 300;
+
+// URIM price bounds (prevents manipulation)
+// Price format: urim_price_scaled = price_usd * 100_000_000
+// Min: $0.0000001 per URIM (scaled: 10)
+// Max: $0.01 per URIM (scaled: 1_000_000) - 1000x above current price
+pub const MIN_URIM_PRICE_SCALED: u64 = 10;
+pub const MAX_URIM_PRICE_SCALED: u64 = 1_000_000;
 
 #[program]
 pub mod urim_solana {
@@ -291,6 +298,13 @@ pub mod urim_solana {
         require!(clock.unix_timestamp < round.end_time, ErrorCode::BettingClosed);
         require!(urim_price_scaled > 0, ErrorCode::InvalidPrice);
 
+        // Validate URIM price is within reasonable bounds (prevents manipulation)
+        require!(
+            urim_price_scaled >= MIN_URIM_PRICE_SCALED &&
+            urim_price_scaled <= MAX_URIM_PRICE_SCALED,
+            ErrorCode::UrimPriceOutOfBounds
+        );
+
         // Calculate USD value with 8-decimal price precision
         // amount is in 6-decimal format (micro-tokens)
         // urim_price_scaled is price_usd * 10^8
@@ -518,6 +532,29 @@ pub mod urim_solana {
             final_price / 100,
             final_price % 100,
             round.outcome
+        );
+
+        Ok(())
+    }
+
+    /// EMERGENCY: Force a draw - ADMIN ONLY, no Pyth needed
+    /// Use when: Pyth is down, keeper failed, or any emergency
+    /// Everyone gets refunded (no winners/losers)
+    pub fn force_draw_emergency(ctx: Context<ForceDrawEmergency>) -> Result<()> {
+        let round = &mut ctx.accounts.round;
+        let clock = Clock::get()?;
+
+        require!(!ctx.accounts.config.paused, ErrorCode::PlatformPaused);
+        require!(!round.resolved, ErrorCode::RoundResolved);
+        require!(clock.unix_timestamp >= round.end_time, ErrorCode::RoundNotEnded);
+
+        round.resolved = true;
+        round.final_price = round.locked_price; // Same as start = draw
+        round.outcome = Outcome::Draw;
+
+        msg!(
+            "EMERGENCY DRAW: Round {} force-resolved as DRAW (everyone refunded)",
+            round.round_id
         );
 
         Ok(())
@@ -1307,6 +1344,22 @@ pub struct ResolveRoundPermissionless<'info> {
     // No admin signer required - anyone can call this
 }
 
+/// Emergency draw - ADMIN ONLY, no Pyth needed
+#[derive(Accounts)]
+pub struct ForceDrawEmergency<'info> {
+    #[account(
+        seeds = [b"config"],
+        bump = config.bump,
+        has_one = admin
+    )]
+    pub config: Account<'info, Config>,
+
+    #[account(mut)]
+    pub round: Account<'info, Round>,
+
+    pub admin: Signer<'info>,
+}
+
 /// Claim USDC winnings
 #[derive(Accounts)]
 pub struct Claim<'info> {
@@ -1645,4 +1698,6 @@ pub enum ErrorCode {
     PythPriceStale,
     #[msg("Wrong claim instruction - use claim() for USDC or claim_urim() for URIM")]
     WrongClaimInstruction,
+    #[msg("URIM price out of bounds - must be between $0.0000001 and $0.01")]
+    UrimPriceOutOfBounds,
 }
