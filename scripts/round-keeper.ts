@@ -7,26 +7,41 @@
  * 3. Starts new rounds automatically
  * 4. Collects fees after resolution
  *
- * Run with: npx ts-node scripts/round-keeper.ts
+ * ENVIRONMENT VARIABLES:
+ *   NETWORK=devnet|mainnet (default: devnet)
+ *   RPC_URL=https://... (optional, uses public RPC if not set)
+ *   KEEPER_PRIVATE_KEY=base58_encoded_key (required for Railway)
  *
- * For production, run with PM2:
- *   pm2 start scripts/round-keeper.ts --interpreter npx --interpreter-args "ts-node"
+ * Local: npx ts-node scripts/round-keeper.ts
+ * Railway: Set env vars and start command
  */
 
 import { Connection, PublicKey, Keypair } from '@solana/web3.js';
 import * as anchor from '@coral-xyz/anchor';
-import { Program } from '@coral-xyz/anchor';
+import { Program, BN } from '@coral-xyz/anchor';
 import { getAssociatedTokenAddress } from '@solana/spl-token';
 import * as fs from 'fs';
 import * as os from 'os';
+import bs58 from 'bs58';
 
 // Configuration
 const CHECK_INTERVAL_MS = 30_000; // Check every 30 seconds
-const ROUND_DURATION_SECONDS = 15 * 60; // 15 minutes per round
+const ROUND_DURATION_SECONDS = 3 * 60; // 3 minutes per round
 const AUTO_START_NEW_ROUND = true;
 const AUTO_COLLECT_FEES = true;
 
-const config = JSON.parse(fs.readFileSync('devnet-config.json', 'utf-8'));
+// Determine network from env
+const NETWORK = process.env.NETWORK || 'devnet';
+const configFile = NETWORK === 'mainnet' ? 'mainnet-config.json' : 'devnet-config.json';
+
+let config: any;
+try {
+  config = JSON.parse(fs.readFileSync(configFile, 'utf-8'));
+} catch {
+  console.error(`Config file not found: ${configFile}`);
+  process.exit(1);
+}
+
 const PROGRAM_ID = new PublicKey(config.programId);
 const USDC_MINT = new PublicKey(config.usdcMint);
 const URIM_MINT = new PublicKey(config.urimMint);
@@ -36,14 +51,24 @@ let program: any;
 let adminKeypair: Keypair;
 
 async function setup() {
-  // Use RPC_URL env var or default to public devnet
-  const rpcUrl = process.env.RPC_URL || 'https://api.devnet.solana.com';
+  // RPC URL: env var > default for network
+  const defaultRpc = NETWORK === 'mainnet'
+    ? 'https://api.mainnet-beta.solana.com'
+    : 'https://api.devnet.solana.com';
+  const rpcUrl = process.env.RPC_URL || defaultRpc;
+
   connection = new Connection(rpcUrl, 'confirmed');
 
-  const walletPath = `${os.homedir()}/.config/solana/id.json`;
-  adminKeypair = Keypair.fromSecretKey(
-    Uint8Array.from(JSON.parse(fs.readFileSync(walletPath, 'utf-8')))
-  );
+  // Load keypair: env var (base58) > local file
+  if (process.env.KEEPER_PRIVATE_KEY) {
+    const secretKey = bs58.decode(process.env.KEEPER_PRIVATE_KEY);
+    adminKeypair = Keypair.fromSecretKey(secretKey);
+  } else {
+    const walletPath = `${os.homedir()}/.config/solana/id.json`;
+    adminKeypair = Keypair.fromSecretKey(
+      Uint8Array.from(JSON.parse(fs.readFileSync(walletPath, 'utf-8')))
+    );
+  }
 
   const wallet = new anchor.Wallet(adminKeypair);
   const provider = new anchor.AnchorProvider(connection, wallet, {});
@@ -53,6 +78,8 @@ async function setup() {
   program = new Program(idl, provider) as any;
 
   console.log('🤖 Round Keeper Started');
+  console.log(`   Network: ${NETWORK}`);
+  console.log(`   RPC: ${rpcUrl.substring(0, 40)}...`);
   console.log(`   Admin: ${adminKeypair.publicKey.toBase58()}`);
   console.log(`   Check interval: ${CHECK_INTERVAL_MS / 1000}s`);
   console.log(`   Round duration: ${ROUND_DURATION_SECONDS / 60} minutes`);
@@ -83,7 +110,7 @@ async function resolveRound(roundId: number): Promise<boolean> {
     console.log(`   Resolving with price: $${(priceInCents / 100).toFixed(2)}`);
 
     await program.methods
-      .resolveRoundManual(new anchor.BN(priceInCents))
+      .resolveRoundManual(new BN(priceInCents))
       .accounts({ round: roundPDA })
       .rpc();
 
@@ -111,7 +138,8 @@ async function collectFees(roundId: number): Promise<void> {
 
     const round = await program.account.round.fetch(roundPDA);
 
-    if (round.totalFees.toNumber() > 0 && !round.feesCollected) {
+    // Only try to collect if there are fees (totalFees is reset to 0 after collection)
+    if (round.totalFees.toNumber() > 0) {
       await program.methods
         .collectFees()
         .accounts({
@@ -134,7 +162,7 @@ async function startNewRound(): Promise<number | null> {
     console.log(`   Starting new round at $${(priceInCents / 100).toFixed(2)}`);
 
     await program.methods
-      .startRoundManual(new anchor.BN(priceInCents), new anchor.BN(ROUND_DURATION_SECONDS))
+      .startRoundManual(new BN(priceInCents), new BN(ROUND_DURATION_SECONDS))
       .accounts({ usdcMint: USDC_MINT, urimMint: URIM_MINT })
       .rpc();
 
