@@ -55,7 +55,7 @@ async function setup() {
   const provider = new anchor.AnchorProvider(connection, wallet, {});
   anchor.setProvider(provider);
 
-  const idl = JSON.parse(fs.readFileSync('target/idl/urim_solana.json', 'utf-8'));
+  const idl = JSON.parse(fs.readFileSync('urim_solana.json', 'utf-8'));
   program = new anchor.Program(idl, provider);
 
   console.log('🤖 Round Keeper Started');
