@@ -9,7 +9,7 @@
 
 import { Connection, PublicKey, Keypair } from '@solana/web3.js';
 import * as anchor from '@coral-xyz/anchor';
-import { Program } from '@coral-xyz/anchor';
+import { Program, BN } from '@coral-xyz/anchor';
 import bs58 from 'bs58';
 
 // Configuration
@@ -166,7 +166,7 @@ async function resolveRound(roundId: number): Promise<boolean> {
     console.log(`   Resolving with price: $${(priceInCents / 100).toFixed(2)}`);
 
     await program.methods
-      .resolveRoundManual(new anchor.BN(priceInCents))
+      .resolveRoundManual(new BN(priceInCents))
       .accounts({ round: roundPDA })
       .rpc();
 
@@ -183,7 +183,7 @@ async function startNewRound(): Promise<number | null> {
     console.log(`   Starting new round at $${(priceInCents / 100).toFixed(2)}`);
 
     await program.methods
-      .startRoundManual(new anchor.BN(priceInCents), new anchor.BN(ROUND_DURATION_SECONDS))
+      .startRoundManual(new BN(priceInCents), new BN(ROUND_DURATION_SECONDS))
       .accounts({ usdcMint: USDC_MINT, urimMint: URIM_MINT })
       .rpc();
 
