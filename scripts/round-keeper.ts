@@ -18,7 +18,8 @@
 
 import { Connection, PublicKey, Keypair } from '@solana/web3.js';
 import * as anchor from '@coral-xyz/anchor';
-import { Program, BN } from '@coral-xyz/anchor';
+import { Program } from '@coral-xyz/anchor';
+import BN from 'bn.js';
 import { getAssociatedTokenAddress } from '@solana/spl-token';
 import * as fs from 'fs';
 import * as os from 'os';
