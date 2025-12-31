@@ -1,0 +1,17 @@
+{
+  "network": "devnet",
+  "programId": "5KqMaQLoKhBYcHD1qWZVcQqu5pmTvMitDUEqmKsqBTQg",
+  "usdcMint": "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU",
+  "urimMint": "z9hasbeeaPU4JVb1Np9oqNbpe984J8cr5THSEGCWwpR",
+  "pythSolUsd": "J83w4HKfqxwcq3BEMMkPFSppX3gqekLyLJBexebFVkix",
+  "adminWallet": "A8BvVoby8b4fGtEL7waCV9FmNJCMjouDJbzcQGh31utL",
+  "treasuryUsdc": "AsLLsJu1Saf6tJLd74RNREGKDz8e9QuQ6Wdq94argmJf",
+  "treasuryUrim": "rwhvAipa4FpU7b4c4pcoe9dP38FrupVVdRkivGy4Hkj",
+  "currentRound": "209",
+  "_note": "RPC URLs should be stored in .env file, not here",
+  "_note_mainnet": {
+    "usdcMint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+    "urimMint": "F8W15WcpXHDthW2TyyiZJ2wMLazGc8CQ4poMNpXQpump",
+    "pythSolUsd": "H6ARHf6YXhGYeQfUzQNGk6rDNnLBQKrenN712K4AQJEG"
+  }
+}

@@ -4,7 +4,7 @@
   "description": "Round keeper for URIM prediction market",
   "main": "keeper.js",
   "scripts": {
-    "start": "npx ts-node keeper.ts",
+    "start": "node keeper.js",
     "build": "echo 'No build needed'"
   },
   "dependencies": {
