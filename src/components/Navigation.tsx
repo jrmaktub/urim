@@ -1,6 +1,7 @@
 import { Sparkles } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
-import { ConnectButton } from "@rainbow-me/rainbowkit";
+// ConnectButton hidden - using Solana wallet on Quantum Pyth Prices page instead
+// import { ConnectButton } from "@rainbow-me/rainbowkit";
 
 const Navigation = () => {
   const location = useLocation();
@@ -51,10 +52,10 @@ const Navigation = () => {
           </div>
         </div>
 
-        {/* Wallet Connect Button */}
-        <div className="flex-shrink-0">
+        {/* Wallet Connect Button - Hidden, using Solana wallet on Quantum Pyth Prices instead */}
+        {/* <div className="flex-shrink-0">
           <ConnectButton />
-        </div>
+        </div> */}
       </div>
     </nav>
   );
