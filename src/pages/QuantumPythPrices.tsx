@@ -815,10 +815,15 @@ const QuantumPythPrices = () => {
       if (tokenType === "USDC") {
         signature = await placeBet(amount, betUp, provider);
       } else {
-        // DEVNET TESTING: Use $1 per URIM so 1 URIM = $1 USD value
-        // This passes the minimum $1 bet requirement easily
-        const urimPriceScaled = 100_000_000; // $1 per URIM for devnet
-        console.log("URIM bet - using devnet price: $1 per URIM (scaled:", urimPriceScaled, ")");
+        // Fetch real URIM price from GeckoTerminal
+        const priceResp = await fetch(
+          "https://api.geckoterminal.com/api/v2/networks/solana/tokens/F8W15WcpXHDthW2TyyiZJ2wMLazGc8CQ4poMNpXQpump"
+        );
+        const priceData = await priceResp.json();
+        const priceUsd = parseFloat(priceData.data.attributes.price_usd);
+        // Convert to scaled format for contract (8 decimals)
+        const urimPriceScaled = Math.round(priceUsd * 100_000_000);
+        console.log("URIM bet - fetched price:", priceUsd, "USD, scaled:", urimPriceScaled);
         signature = await placeBetUrim(amount, betUp, urimPriceScaled, provider);
       }
       toast({
