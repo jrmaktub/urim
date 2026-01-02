@@ -95,7 +95,7 @@ const RoundInfoCard = ({ round, currentPrice, loading, error }: RoundCardProps) 
           <p className="text-yellow-500 font-medium">Contract Status</p>
           <p className="text-sm text-muted-foreground">{error}</p>
           <Badge variant="outline" className="border-yellow-500/50 text-yellow-500">
-            Devnet · Waiting for round initialization
+            Mainnet · Waiting for round initialization
           </Badge>
         </div>
       </Card>
@@ -137,7 +137,7 @@ const RoundInfoCard = ({ round, currentPrice, loading, error }: RoundCardProps) 
               {round.resolved ? `Resolved: ${round.outcome}` : "Live"}
             </Badge>
             <Badge variant="outline" className="border-primary/50">
-              Devnet
+              Mainnet
             </Badge>
           </div>
         </div>

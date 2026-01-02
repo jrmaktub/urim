@@ -1,11 +1,16 @@
 import { useState, useEffect, useCallback } from "react";
 
-// Devnet configuration
-export const DEVNET_USDC_MINT = "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU";
-export const DEVNET_URIM_MINT = "z9hasbeeaPU4JVb1Np9oqNbpe984J8cr5THSEGCWwpR";
-export const PYTH_SOL_USD_FEED = "J83w4HKfqxwcq3BEMMkPFSppX3gqekLyLJBexebFVkix";
+// Mainnet configuration
+export const USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
+export const URIM_MINT = "F8W15WcpXHDthW2TyyiZJ2wMLazGc8CQ4poMNpXQpump";
+export const PYTH_SOL_USD_FEED = "H6ARHf6YXhGYeQfUzQNGk6rDNnLBQKrenN712K4AQJEG";
 export const PROGRAM_ID = "5KqMaQLoKhBYcHD1qWZVcQqu5pmTvMitDUEqmKsqBTQg";
-export const SOLANA_DEVNET_RPC = "https://api.devnet.solana.com";
+export const SOLANA_RPC = "https://solana-mainnet.g.alchemy.com/v2/27SvVEbGAVC2VSJ8rPss0";
+
+// Legacy exports for compatibility
+export const DEVNET_USDC_MINT = USDC_MINT;
+export const DEVNET_URIM_MINT = URIM_MINT;
+export const SOLANA_DEVNET_RPC = SOLANA_RPC;
 
 interface PhantomProvider {
   isPhantom?: boolean;
