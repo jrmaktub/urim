@@ -5,17 +5,40 @@ import { TOKEN_PROGRAM_ID, getAssociatedTokenAddress, getAccount } from "@solana
 
 // URIM Price Helper Functions
 export async function getUrimPriceUsd(): Promise<number> {
-  const response = await fetch(
-    `https://api.coingecko.com/api/v3/simple/token_price/solana?contract_addresses=${URIM_MINT}&vs_currencies=usd`
-  );
-  const data = await response.json();
-  
-  const priceKey = URIM_MINT.toLowerCase();
-  if (!data[priceKey]?.usd) {
-    throw new Error('Failed to fetch URIM price from CoinGecko');
+  // Try CoinGecko coin ID first (more reliable)
+  try {
+    const response = await fetch(
+      'https://api.coingecko.com/api/v3/simple/price?ids=urim&vs_currencies=usd'
+    );
+    const data = await response.json();
+    
+    if (data.urim?.usd) {
+      console.log('URIM price from CoinGecko:', data.urim.usd);
+      return data.urim.usd;
+    }
+  } catch (e) {
+    console.warn('CoinGecko coin ID fetch failed:', e);
   }
   
-  return data[priceKey].usd; // ~0.000008
+  // Fallback: try token_price endpoint with contract address
+  try {
+    const response = await fetch(
+      `https://api.coingecko.com/api/v3/simple/token_price/solana?contract_addresses=${URIM_MINT}&vs_currencies=usd`
+    );
+    const data = await response.json();
+    const priceKey = URIM_MINT.toLowerCase();
+    
+    if (data[priceKey]?.usd) {
+      console.log('URIM price from token_price:', data[priceKey].usd);
+      return data[priceKey].usd;
+    }
+  } catch (e) {
+    console.warn('CoinGecko token_price fetch failed:', e);
+  }
+  
+  // Final fallback: use approximate price if API fails
+  console.warn('Using fallback URIM price: $0.000008');
+  return 0.000008; // Approximate fallback price
 }
 
 // Convert price to contract format (8 decimals)
