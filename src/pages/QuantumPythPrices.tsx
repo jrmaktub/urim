@@ -815,13 +815,13 @@ const QuantumPythPrices = () => {
       if (tokenType === "USDC") {
         signature = await placeBet(amount, betUp, provider);
       } else {
-        // Fetch real URIM price from GeckoTerminal
+        // Fetch real URIM price from CoinGecko
         const priceResp = await fetch(
-          "https://api.geckoterminal.com/api/v2/networks/solana/tokens/F8W15WcpXHDthW2TyyiZJ2wMLazGc8CQ4poMNpXQpump"
+          "https://api.coingecko.com/api/v3/simple/price?ids=urim&vs_currencies=usd"
         );
         const priceData = await priceResp.json();
-        const priceUsd = parseFloat(priceData.data.attributes.price_usd);
-        // Convert to scaled format for contract (8 decimals)
+        const priceUsd = priceData.urim.usd;
+        // Scale to 8 decimals for contract: $0.057995 -> 5799500
         const urimPriceScaled = Math.round(priceUsd * 100_000_000);
         console.log("URIM bet - fetched price:", priceUsd, "USD, scaled:", urimPriceScaled);
         signature = await placeBetUrim(amount, betUp, urimPriceScaled, provider);
