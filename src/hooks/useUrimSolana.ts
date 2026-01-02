@@ -2,43 +2,29 @@ import { useState, useCallback, useEffect } from "react";
 import { Connection, PublicKey, SystemProgram, Transaction, TransactionInstruction } from "@solana/web3.js";
 import { PROGRAM_ID, SOLANA_DEVNET_RPC, DEVNET_USDC_MINT, DEVNET_URIM_MINT, URIM_MINT } from "./useSolanaWallet";
 import { TOKEN_PROGRAM_ID, getAssociatedTokenAddress, getAccount } from "@solana/spl-token";
+import { supabase } from "@/integrations/supabase/client";
 
-// URIM Price Helper Functions
+// URIM Price Helper Functions - uses edge function to avoid CORS
 export async function getUrimPriceUsd(): Promise<number> {
-  // Try CoinGecko coin ID first (more reliable)
   try {
-    const response = await fetch(
-      'https://api.coingecko.com/api/v3/simple/price?ids=urim&vs_currencies=usd'
-    );
-    const data = await response.json();
+    const { data, error } = await supabase.functions.invoke('getUrimPrice');
     
-    if (data.urim?.usd) {
-      console.log('URIM price from CoinGecko:', data.urim.usd);
-      return data.urim.usd;
+    if (error) {
+      console.warn('Edge function error:', error);
+      return 0.000008; // Fallback
     }
-  } catch (e) {
-    console.warn('CoinGecko coin ID fetch failed:', e);
-  }
-  
-  // Fallback: try token_price endpoint with contract address
-  try {
-    const response = await fetch(
-      `https://api.coingecko.com/api/v3/simple/token_price/solana?contract_addresses=${URIM_MINT}&vs_currencies=usd`
-    );
-    const data = await response.json();
-    const priceKey = URIM_MINT.toLowerCase();
     
-    if (data[priceKey]?.usd) {
-      console.log('URIM price from token_price:', data[priceKey].usd);
-      return data[priceKey].usd;
+    if (data?.price) {
+      console.log('URIM price from edge function:', data.price);
+      return data.price;
     }
+    
+    console.warn('No price in response, using fallback');
+    return 0.000008;
   } catch (e) {
-    console.warn('CoinGecko token_price fetch failed:', e);
+    console.warn('Failed to fetch URIM price:', e);
+    return 0.000008; // Fallback price
   }
-  
-  // Final fallback: use approximate price if API fails
-  console.warn('Using fallback URIM price: $0.000008');
-  return 0.000008; // Approximate fallback price
 }
 
 // Convert price to contract format (8 decimals)
