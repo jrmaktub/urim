@@ -1,7 +1,38 @@
 import { useState, useCallback, useEffect } from "react";
 import { Connection, PublicKey, SystemProgram, Transaction, TransactionInstruction } from "@solana/web3.js";
-import { PROGRAM_ID, SOLANA_DEVNET_RPC, DEVNET_USDC_MINT, DEVNET_URIM_MINT } from "./useSolanaWallet";
+import { PROGRAM_ID, SOLANA_DEVNET_RPC, DEVNET_USDC_MINT, DEVNET_URIM_MINT, URIM_MINT } from "./useSolanaWallet";
 import { TOKEN_PROGRAM_ID, getAssociatedTokenAddress, getAccount } from "@solana/spl-token";
+
+// URIM Price Helper Functions
+export async function getUrimPriceUsd(): Promise<number> {
+  const response = await fetch(
+    `https://api.coingecko.com/api/v3/simple/token_price/solana?contract_addresses=${URIM_MINT}&vs_currencies=usd`
+  );
+  const data = await response.json();
+  
+  const priceKey = URIM_MINT.toLowerCase();
+  if (!data[priceKey]?.usd) {
+    throw new Error('Failed to fetch URIM price from CoinGecko');
+  }
+  
+  return data[priceKey].usd; // ~0.000008
+}
+
+// Convert price to contract format (8 decimals)
+export function usdToScaledPrice(priceUsd: number): number {
+  return Math.round(priceUsd * 100_000_000); // e.g., 0.000008 → 800
+}
+
+// Calculate URIM tokens needed for USD value
+export function calculateUrimAmount(usdValue: number, priceUsd: number): bigint {
+  const urimTokens = usdValue / priceUsd;
+  return BigInt(Math.ceil(urimTokens * 1_000_000)); // micro-units (6 decimals)
+}
+
+// Calculate minimum URIM for $1 bet
+export function getMinimumUrim(priceUsd: number): number {
+  return Math.ceil(1 / priceUsd); // e.g., ~125,000 URIM for $1
+}
 
 // Account discriminators from IDL
 const CONFIG_DISCRIMINATOR = Buffer.from([155, 12, 170, 224, 30, 250, 204, 130]);
@@ -535,9 +566,8 @@ export function useUrimSolana(userPublicKey: string | null) {
 
   // Place bet function (URIM)
   const placeBetUrim = useCallback(async (
-    amount: number, // URIM amount (in whole tokens)
+    amountUsd: number, // USD value (e.g., 1 for $1)
     betUp: boolean,
-    urimPriceScaled: number, // URIM price scaled: price_usd * 100_000_000
     provider: unknown
   ) => {
     if (!userPublicKey || !currentRound || !config) {
@@ -549,15 +579,20 @@ export function useUrimSolana(userPublicKey: string | null) {
       publicKey: PublicKey;
     };
 
+    // 1. Fetch URIM price from CoinGecko
+    const priceUsd = await getUrimPriceUsd();
+    const priceScaled = usdToScaledPrice(priceUsd);
+    const urimAmount = calculateUrimAmount(amountUsd, priceUsd);
+
     const userPubkey = new PublicKey(userPublicKey);
-    const amountLamports = BigInt(Math.floor(amount * 1_000_000)); // URIM has 6 decimals
-    const urimPriceScaledBigInt = BigInt(Math.floor(urimPriceScaled));
+    const urimPriceScaledBigInt = BigInt(priceScaled);
     
     console.log("=== PlaceBetUrim Debug ===");
-    console.log("URIM amount:", amount);
-    console.log("URIM amount (micro-units):", amountLamports.toString());
-    console.log("URIM price scaled (price * 10^8):", urimPriceScaled);
-    console.log("Estimated USD value:", (Number(amountLamports) * urimPriceScaled / 100_000_000 / 1_000_000).toFixed(4));
+    console.log("URIM Bet - USD value:", amountUsd);
+    console.log("URIM price (USD):", priceUsd);
+    console.log("URIM price scaled (price * 10^8):", priceScaled);
+    console.log("URIM amount (micro-units):", urimAmount.toString());
+    console.log("URIM tokens:", Number(urimAmount) / 1_000_000);
     
     const configPda = getConfigPda();
     const roundPda = getRoundPda(currentRound.roundId);
@@ -570,7 +605,7 @@ export function useUrimSolana(userPublicKey: string | null) {
 
     // Build instruction data: amount (u64) + bet_up (bool) + urim_price_cents (u64)
     const amountBuffer = Buffer.alloc(8);
-    amountBuffer.writeBigUInt64LE(amountLamports);
+    amountBuffer.writeBigUInt64LE(urimAmount);
     const betUpBuffer = Buffer.from([betUp ? 1 : 0]);
     const urimPriceBuffer = Buffer.alloc(8);
     urimPriceBuffer.writeBigUInt64LE(urimPriceScaledBigInt);
