@@ -12,7 +12,7 @@ import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useSolanaWallet } from "@/hooks/useSolanaWallet";
-import { useUrimSolana, RoundData, UserBetData, HistoricalRound, ClaimableRound, UserBetHistory } from "@/hooks/useUrimSolana";
+import { useUrimSolana, RoundData, UserBetData, HistoricalRound, ClaimableRound, UserBetHistory, getUrimPriceUsd, getMinimumUrim } from "@/hooks/useUrimSolana";
 import { CopyableError, parseSolanaError } from "@/components/CopyableErrorToast";
 
 const BASE_PRICE = 131.96;
@@ -209,6 +209,19 @@ const BettingCard = ({ round, userBet, connected, onPlaceBet, onClaim, placing, 
   const [amount, setAmount] = useState("");
   const [selectedToken, setSelectedToken] = useState<TokenType>("USDC");
   const [timeLeft, setTimeLeft] = useState<number>(0);
+  const [minUrimDisplay, setMinUrimDisplay] = useState("~125,000 URIM");
+  const [urimPriceUsd, setUrimPriceUsd] = useState<number | null>(null);
+
+  // Fetch URIM price for minimum display
+  useEffect(() => {
+    getUrimPriceUsd().then(price => {
+      setUrimPriceUsd(price);
+      const minTokens = getMinimumUrim(price);
+      setMinUrimDisplay(`~${minTokens.toLocaleString()} URIM`);
+    }).catch(() => {
+      setMinUrimDisplay("~125,000 URIM"); // fallback
+    });
+  }, []);
 
   // Calculate time remaining
   useEffect(() => {
@@ -228,16 +241,32 @@ const BettingCard = ({ round, userBet, connected, onPlaceBet, onClaim, placing, 
   const handleBet = async (betUp: boolean) => {
     const numericAmount = parseFloat(amount);
     const balance = selectedToken === "USDC" ? usdcBalance : urimBalance;
-    const minBet = selectedToken === "USDC" ? 1 : 1; // Min $1 value
+    const minBet = 1; // Min $1 value for both tokens
+    const minUrimTokens = urimPriceUsd ? getMinimumUrim(urimPriceUsd) : 125000;
     
     if (!amount || isNaN(numericAmount) || numericAmount < minBet) {
-      toast({ title: `Minimum bet is ${minBet} ${selectedToken}`, variant: "destructive" });
+      if (selectedToken === "URIM") {
+        toast({ title: `Minimum bet is $1 (~${minUrimTokens.toLocaleString()} URIM)`, variant: "destructive" });
+      } else {
+        toast({ title: `Minimum bet is $${minBet} USDC`, variant: "destructive" });
+      }
       return;
     }
-    if (numericAmount > balance) {
+    // For URIM, the amount entered is USD value, check if user has enough URIM tokens
+    if (selectedToken === "URIM" && urimPriceUsd) {
+      const requiredUrim = numericAmount / urimPriceUsd;
+      if (requiredUrim > urimBalance) {
+        toast({ 
+          title: `Insufficient URIM balance`, 
+          description: `You need ~${Math.ceil(requiredUrim).toLocaleString()} URIM for a $${numericAmount} bet. You have ${urimBalance.toFixed(0)} URIM.`,
+          variant: "destructive" 
+        });
+        return;
+      }
+    } else if (selectedToken === "USDC" && numericAmount > balance) {
       toast({ 
-        title: `Insufficient ${selectedToken} balance`, 
-        description: `You have ${balance.toFixed(2)} ${selectedToken}.`,
+        title: `Insufficient USDC balance`, 
+        description: `You have $${balance.toFixed(2)} USDC.`,
         variant: "destructive" 
       });
       return;
@@ -381,16 +410,23 @@ const BettingCard = ({ round, userBet, connected, onPlaceBet, onClaim, placing, 
       ) : canBet ? (
         <div className="space-y-4">
           <div>
-            <label className="text-sm text-muted-foreground mb-2 block">Amount ({selectedToken})</label>
+            <label className="text-sm text-muted-foreground mb-2 block">
+              {selectedToken === "USDC" ? "Amount (USDC)" : "Bet Value (USD)"}
+            </label>
             <Input
               type="number"
-              placeholder={`Min 1 ${selectedToken}`}
+              placeholder={selectedToken === "USDC" ? "Min $1 USDC" : `Min $1 (${minUrimDisplay})`}
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
               className="bg-background/50"
               min="1"
               step="0.01"
             />
+            {selectedToken === "URIM" && urimPriceUsd && (
+              <p className="text-xs text-muted-foreground mt-1">
+                ≈ {amount ? Math.ceil(parseFloat(amount || "0") / urimPriceUsd).toLocaleString() : "0"} URIM @ ${urimPriceUsd.toFixed(8)}/URIM
+              </p>
+            )}
           </div>
 
           <div className="grid grid-cols-4 gap-2">
@@ -427,7 +463,7 @@ const BettingCard = ({ round, userBet, connected, onPlaceBet, onClaim, placing, 
           </div>
 
           <p className="text-xs text-muted-foreground text-center">
-            0.5% fee on all bets · Min 1 {selectedToken}
+            0.5% fee on all bets · Min $1 {selectedToken === "URIM" ? `(${minUrimDisplay})` : ""}
           </p>
         </div>
       ) : (
@@ -815,16 +851,8 @@ const QuantumPythPrices = () => {
       if (tokenType === "USDC") {
         signature = await placeBet(amount, betUp, provider);
       } else {
-        // Fetch real URIM price from CoinGecko
-        const priceResp = await fetch(
-          "https://api.coingecko.com/api/v3/simple/price?ids=urim&vs_currencies=usd"
-        );
-        const priceData = await priceResp.json();
-        const priceUsd = priceData.urim.usd;
-        // Scale to 8 decimals for contract: $0.057995 -> 5799500
-        const urimPriceScaled = Math.round(priceUsd * 100_000_000);
-        console.log("URIM bet - fetched price:", priceUsd, "USD, scaled:", urimPriceScaled);
-        signature = await placeBetUrim(amount, betUp, urimPriceScaled, provider);
+        // placeBetUrim now takes USD amount directly and fetches price internally
+        signature = await placeBetUrim(amount, betUp, provider);
       }
       toast({
         title: "Bet placed successfully!",
