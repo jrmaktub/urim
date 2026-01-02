@@ -42,8 +42,8 @@ async function main() {
   const balance = await connection.getBalance(walletKeypair.publicKey);
   console.log(`💰 Balance: ${(balance / 1e9).toFixed(4)} SOL`);
 
-  if (balance < 0.05 * 1e9) {
-    console.log("❌ Insufficient SOL balance. Need at least 0.05 SOL for fees.");
+  if (balance < 0.02 * 1e9) {
+    console.log("❌ Insufficient SOL balance. Need at least 0.02 SOL for fees.");
     process.exit(1);
   }
 
