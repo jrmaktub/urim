@@ -33,18 +33,28 @@ function formatPrice(cents: bigint): string {
 // Token amounts have 6 decimals
 function formatUsdcPool(amount: bigint): string {
   const value = Number(amount) / 1_000_000;
-  return `$${value.toFixed(2)}`;
+  return `$${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 function formatUrimPool(amount: bigint): string {
   const value = Number(amount) / 1_000_000;
-  return `${value.toFixed(2)} URIM`;
+  return `${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} URIM`;
+}
+
+// Format bet amount based on token type
+function formatBetAmount(amount: bigint, tokenType: "USDC" | "URIM"): string {
+  const value = Number(amount) / 1_000_000;
+  if (tokenType === "USDC") {
+    return `$${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  } else {
+    return `${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} URIM`;
+  }
 }
 
 // USD value pools are in cents
 function formatUsdValue(cents: bigint): string {
   const value = Number(cents) / 100;
-  return `$${value.toFixed(2)}`;
+  return `$${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 function formatTimeRemaining(endTime: bigint, resolved: boolean): string {
@@ -379,7 +389,7 @@ const BettingCard = ({ round, userBet, connected, onPlaceBet, onClaim, placing, 
               )}>
                 {userBet.betUp ? "UP" : "DOWN"}
               </span>
-              <span className="font-bold">{formatUsdcPool(userBet.amount)}</span>
+              <span className="font-bold">{formatBetAmount(userBet.amount, userBet.tokenType)}</span>
             </div>
           </div>
 
@@ -730,7 +740,7 @@ const UserBetHistoryComponent = ({ betHistory, connected }: UserBetHistoryProps)
                 <div>
                   <span className="text-sm text-muted-foreground">Bet: </span>
                   <span className="font-semibold">
-                    {betAmount.toFixed(2)} {bet.userBet.tokenType}
+                    {betAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {bet.userBet.tokenType}
                   </span>
                 </div>
                 
@@ -741,7 +751,7 @@ const UserBetHistoryComponent = ({ betHistory, connected }: UserBetHistoryProps)
                         <Trophy className="w-4 h-4 text-green-400" />
                         <div>
                           <span className="text-green-400 font-bold">
-                            +{winningsAmount.toFixed(2)} {bet.userBet.tokenType}
+                            +{winningsAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {bet.userBet.tokenType}
                           </span>
                           <span className="text-xs text-muted-foreground ml-2">
                             ({multiplier.toFixed(2)}x)
@@ -751,7 +761,7 @@ const UserBetHistoryComponent = ({ betHistory, connected }: UserBetHistoryProps)
                     ) : bet.outcome === "Draw" ? (
                       <span className="text-yellow-400 font-medium">Refund</span>
                     ) : (
-                      <span className="text-red-400 font-medium">-{betAmount.toFixed(2)}</span>
+                      <span className="text-red-400 font-medium">-{betAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     )}
                   </div>
                 )}
@@ -858,15 +868,30 @@ const QuantumPythPrices = () => {
         title: "Bet placed successfully!",
         description: `Transaction: ${signature.slice(0, 8)}...`,
       });
+      // Refresh data after successful bet
+      setTimeout(() => refetch(), 2000);
     } catch (err: unknown) {
       console.error("Bet error:", err);
-      const { userMessage, fullError } = parseSolanaError(err);
-      toast({ 
-        title: "Error", 
-        description: <CopyableError message={fullError} />,
-        variant: "destructive",
-        duration: 15000,
-      });
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      
+      // Check if it's a timeout error - transaction likely succeeded
+      if (errorMessage.includes("was not confirmed in") || errorMessage.includes("30.00 seconds")) {
+        toast({
+          title: "Transaction submitted!",
+          description: "Transaction was sent but confirmation timed out. It likely succeeded - refreshing data...",
+          variant: "default",
+        });
+        // Refresh data since transaction probably went through
+        setTimeout(() => refetch(), 3000);
+      } else {
+        const { fullError } = parseSolanaError(err);
+        toast({ 
+          title: "Error", 
+          description: <CopyableError message={fullError} />,
+          variant: "destructive",
+          duration: 15000,
+        });
+      }
     } finally {
       setPlacing(false);
     }
