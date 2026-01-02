@@ -149,8 +149,17 @@ async function checkAndManageRounds() {
   try {
     const [configPDA] = PublicKey.findProgramAddressSync([Buffer.from('config')], PROGRAM_ID);
     const configAccount = await program.account.config.fetch(configPDA);
-    const currentRoundId = configAccount.currentRoundId.toNumber() - 1;
+    const nextRoundId = configAccount.currentRoundId.toNumber();
 
+    // If no rounds exist yet (nextRoundId is 0), start the first round
+    if (nextRoundId === 0) {
+      console.log(`[${timestamp}] No rounds exist yet, starting first round...`);
+      const newId = await startNewRound();
+      if (newId !== null) console.log(`   ✅ Started Round #${newId}`);
+      return;
+    }
+
+    const currentRoundId = nextRoundId - 1;
     const roundIdBuffer = Buffer.alloc(8);
     roundIdBuffer.writeBigUInt64LE(BigInt(currentRoundId));
     const [roundPDA] = PublicKey.findProgramAddressSync(
