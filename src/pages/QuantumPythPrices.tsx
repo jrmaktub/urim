@@ -967,9 +967,6 @@ const QuantumPythPrices = () => {
 
             {/* Wallet Connection */}
             <div className="flex items-center gap-3">
-              <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/50">
-                DEVNET
-              </Badge>
               {connected && publicKey ? (
                 <div className="flex items-center gap-2">
                   <Badge variant="outline" className="border-green-500/50 text-green-400 py-2 px-3">
@@ -1064,38 +1061,17 @@ const QuantumPythPrices = () => {
           <ResultsHistory historicalRounds={historicalRounds} />
 
           {/* Info */}
-          <Card className="p-6 border-2 border-accent/30 bg-accent/5">
+          <Card className="p-6 border-2 border-primary/30 bg-primary/5">
             <div className="text-center space-y-2">
-              <h3 className="text-lg font-semibold text-accent">
-                Solana Devnet Testing
+              <h3 className="text-lg font-semibold text-primary">
+                Live on Solana Mainnet
               </h3>
               <p className="text-sm text-muted-foreground">
-                Get test SOL from{" "}
-                <a 
-                  href="https://faucet.solana.com/" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="text-primary hover:underline"
-                >
-                  Solana Faucet
-                </a>
-                {" "}and devnet USDC from{" "}
-                <a 
-                  href="https://faucet.circle.com/" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="text-primary hover:underline"
-                >
-                  Circle Faucet
-                </a>
-                {" "}(select Solana Devnet, mint: 4zMMC9...ncDU).
+                Bet with real USDC or URIM tokens. Powered by Pyth Network price oracles.
               </p>
               <div className="flex items-center justify-center gap-2 pt-2">
-                <Badge variant="outline" className="text-xs">
+                <Badge variant="outline" className="text-xs border-primary/50">
                   Program: 5KqMa...BTQG
-                </Badge>
-                <Badge variant="outline" className="text-xs">
-                  USDC: 4zMMC9...ncDU
                 </Badge>
                 <Button variant="ghost" size="sm" onClick={refetch}>
                   Refresh Data
