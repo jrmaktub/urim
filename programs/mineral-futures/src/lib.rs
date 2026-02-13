@@ -1,23 +1,32 @@
 use anchor_lang::prelude::*;
 
-declare_id!("BxCSsWy14b1yUGi8h5mEDJc9tH4AEbqVwGC8b4tcVvmz");
+declare_id!("9zakGc9vksLmWz62R84BG9KNHP4xjNAPJ6L91eFhRxUq");
 
-// Fee constants (Binance-style)
-pub const TAKER_FEE_BPS: u64 = 5; // 0.05%
-pub const URIM_DISCOUNT_BPS: u64 = 1; // 10% discount = 0.005% effective (1 bps off)
-pub const LIQUIDATION_THRESHOLD_BPS: u64 = 8000; // 80% loss triggers liquidation
+// ─── Fee Constants (Binance-style) ────────────────────────────────────────────
+// Taker fee: 0.05% = 5 bps
+pub const TAKER_FEE_BPS: u64 = 5;
+// URIM discount: 10% off the taker fee. We compute as fee * 9 / 10.
+// Example: 0.05% fee → URIM holders pay 0.045%
+pub const URIM_DISCOUNT_NUMERATOR: u64 = 9;
+pub const URIM_DISCOUNT_DENOMINATOR: u64 = 10;
+
+// Liquidation at 80% loss
+pub const LIQUIDATION_THRESHOLD_BPS: u64 = 8000;
 pub const BPS_DENOMINATOR: u64 = 10_000;
+
+// Liquidator earns 2% of collateral
+pub const LIQUIDATOR_REWARD_BPS: u64 = 200;
 
 #[program]
 pub mod mineral_futures {
     use super::*;
 
     /// Initialize a new commodity futures market.
-    /// Called by the agent authority to create markets for each mineral.
+    /// Called once by the agent authority per commodity.
     pub fn initialize_market(
         ctx: Context<InitializeMarket>,
         commodity: String,
-        initial_price: u64, // price in USD cents (e.g. 68 = $0.68)
+        initial_price: u64, // USD per metric ton (integer, e.g. 21834 = $21,834/ton)
     ) -> Result<()> {
         require!(commodity.len() <= 16, FuturesError::CommodityNameTooLong);
         require!(initial_price > 0, FuturesError::InvalidPrice);
@@ -42,12 +51,12 @@ pub mod mineral_futures {
             authority: ctx.accounts.authority.key(),
         });
 
-        msg!("Market initialized: {} at price {} USD cents", commodity, initial_price);
+        msg!("Market initialized: {} at ${}/ton", commodity, initial_price);
         Ok(())
     }
 
     /// Update the mark price for a market. Only callable by the market authority (the agent).
-    /// The agent fetches real prices from Metals-API and posts them here.
+    /// Agent fetches real prices from Metals-API and posts them here every 3 hours.
     pub fn update_price(
         ctx: Context<UpdatePrice>,
         new_price: u64,
@@ -66,67 +75,98 @@ pub mod mineral_futures {
             timestamp: market.last_price_update,
         });
 
-        msg!("Price updated: {} -> {} USD cents", old_price, new_price);
+        msg!("Price updated: ${} -> ${}/ton", old_price, new_price);
         Ok(())
     }
 
     /// Open a long or short position on a commodity.
-    /// User deposits SOL as collateral. Position size = collateral (1x, no leverage for simplicity).
+    ///
+    /// Flow:
+    ///   1. This instruction initializes the per-position vault (owned by the program).
+    ///   2. Trader's collateral is deposited via the `init` payer mechanism (lamports
+    ///      sent from trader to vault by including `collateral_lamports` in the tx).
+    ///      Actually: client passes `collateral_lamports` arg; program transfers it
+    ///      from trader to vault inside the instruction via CPI to system program.
+    ///   3. Fee is deducted from vault → authority (treasury).
+    ///   4. Net collateral recorded in Position.
+    ///
+    /// use_urim_discount: pass true if user holds ≥$10 URIM (checked client-side).
+    ///   Effect: taker fee reduced by 10% (0.05% → 0.045%).
     pub fn open_position(
         ctx: Context<OpenPosition>,
-        direction: u8, // 0 = Long, 1 = Short
-        nonce: i64,    // unique nonce (use unix timestamp client-side) to allow multiple positions
+        direction: u8,              // 0 = Long, 1 = Short
+        nonce: i64,                 // unix timestamp — makes each position PDA unique
+        collateral_lamports: u64,   // SOL collateral to deposit (lamports)
         use_urim_discount: bool,
     ) -> Result<()> {
         require!(direction == 0 || direction == 1, FuturesError::InvalidDirection);
+        require!(collateral_lamports > 0, FuturesError::ZeroCollateral);
 
-        let collateral = ctx.accounts.position.to_account_info().lamports()
-            .checked_sub(Rent::get()?.minimum_balance(Position::SIZE))
-            .unwrap_or(0);
+        // Transfer collateral from trader → program-owned vault via CPI
+        let cpi_ctx = CpiContext::new(
+            ctx.accounts.system_program.to_account_info(),
+            anchor_lang::system_program::Transfer {
+                from: ctx.accounts.trader.to_account_info(),
+                to: ctx.accounts.vault.to_account_info(),
+            },
+        );
+        anchor_lang::system_program::transfer(cpi_ctx, collateral_lamports)?;
 
-        // Collateral is sent via the init instruction (payer deposits)
-        // We just record the entry state
-        let market = &ctx.accounts.market;
-        let position = &mut ctx.accounts.position;
-        let clock = Clock::get()?;
-
-        // Calculate fee
-        let effective_fee_bps = if use_urim_discount {
-            TAKER_FEE_BPS.saturating_sub(URIM_DISCOUNT_BPS)
-        } else {
-            TAKER_FEE_BPS
-        };
-
-        let collateral_amount = ctx.accounts.vault.lamports()
-            .checked_sub(Rent::get()?.minimum_balance(0))
-            .unwrap_or(0);
-
-        let fee = collateral_amount
-            .checked_mul(effective_fee_bps)
+        // Calculate taker fee — 0.05% standard, 0.045% with URIM discount (10% off)
+        let base_fee = collateral_lamports
+            .checked_mul(TAKER_FEE_BPS)
             .unwrap_or(0)
             .checked_div(BPS_DENOMINATOR)
             .unwrap_or(0);
 
+        let fee = if use_urim_discount {
+            // 10% off: fee * 9 / 10
+            base_fee
+                .checked_mul(URIM_DISCOUNT_NUMERATOR)
+                .unwrap_or(base_fee)
+                .checked_div(URIM_DISCOUNT_DENOMINATOR)
+                .unwrap_or(base_fee)
+        } else {
+            base_fee
+        };
+
+        let net_collateral = collateral_lamports.saturating_sub(fee);
+
+        // Transfer fee from vault → protocol authority (treasury)
+        // Vault is owned by this program so lamport mutation is allowed
+        if fee > 0 {
+            **ctx.accounts.vault.to_account_info().try_borrow_mut_lamports()? -= fee;
+            **ctx.accounts.authority.to_account_info().try_borrow_mut_lamports()? += fee;
+        }
+
+        // Record position state
+        let market = &ctx.accounts.market;
+        let position = &mut ctx.accounts.position;
+
         position.owner = ctx.accounts.trader.key();
         position.market = ctx.accounts.market.key();
         position.direction = direction;
-        position.collateral = collateral_amount.saturating_sub(fee);
+        position.collateral = net_collateral;
         position.entry_price = market.mark_price;
         position.opened_at = nonce;
         position.fee_paid = fee;
         position.is_open = true;
         position.bump = ctx.bumps.position;
 
-        // Capture keys before mutable borrow
+        // Capture before mutable re-borrow of market
         let market_key = ctx.accounts.market.key();
         let commodity_bytes = ctx.accounts.market.commodity;
 
-        // Track open interest
+        // Update open interest + fee tracking on market
         let market = &mut ctx.accounts.market;
         if direction == 0 {
-            market.open_interest_long = market.open_interest_long.saturating_add(position.collateral);
+            market.open_interest_long = market
+                .open_interest_long
+                .saturating_add(net_collateral);
         } else {
-            market.open_interest_short = market.open_interest_short.saturating_add(position.collateral);
+            market.open_interest_short = market
+                .open_interest_short
+                .saturating_add(net_collateral);
         }
         market.total_fees_collected = market.total_fees_collected.saturating_add(fee);
 
@@ -134,79 +174,89 @@ pub mod mineral_futures {
             trader: ctx.accounts.trader.key(),
             market: market_key,
             direction,
-            collateral: position.collateral,
+            collateral: net_collateral,
             entry_price: position.entry_price,
             fee_paid: fee,
+            urim_discount: use_urim_discount,
         });
 
+        let direction_str = if direction == 0 { "LONG" } else { "SHORT" };
+        let commodity_str = std::str::from_utf8(&commodity_bytes)
+            .unwrap_or("???")
+            .trim_matches('\0');
         msg!(
-            "Position opened: {} {} @ {} cents, collateral={} lamports, fee={} lamports",
-            if direction == 0 { "LONG" } else { "SHORT" },
-            std::str::from_utf8(&commodity_bytes).unwrap_or("???").trim_matches('\0'),
+            "Position opened: {} {} @ ${}/ton | collateral={} lamports | fee={} lamports{}",
+            direction_str,
+            commodity_str,
             position.entry_price,
-            position.collateral,
-            fee
+            net_collateral,
+            fee,
+            if use_urim_discount { " (URIM 10% discount applied)" } else { "" }
         );
         Ok(())
     }
 
-    /// Close an open position. Calculates PnL and pays out from vault.
+    /// Close an open position. Calculates PnL and pays out from per-position vault.
+    /// Only the position owner can close their own position.
     pub fn close_position(ctx: Context<ClosePosition>) -> Result<()> {
         let position = &ctx.accounts.position;
         let market = &ctx.accounts.market;
 
         require!(position.is_open, FuturesError::PositionAlreadyClosed);
-        require!(position.owner == ctx.accounts.trader.key(), FuturesError::Unauthorized);
+        require!(
+            position.owner == ctx.accounts.trader.key(),
+            FuturesError::Unauthorized
+        );
 
         let current_price = market.mark_price;
         let entry_price = position.entry_price;
         let collateral = position.collateral;
 
-        // Calculate PnL in basis points
-        // Long PnL = (current - entry) / entry * collateral
-        // Short PnL = (entry - current) / entry * collateral
+        // PnL calculation (integer, lamport-scaled):
+        //   Long:  PnL = (current - entry) / entry × collateral
+        //   Short: PnL = (entry - current) / entry × collateral
         let pnl: i64 = if position.direction == 0 {
             // Long
             let price_change = (current_price as i64).saturating_sub(entry_price as i64);
             price_change
-                .checked_mul(collateral as i64)
-                .unwrap_or(0)
+                .saturating_mul(collateral as i64)
                 .checked_div(entry_price as i64)
                 .unwrap_or(0)
         } else {
             // Short
             let price_change = (entry_price as i64).saturating_sub(current_price as i64);
             price_change
-                .checked_mul(collateral as i64)
-                .unwrap_or(0)
+                .saturating_mul(collateral as i64)
                 .checked_div(entry_price as i64)
                 .unwrap_or(0)
         };
 
-        let payout = if pnl >= 0 {
+        // Payout = collateral + PnL (floored at 0 — trader can't owe more than collateral)
+        let payout: u64 = if pnl >= 0 {
             collateral.saturating_add(pnl as u64)
         } else {
-            collateral.saturating_sub(pnl.unsigned_abs())
+            collateral.saturating_sub(pnl.unsigned_abs().min(collateral))
         };
 
-        // Transfer payout from vault to trader
-        let vault_balance = ctx.accounts.vault.lamports();
+        // Pay out from the per-position vault (program-owned, so lamport mutation allowed)
+        let vault_balance = ctx.accounts.vault.to_account_info().lamports();
         let actual_payout = payout.min(vault_balance);
 
         if actual_payout > 0 {
-            **ctx.accounts.vault.try_borrow_mut_lamports()? -= actual_payout;
-            **ctx.accounts.trader.try_borrow_mut_lamports()? += actual_payout;
+            **ctx.accounts.vault.to_account_info().try_borrow_mut_lamports()? -= actual_payout;
+            **ctx.accounts.trader.to_account_info().try_borrow_mut_lamports()? += actual_payout;
         }
 
-        // Update open interest
+        // Update market open interest
         let market = &mut ctx.accounts.market;
         if position.direction == 0 {
-            market.open_interest_long = market.open_interest_long.saturating_sub(collateral);
+            market.open_interest_long =
+                market.open_interest_long.saturating_sub(collateral);
         } else {
-            market.open_interest_short = market.open_interest_short.saturating_sub(collateral);
+            market.open_interest_short =
+                market.open_interest_short.saturating_sub(collateral);
         }
 
-        // Mark position closed
         let position = &mut ctx.accounts.position;
         position.is_open = false;
 
@@ -221,8 +271,10 @@ pub mod mineral_futures {
             payout: actual_payout,
         });
 
+        let outcome = if pnl > 0 { "PROFIT" } else if pnl < 0 { "LOSS" } else { "BREAKEVEN" };
         msg!(
-            "Position closed: PnL={} lamports, payout={} lamports",
+            "Position closed: {} | PnL={} lamports | payout={} lamports",
+            outcome,
             pnl,
             actual_payout
         );
@@ -230,7 +282,11 @@ pub mod mineral_futures {
     }
 
     /// Liquidate an underwater position. Permissionless — anyone can call this.
-    /// The agent monitors positions and calls this automatically.
+    /// The autonomous agent monitors all positions every 15 minutes and calls this
+    /// when any position's loss exceeds 80% of its collateral.
+    ///
+    /// Liquidator earns 2% of the collateral as a reward.
+    /// Remaining collateral stays in the vault (protocol insurance).
     pub fn liquidate(ctx: Context<Liquidate>) -> Result<()> {
         let position = &ctx.accounts.position;
         let market = &ctx.accounts.market;
@@ -243,7 +299,7 @@ pub mod mineral_futures {
 
         // Calculate loss in bps
         let loss_bps: u64 = if position.direction == 0 {
-            // Long: losing if price dropped
+            // Long: losing if price dropped below entry
             if current_price >= entry_price {
                 return err!(FuturesError::NotLiquidatable);
             }
@@ -253,7 +309,7 @@ pub mod mineral_futures {
                 .checked_div(entry_price)
                 .unwrap_or(u64::MAX)
         } else {
-            // Short: losing if price rose
+            // Short: losing if price rose above entry
             if current_price <= entry_price {
                 return err!(FuturesError::NotLiquidatable);
             }
@@ -266,27 +322,31 @@ pub mod mineral_futures {
 
         require!(loss_bps >= LIQUIDATION_THRESHOLD_BPS, FuturesError::NotLiquidatable);
 
-        // Liquidator gets 2% of collateral as reward
+        // Liquidator reward: 2% of original collateral
         let liquidator_reward = collateral
-            .checked_mul(200)
+            .checked_mul(LIQUIDATOR_REWARD_BPS)
             .unwrap_or(0)
             .checked_div(BPS_DENOMINATOR)
             .unwrap_or(0);
 
-        let vault_balance = ctx.accounts.vault.lamports();
+        let vault_balance = ctx.accounts.vault.to_account_info().lamports();
         let actual_reward = liquidator_reward.min(vault_balance);
 
         if actual_reward > 0 {
-            **ctx.accounts.vault.try_borrow_mut_lamports()? -= actual_reward;
-            **ctx.accounts.liquidator.try_borrow_mut_lamports()? += actual_reward;
+            **ctx.accounts.vault.to_account_info().try_borrow_mut_lamports()? -= actual_reward;
+            **ctx.accounts.liquidator.to_account_info().try_borrow_mut_lamports()? += actual_reward;
         }
 
-        // Update open interest
+        // Remaining vault balance stays as protocol insurance fund (intentional)
+
+        // Update market open interest
         let market = &mut ctx.accounts.market;
         if position.direction == 0 {
-            market.open_interest_long = market.open_interest_long.saturating_sub(collateral);
+            market.open_interest_long =
+                market.open_interest_long.saturating_sub(collateral);
         } else {
-            market.open_interest_short = market.open_interest_short.saturating_sub(collateral);
+            market.open_interest_short =
+                market.open_interest_short.saturating_sub(collateral);
         }
 
         let position = &mut ctx.accounts.position;
@@ -302,8 +362,9 @@ pub mod mineral_futures {
         });
 
         msg!(
-            "Position liquidated! loss={}bps, liquidator_reward={} lamports",
+            "Position LIQUIDATED: loss={}bps ({}%) | liquidator_reward={} lamports",
             loss_bps,
+            loss_bps / 100,
             actual_reward
         );
         Ok(())
@@ -314,55 +375,60 @@ pub mod mineral_futures {
 
 #[account]
 pub struct Market {
-    pub commodity: [u8; 16],          // e.g. "ANTIMONY\0\0\0\0\0\0\0\0"
-    pub mark_price: u64,              // USD cents (e.g. 68 = $0.68/unit)
-    pub last_price_update: i64,       // unix timestamp
-    pub open_interest_long: u64,      // total collateral in long positions (lamports)
-    pub open_interest_short: u64,     // total collateral in short positions (lamports)
-    pub total_fees_collected: u64,    // cumulative fees (lamports)
-    pub authority: Pubkey,            // agent wallet that can update prices
+    pub commodity: [u8; 16],          // e.g. b"ANTIMONY\0\0\0\0\0\0\0\0"
+    pub mark_price: u64,              // USD per metric ton (integer)
+    pub last_price_update: i64,       // unix timestamp of last price update
+    pub open_interest_long: u64,      // total net collateral in long positions (lamports)
+    pub open_interest_short: u64,     // total net collateral in short positions (lamports)
+    pub total_fees_collected: u64,    // cumulative fees sent to authority (lamports)
+    pub authority: Pubkey,            // agent wallet — sole price updater
     pub bump: u8,
 }
 
 impl Market {
-    pub const SIZE: usize = 8  // discriminator
-        + 16                   // commodity
-        + 8                    // mark_price
-        + 8                    // last_price_update
-        + 8                    // open_interest_long
-        + 8                    // open_interest_short
-        + 8                    // total_fees_collected
-        + 32                   // authority
-        + 1;                   // bump
+    pub const SIZE: usize = 8   // discriminator
+        + 16                    // commodity [u8;16]
+        + 8                     // mark_price u64
+        + 8                     // last_price_update i64
+        + 8                     // open_interest_long u64
+        + 8                     // open_interest_short u64
+        + 8                     // total_fees_collected u64
+        + 32                    // authority Pubkey
+        + 1;                    // bump u8
 }
 
 #[account]
 pub struct Position {
-    pub owner: Pubkey,
-    pub market: Pubkey,
-    pub direction: u8,         // 0 = Long, 1 = Short
-    pub collateral: u64,       // lamports locked (after fee)
-    pub entry_price: u64,      // mark price when opened
-    pub opened_at: i64,        // unix timestamp
-    pub fee_paid: u64,         // lamports paid as fee
-    pub is_open: bool,
+    pub owner: Pubkey,          // trader wallet
+    pub market: Pubkey,         // market PDA this position belongs to
+    pub direction: u8,          // 0 = Long, 1 = Short
+    pub collateral: u64,        // net collateral after fee (lamports)
+    pub entry_price: u64,       // mark_price at open
+    pub opened_at: i64,         // nonce passed at open (unix timestamp)
+    pub fee_paid: u64,          // fee sent to protocol treasury (lamports)
+    pub is_open: bool,          // false once closed or liquidated
     pub bump: u8,
 }
 
 impl Position {
-    pub const SIZE: usize = 8  // discriminator
-        + 32                   // owner
-        + 32                   // market
-        + 1                    // direction
-        + 8                    // collateral
-        + 8                    // entry_price
-        + 8                    // opened_at
-        + 8                    // fee_paid
-        + 1                    // is_open
-        + 1;                   // bump
+    pub const SIZE: usize = 8   // discriminator
+        + 32                    // owner Pubkey
+        + 32                    // market Pubkey
+        + 1                     // direction u8
+        + 8                     // collateral u64
+        + 8                     // entry_price u64
+        + 8                     // opened_at i64
+        + 8                     // fee_paid u64
+        + 1                     // is_open bool
+        + 1;                    // bump u8
 }
 
-// ─── Contexts ──────────────────────────────────────────────────────────────────
+/// Zero-data account owned by this program — used as the per-position collateral vault.
+/// Being program-owned means we can freely modify its lamport balance.
+#[account]
+pub struct VaultAccount {}
+
+// ─── Account Contexts ──────────────────────────────────────────────────────────
 
 #[derive(Accounts)]
 #[instruction(commodity: String)]
@@ -394,7 +460,7 @@ pub struct UpdatePrice<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(direction: u8, nonce: i64)]
+#[instruction(direction: u8, nonce: i64, collateral_lamports: u64)]
 pub struct OpenPosition<'info> {
     #[account(mut)]
     pub market: Account<'info, Market>,
@@ -413,14 +479,25 @@ pub struct OpenPosition<'info> {
     )]
     pub position: Account<'info, Position>,
 
-    /// Vault PDA holds all collateral for this market
+    /// Per-position vault — program-owned PDA that holds the trader's collateral.
+    /// Isolated margin: one vault per position, seeded with trader+market+nonce.
+    /// Using UncheckedAccount + init_if_needed so it can hold bare lamports.
     #[account(
-        mut,
-        seeds = [b"vault", market.key().as_ref()],
+        init,
+        payer = trader,
+        space = 8,
+        seeds = [b"vault", trader.key().as_ref(), market.key().as_ref(), &nonce.to_le_bytes()],
         bump,
     )]
-    /// CHECK: PDA vault, lamports transferred in by trader
-    pub vault: AccountInfo<'info>,
+    pub vault: Account<'info, VaultAccount>,
+
+    /// Protocol treasury — receives taker fees. Must match market.authority.
+    #[account(
+        mut,
+        constraint = authority.key() == market.authority @ FuturesError::Unauthorized
+    )]
+    /// CHECK: Market authority / fee collector
+    pub authority: AccountInfo<'info>,
 
     #[account(mut)]
     pub trader: Signer<'info>,
@@ -446,13 +523,18 @@ pub struct ClosePosition<'info> {
     )]
     pub position: Account<'info, Position>,
 
+    /// Per-position vault (isolated — only this trader's collateral)
     #[account(
         mut,
-        seeds = [b"vault", market.key().as_ref()],
+        seeds = [
+            b"vault",
+            trader.key().as_ref(),
+            market.key().as_ref(),
+            &position.opened_at.to_le_bytes(),
+        ],
         bump,
     )]
-    /// CHECK: PDA vault
-    pub vault: AccountInfo<'info>,
+    pub vault: Account<'info, VaultAccount>,
 
     #[account(mut)]
     pub trader: Signer<'info>,
@@ -478,15 +560,20 @@ pub struct Liquidate<'info> {
     )]
     pub position: Account<'info, Position>,
 
+    /// Per-position vault for the trader being liquidated
     #[account(
         mut,
-        seeds = [b"vault", market.key().as_ref()],
+        seeds = [
+            b"vault",
+            position.owner.as_ref(),
+            market.key().as_ref(),
+            &position.opened_at.to_le_bytes(),
+        ],
         bump,
     )]
-    /// CHECK: PDA vault
-    pub vault: AccountInfo<'info>,
+    pub vault: Account<'info, VaultAccount>,
 
-    /// Anyone can be the liquidator and earn the reward
+    /// Anyone can be the liquidator — they earn 2% reward
     #[account(mut)]
     pub liquidator: Signer<'info>,
 
@@ -518,6 +605,7 @@ pub struct PositionOpened {
     pub collateral: u64,
     pub entry_price: u64,
     pub fee_paid: u64,
+    pub urim_discount: bool,
 }
 
 #[event]
@@ -560,4 +648,6 @@ pub enum FuturesError {
     NotLiquidatable,
     #[msg("Invalid market account for this position")]
     InvalidMarket,
+    #[msg("Zero collateral: must deposit SOL into vault before opening position")]
+    ZeroCollateral,
 }
