@@ -1,3 +1,7 @@
+import { fileURLToPath } from "url";
+import { dirname } from "path";
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 /**
  * Mineral Futures Price Agent
  *
@@ -20,7 +24,10 @@ import {
   PublicKey,
   SystemProgram,
   LAMPORTS_PER_SOL,
+  Transaction,
+  sendAndConfirmTransaction,
 } from "@solana/web3.js";
+import BN from "bn.js";
 import * as fs from "fs";
 import * as path from "path";
 
@@ -147,7 +154,7 @@ function getPositionPDA(trader: PublicKey, market: PublicKey, nonce: number): Pu
       Buffer.from("position"),
       trader.toBuffer(),
       market.toBuffer(),
-      Buffer.from(new anchor.BN(nonce).toArray("le", 8)),
+      Buffer.from(new BN(nonce).toArray("le", 8)),
     ],
     PROGRAM_ID
   );
@@ -284,7 +291,7 @@ async function initializeMarketsIfNeeded(
       );
 
       const tx = await (program.methods as any)
-        .initializeMarket(config.commodity, new anchor.BN(config.initialPrice))
+        .initializeMarket(config.commodity, new BN(config.initialPrice))
         .accounts({
           market: marketPDA,
           authority: authority.publicKey,
@@ -331,7 +338,7 @@ async function updatePricesOnChain(program: Program, authority: Keypair) {
       );
 
       const tx = await (program.methods as any)
-        .updatePrice(new anchor.BN(update.price))
+        .updatePrice(new BN(update.price))
         .accounts({
           market: marketPDA,
           authority: authority.publicKey,
@@ -379,8 +386,22 @@ async function openDemoPosition(
   );
 
   try {
+    // Fund the vault PDA with collateral before opening position
+    // (vault holds all collateral; position reads from vault lamports)
+    const fundTx = new Transaction().add(
+      SystemProgram.transfer({
+        fromPubkey: trader.publicKey,
+        toPubkey: vaultPDA,
+        lamports: collateral,
+      })
+    );
+    await sendAndConfirmTransaction(connection, fundTx, [trader], { commitment: "confirmed" });
+    log("VAULT_FUNDED", `Funded vault with ${collateral / LAMPORTS_PER_SOL} SOL collateral`, {
+      vault: vaultPDA.toBase58(), collateral,
+    });
+
     const tx = await (program.methods as any)
-      .openPosition(direction, new anchor.BN(nonce), false)
+      .openPosition(direction, new BN(nonce), false)
       .accounts({
         market: marketPDA,
         position: positionPDA,
