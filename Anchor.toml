@@ -7,9 +7,11 @@ skip-lint = false
 
 [programs.devnet]
 urim_solana = "5KqMaQLoKhBYcHD1qWZVcQqu5pmTvMitDUEqmKsqBTQg"
+mineral_futures = "BxCSsWy14b1yUGi8h5mEDJc9tH4AEbqVwGC8b4tcVvmz"
 
 [programs.localnet]
 urim_solana = "5KqMaQLoKhBYcHD1qWZVcQqu5pmTvMitDUEqmKsqBTQg"
+mineral_futures = "BxCSsWy14b1yUGi8h5mEDJc9tH4AEbqVwGC8b4tcVvmz"
 
 [registry]
 url = "https://api.apr.dev"
