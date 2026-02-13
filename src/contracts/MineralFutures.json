@@ -1,0 +1,80 @@
+{
+  "address": "9zakGc9vksLmWz62R84BG9KNHP4xjNAPJ6L91eFhRxUq",
+  "metadata": {
+    "name": "mineral_futures",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Mineral Futures Perpetual Trading"
+  },
+  "instructions": [
+    {
+      "name": "open_position",
+      "discriminator": [],
+      "accounts": [
+        { "name": "market", "writable": true },
+        { "name": "position", "writable": true },
+        { "name": "vault", "writable": true },
+        { "name": "authority" },
+        { "name": "trader", "writable": true, "signer": true },
+        { "name": "system_program", "address": "11111111111111111111111111111111" }
+      ],
+      "args": [
+        { "name": "direction", "type": "u8" },
+        { "name": "nonce", "type": "i64" },
+        { "name": "collateral", "type": "u64" },
+        { "name": "use_urim_discount", "type": "bool" }
+      ]
+    },
+    {
+      "name": "close_position",
+      "discriminator": [],
+      "accounts": [
+        { "name": "market" },
+        { "name": "position", "writable": true },
+        { "name": "vault", "writable": true },
+        { "name": "trader", "writable": true, "signer": true },
+        { "name": "system_program", "address": "11111111111111111111111111111111" }
+      ],
+      "args": []
+    }
+  ],
+  "accounts": [
+    { "name": "Market", "discriminator": [] },
+    { "name": "Position", "discriminator": [] }
+  ],
+  "types": [
+    {
+      "name": "Market",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          { "name": "commodity", "type": { "array": ["u8", 16] } },
+          { "name": "mark_price", "type": "u64" },
+          { "name": "last_price_update", "type": "i64" },
+          { "name": "open_interest_long", "type": "u64" },
+          { "name": "open_interest_short", "type": "u64" },
+          { "name": "total_fees_collected", "type": "u64" },
+          { "name": "authority", "type": "pubkey" },
+          { "name": "bump", "type": "u8" }
+        ]
+      }
+    },
+    {
+      "name": "Position",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          { "name": "owner", "type": "pubkey" },
+          { "name": "market", "type": "pubkey" },
+          { "name": "direction", "type": "u8" },
+          { "name": "collateral", "type": "u64" },
+          { "name": "entry_price", "type": "u64" },
+          { "name": "opened_at", "type": "i64" },
+          { "name": "fee_paid", "type": "u64" },
+          { "name": "is_open", "type": "bool" },
+          { "name": "bump", "type": "u8" }
+        ]
+      }
+    }
+  ]
+}
