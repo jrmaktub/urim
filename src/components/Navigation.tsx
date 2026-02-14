@@ -7,8 +7,8 @@ const Navigation = () => {
   const location = useLocation();
   
   const navLinks = [
-    { name: "Elections", path: "/" },
-    { name: "Mineral Futures", path: "/mineral-futures" },
+    { name: "Mineral Futures", path: "/" },
+    { name: "Elections", path: "/elections" },
     { name: "Quantum Bets", path: "/quantum-bets" },
     { name: "Quantum Pyth Prices", path: "/quantum-pyth-prices" },
     { name: "50/50 Lottery", path: "/lottery" },
