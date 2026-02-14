@@ -203,7 +203,7 @@ export function useMineralFutures(userPublicKey: string | null) {
         { pubkey: marketPDA, isSigner: false, isWritable: true },
         { pubkey: positionPDA, isSigner: false, isWritable: true },
         { pubkey: vaultPDA, isSigner: false, isWritable: true },
-        { pubkey: MARKET_AUTHORITY, isSigner: false, isWritable: false },
+        { pubkey: MARKET_AUTHORITY, isSigner: false, isWritable: true },
         { pubkey: trader, isSigner: true, isWritable: true },
         { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
       ];
