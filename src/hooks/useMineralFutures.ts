@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Connection, PublicKey, SystemProgram } from "@solana/web3.js";
+import { Connection, PublicKey, SystemProgram, Transaction, TransactionInstruction } from "@solana/web3.js";
 import { getAssociatedTokenAddress, getAccount } from "@solana/spl-token";
 import BN from "bn.js";
 import {
@@ -16,13 +16,21 @@ import {
 
 const connection = new Connection(MINERAL_FUTURES_RPC, "confirmed");
 
+// ── Discriminator helper ──
+// Anchor discriminator = first 8 bytes of SHA-256("global:<instruction_name>")
+async function getDiscriminator(instructionName: string): Promise<Buffer> {
+  const msgBuffer = new TextEncoder().encode(`global:${instructionName}`);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", msgBuffer);
+  return Buffer.from(new Uint8Array(hashBuffer).slice(0, 8));
+}
+
 // ── Account Parsing ──
 
 export interface MarketData {
   commodity: string;
-  markPrice: number; // USD integer
+  markPrice: number;
   lastPriceUpdate: number;
-  openInterestLong: number; // lamports
+  openInterestLong: number;
   openInterestShort: number;
   totalFeesCollected: number;
   authority: string;
@@ -32,9 +40,9 @@ export interface PositionData {
   publicKey: string;
   owner: string;
   market: string;
-  direction: number; // 0=Long 1=Short
-  collateral: number; // lamports
-  entryPrice: number; // USD integer
+  direction: number;
+  collateral: number;
+  entryPrice: number;
   openedAt: number;
   feePaid: number;
   isOpen: boolean;
@@ -42,7 +50,7 @@ export interface PositionData {
 
 function parseMarketAccount(data: Buffer): MarketData | null {
   try {
-    const offset = 8; // skip discriminator
+    const offset = 8;
     const commodityBytes = data.subarray(offset, offset + 16);
     const commodity = Buffer.from(commodityBytes).toString("utf-8").replace(/\0/g, "");
     const markPrice = Number(data.readBigUInt64LE(offset + 16));
@@ -87,11 +95,9 @@ export function useMineralFutures(userPublicKey: string | null) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch all market accounts
   const fetchMarkets = useCallback(async () => {
     const results: Record<string, MarketData> = {};
     const entries = Object.entries(MARKET_PDAS) as [CommodityName, string][];
-    
     await Promise.all(
       entries.map(async ([name, address]) => {
         try {
@@ -108,12 +114,8 @@ export function useMineralFutures(userPublicKey: string | null) {
     setMarkets(results);
   }, []);
 
-  // Fetch user positions
   const fetchPositions = useCallback(async () => {
-    if (!userPublicKey) {
-      setPositions([]);
-      return;
-    }
+    if (!userPublicKey) { setPositions([]); return; }
     try {
       const accounts = await connection.getProgramAccounts(MINERAL_FUTURES_PROGRAM_ID, {
         filters: [
@@ -131,7 +133,6 @@ export function useMineralFutures(userPublicKey: string | null) {
     }
   }, [userPublicKey]);
 
-  // Fetch balances
   const fetchBalances = useCallback(async () => {
     if (!userPublicKey) return;
     try {
@@ -146,14 +147,13 @@ export function useMineralFutures(userPublicKey: string | null) {
       const account = await getAccount(connection, ata);
       const bal = Number(account.amount) / 1e6;
       setUrimBalance(bal);
-      setHasUrimDiscount(bal > 0); // any URIM = discount
+      setHasUrimDiscount(bal > 0);
     } catch {
       setUrimBalance(0);
       setHasUrimDiscount(false);
     }
   }, [userPublicKey]);
 
-  // Refresh all data
   const refresh = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -166,20 +166,19 @@ export function useMineralFutures(userPublicKey: string | null) {
     }
   }, [fetchMarkets, fetchPositions, fetchBalances]);
 
-  // Auto-refresh every 30s
   useEffect(() => {
     refresh();
     const interval = setInterval(refresh, 30_000);
     return () => clearInterval(interval);
   }, [refresh]);
 
-  // ── Trade Actions ──
+  // ── Trade Actions (raw TransactionInstruction, no Anchor Program class) ──
 
   const openPosition = useCallback(
     async (
       provider: any,
       commodityName: CommodityName,
-      direction: number, // 0=Long, 1=Short
+      direction: number,
       collateralLamports: number
     ) => {
       if (!provider || !userPublicKey) throw new Error("Wallet not connected");
@@ -190,40 +189,42 @@ export function useMineralFutures(userPublicKey: string | null) {
       const positionPDA = getPositionPDA(trader, marketPDA, nonce);
       const vaultPDA = getVaultPDA(trader, marketPDA, nonce);
 
-      // Build the instruction manually using Anchor discriminator
-      // open_position discriminator = sha256("global:open_position")[0..8]
-      const { Program, AnchorProvider, Wallet, BN: AnchorBN } = await import("@coral-xyz/anchor");
-      const idl = (await import("@/contracts/MineralFutures.json")).default;
+      // Build instruction data manually:
+      // [8 bytes discriminator][1 byte direction][8 bytes nonce i64 LE][8 bytes collateral u64 LE][1 byte bool]
+      const discriminator = await getDiscriminator("open_position");
+      const data = Buffer.alloc(8 + 1 + 8 + 8 + 1);
+      discriminator.copy(data, 0);
+      data.writeUInt8(direction, 8);
+      data.writeBigInt64LE(BigInt(nonce), 9);
+      data.writeBigUInt64LE(BigInt(collateralLamports), 17);
+      data.writeUInt8(hasUrimDiscount ? 1 : 0, 25);
 
-      // Create a read-only provider, we'll sign via Phantom
-      const anchorProvider = new AnchorProvider(connection, {
-        publicKey: trader,
-        signTransaction: provider.signTransaction.bind(provider),
-        signAllTransactions: provider.signAllTransactions.bind(provider),
-      } as any, { commitment: "confirmed" });
+      const keys = [
+        { pubkey: marketPDA, isSigner: false, isWritable: true },
+        { pubkey: positionPDA, isSigner: false, isWritable: true },
+        { pubkey: vaultPDA, isSigner: false, isWritable: true },
+        { pubkey: MARKET_AUTHORITY, isSigner: false, isWritable: false },
+        { pubkey: trader, isSigner: true, isWritable: true },
+        { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+      ];
 
-      const program = new Program(idl as any, anchorProvider);
+      const instruction = new TransactionInstruction({
+        keys,
+        programId: MINERAL_FUTURES_PROGRAM_ID,
+        data,
+      });
 
-      const tx = await (program.methods as any)
-        .openPosition(
-          direction,
-          new AnchorBN(nonce),
-          new AnchorBN(collateralLamports),
-          hasUrimDiscount
-        )
-        .accounts({
-          market: marketPDA,
-          position: positionPDA,
-          vault: vaultPDA,
-          authority: MARKET_AUTHORITY,
-          trader,
-          systemProgram: SystemProgram.programId,
-        })
-        .rpc();
+      const tx = new Transaction().add(instruction);
+      tx.feePayer = trader;
+      tx.recentBlockhash = (await connection.getLatestBlockhash("confirmed")).blockhash;
 
-      console.log("Position opened:", tx);
+      const signed = await provider.signTransaction(tx);
+      const txId = await connection.sendRawTransaction(signed.serialize());
+      await connection.confirmTransaction(txId, "confirmed");
+
+      console.log("Position opened:", txId);
       await refresh();
-      return tx;
+      return txId;
     },
     [userPublicKey, hasUrimDiscount, refresh]
   );
@@ -237,31 +238,34 @@ export function useMineralFutures(userPublicKey: string | null) {
       const positionPDA = new PublicKey(position.publicKey);
       const vaultPDA = getVaultPDA(trader, marketPDA, position.openedAt);
 
-      const { Program, AnchorProvider } = await import("@coral-xyz/anchor");
-      const idl = (await import("@/contracts/MineralFutures.json")).default;
+      // close_position has no args, just the discriminator
+      const discriminator = await getDiscriminator("close_position");
 
-      const anchorProvider = new AnchorProvider(connection, {
-        publicKey: trader,
-        signTransaction: provider.signTransaction.bind(provider),
-        signAllTransactions: provider.signAllTransactions.bind(provider),
-      } as any, { commitment: "confirmed" });
+      const keys = [
+        { pubkey: marketPDA, isSigner: false, isWritable: false },
+        { pubkey: positionPDA, isSigner: false, isWritable: true },
+        { pubkey: vaultPDA, isSigner: false, isWritable: true },
+        { pubkey: trader, isSigner: true, isWritable: true },
+        { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+      ];
 
-      const program = new Program(idl as any, anchorProvider);
+      const instruction = new TransactionInstruction({
+        keys,
+        programId: MINERAL_FUTURES_PROGRAM_ID,
+        data: discriminator,
+      });
 
-      const tx = await (program.methods as any)
-        .closePosition()
-        .accounts({
-          market: marketPDA,
-          position: positionPDA,
-          vault: vaultPDA,
-          trader,
-          systemProgram: SystemProgram.programId,
-        })
-        .rpc();
+      const tx = new Transaction().add(instruction);
+      tx.feePayer = trader;
+      tx.recentBlockhash = (await connection.getLatestBlockhash("confirmed")).blockhash;
 
-      console.log("Position closed:", tx);
+      const signed = await provider.signTransaction(tx);
+      const txId = await connection.sendRawTransaction(signed.serialize());
+      await connection.confirmTransaction(txId, "confirmed");
+
+      console.log("Position closed:", txId);
       await refresh();
-      return tx;
+      return txId;
     },
     [userPublicKey, refresh]
   );
