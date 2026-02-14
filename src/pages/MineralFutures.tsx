@@ -282,31 +282,15 @@ export default function MineralFutures() {
                   )}
                 </div>
 
-                {/* Fee info */}
-                <div className="bg-muted/30 rounded-lg p-3 space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Fee</span>
-                    <span className={`font-mono ${hasUrimDiscount ? "text-[hsl(45,95%,55%)]" : "text-foreground"}`}>
-                      {feeLabel}
-                    </span>
-                  </div>
-                  {currentMarket && solAmount && (
+                {/* Entry price info */}
+                {currentMarket && solAmount && (
+                  <div className="bg-muted/30 rounded-lg p-3 text-sm">
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Entry Price</span>
                       <span className="font-mono text-foreground">
                         {formatPrice(currentMarket.markPrice)}/ton
                       </span>
                     </div>
-                  )}
-                </div>
-
-                {/* URIM discount badge */}
-                {hasUrimDiscount && (
-                  <div className="flex items-center gap-2 bg-[hsl(45,95%,55%/0.1)] border border-[hsl(45,95%,55%/0.3)] rounded-lg px-3 py-2">
-                    <Shield className="w-4 h-4 text-[hsl(45,95%,55%)]" />
-                    <span className="text-xs text-[hsl(45,95%,55%)] font-semibold">
-                      URIM discount active — 0.045% fees
-                    </span>
                   </div>
                 )}
 
