@@ -5,7 +5,6 @@ auto = "fallback"
 [install.scopes]
 # Make all Trezor packages optional
 "@trezor" = "optional"
-"@ledgerhq" = "optional"
 
 [install.trustedDependencies]
 # Don't trust any packages to run lifecycle scripts
