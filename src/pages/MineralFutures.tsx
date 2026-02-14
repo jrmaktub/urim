@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { parseSolanaError } from "@/components/CopyableErrorToast";
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
 import { useSolanaWallet } from "@/hooks/useSolanaWallet";
@@ -83,8 +84,14 @@ export default function MineralFutures() {
       toast.success(`Position opened! TX: ${tx.slice(0, 8)}...`);
       setSolAmount("");
     } catch (e: any) {
-      console.error("Open position error:", e);
-      toast.error(e.message || "Failed to open position");
+      const { userMessage, fullError } = parseSolanaError(e);
+      toast.error(userMessage, {
+        description: fullError.length > 100 ? fullError.slice(0, 100) + "..." : undefined,
+        action: {
+          label: "Copy",
+          onClick: () => navigator.clipboard.writeText(fullError),
+        },
+      });
     } finally {
       setPlacingOrder(false);
     }
@@ -97,8 +104,14 @@ export default function MineralFutures() {
       const tx = await closePosition(provider, pos);
       toast.success(`Position closed! TX: ${tx.slice(0, 8)}...`);
     } catch (e: any) {
-      console.error("Close position error:", e);
-      toast.error(e.message || "Failed to close position");
+      const { userMessage, fullError } = parseSolanaError(e);
+      toast.error(userMessage, {
+        description: fullError.length > 100 ? fullError.slice(0, 100) + "..." : undefined,
+        action: {
+          label: "Copy",
+          onClick: () => navigator.clipboard.writeText(fullError),
+        },
+      });
     } finally {
       setClosingPosition(null);
     }

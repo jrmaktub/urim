@@ -1,60 +1,49 @@
 {
-  "address": "9zakGc9vksLmWz62R84BG9KNHP4xjNAPJ6L91eFhRxUq",
-  "metadata": {
-    "name": "mineral_futures",
-    "version": "0.1.0",
-    "spec": "0.1.0",
-    "description": "Mineral Futures Perpetual Trading"
-  },
+  "version": "0.1.0",
+  "name": "mineral_futures",
   "instructions": [
     {
-      "name": "open_position",
-      "discriminator": [],
+      "name": "openPosition",
       "accounts": [
-        { "name": "market", "writable": true },
-        { "name": "position", "writable": true },
-        { "name": "vault", "writable": true },
-        { "name": "authority" },
-        { "name": "trader", "writable": true, "signer": true },
-        { "name": "system_program", "address": "11111111111111111111111111111111" }
+        { "name": "market", "isMut": true, "isSigner": false },
+        { "name": "position", "isMut": true, "isSigner": false },
+        { "name": "vault", "isMut": true, "isSigner": false },
+        { "name": "authority", "isMut": false, "isSigner": false },
+        { "name": "trader", "isMut": true, "isSigner": true },
+        { "name": "systemProgram", "isMut": false, "isSigner": false }
       ],
       "args": [
         { "name": "direction", "type": "u8" },
         { "name": "nonce", "type": "i64" },
         { "name": "collateral", "type": "u64" },
-        { "name": "use_urim_discount", "type": "bool" }
+        { "name": "useUrimDiscount", "type": "bool" }
       ]
     },
     {
-      "name": "close_position",
-      "discriminator": [],
+      "name": "closePosition",
       "accounts": [
-        { "name": "market" },
-        { "name": "position", "writable": true },
-        { "name": "vault", "writable": true },
-        { "name": "trader", "writable": true, "signer": true },
-        { "name": "system_program", "address": "11111111111111111111111111111111" }
+        { "name": "market", "isMut": false, "isSigner": false },
+        { "name": "position", "isMut": true, "isSigner": false },
+        { "name": "vault", "isMut": true, "isSigner": false },
+        { "name": "trader", "isMut": true, "isSigner": true },
+        { "name": "systemProgram", "isMut": false, "isSigner": false }
       ],
       "args": []
     }
   ],
   "accounts": [
-    { "name": "Market", "discriminator": [] },
-    { "name": "Position", "discriminator": [] }
-  ],
-  "types": [
     {
       "name": "Market",
       "type": {
         "kind": "struct",
         "fields": [
           { "name": "commodity", "type": { "array": ["u8", 16] } },
-          { "name": "mark_price", "type": "u64" },
-          { "name": "last_price_update", "type": "i64" },
-          { "name": "open_interest_long", "type": "u64" },
-          { "name": "open_interest_short", "type": "u64" },
-          { "name": "total_fees_collected", "type": "u64" },
-          { "name": "authority", "type": "pubkey" },
+          { "name": "markPrice", "type": "u64" },
+          { "name": "lastPriceUpdate", "type": "i64" },
+          { "name": "openInterestLong", "type": "u64" },
+          { "name": "openInterestShort", "type": "u64" },
+          { "name": "totalFeesCollected", "type": "u64" },
+          { "name": "authority", "type": "publicKey" },
           { "name": "bump", "type": "u8" }
         ]
       }
@@ -64,14 +53,14 @@
       "type": {
         "kind": "struct",
         "fields": [
-          { "name": "owner", "type": "pubkey" },
-          { "name": "market", "type": "pubkey" },
+          { "name": "owner", "type": "publicKey" },
+          { "name": "market", "type": "publicKey" },
           { "name": "direction", "type": "u8" },
           { "name": "collateral", "type": "u64" },
-          { "name": "entry_price", "type": "u64" },
-          { "name": "opened_at", "type": "i64" },
-          { "name": "fee_paid", "type": "u64" },
-          { "name": "is_open", "type": "bool" },
+          { "name": "entryPrice", "type": "u64" },
+          { "name": "openedAt", "type": "i64" },
+          { "name": "feePaid", "type": "u64" },
+          { "name": "isOpen", "type": "bool" },
           { "name": "bump", "type": "u8" }
         ]
       }
