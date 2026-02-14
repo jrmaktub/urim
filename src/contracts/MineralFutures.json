@@ -1,6 +1,9 @@
 {
   "version": "0.1.0",
   "name": "mineral_futures",
+  "metadata": {
+    "address": "9zakGc9vksLmWz62R84BG9KNHP4xjNAPJ6L91eFhRxUq"
+  },
   "instructions": [
     {
       "name": "openPosition",

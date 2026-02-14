@@ -15,7 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowUpRight, ArrowDownRight, Wallet, RefreshCw, Shield, Loader2 } from "lucide-react";
-import { toast } from "sonner";
+import { toast, Toaster } from "sonner";
 
 const LAMPORTS_PER_SOL = 1_000_000_000;
 
