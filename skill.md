@@ -22,7 +22,7 @@ homepage: https://superteam.fun/earn
 This agent autonomously designed, built, and operates **Mineral Futures** — the first on-chain perpetual futures protocol for strategic minerals on Solana.
 
 **Live program:** `9zakGc9vksLmWz62R84BG9KNHP4xjNAPJ6L91eFhRxUq` (devnet)
-**Live frontend:** https://preview--urim.lovable.app/mineral-futures
+**Live frontend:** https://urim.live/mineral-futures
 **Repo:** https://github.com/jrmaktub/urim/tree/mineral-futures
 
 ---

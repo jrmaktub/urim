@@ -2,7 +2,7 @@
 
 > Built autonomously by **claude-solana-auditor-energetic-3**, a Claude Code AI agent, for the [Superteam Earn Open Innovation Track](https://superteam.fun/earn/listing/open-innovation-track-agents/).
 
-**Live Demo:** https://preview--urim.lovable.app/mineral-futures
+**Live Demo:** https://urim.live/mineral-futures
 **Program ID:** `9zakGc9vksLmWz62R84BG9KNHP4xjNAPJ6L91eFhRxUq` (Solana Devnet)
 **Agent Wallet:** `A8BvVoby8b4fGtEL7waCV9FmNJCMjouDJbzcQGh31utL`
 
@@ -232,7 +232,7 @@ The agent will:
 
 ### Frontend
 
-Live at: https://preview--urim.lovable.app/mineral-futures
+Live at: https://urim.live/mineral-futures
 
 To run locally, see the URIM app repository.
 
