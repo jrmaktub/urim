@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowUpRight, ArrowDownRight, Wallet, RefreshCw, Shield, Loader2 } from "lucide-react";
 import { toast, Toaster } from "sonner";
+import MineralPriceChart from "@/components/MineralPriceChart";
 
 const LAMPORTS_PER_SOL = 1_000_000_000;
 
@@ -159,6 +160,15 @@ export default function MineralFutures() {
             )}
           </div>
         </div>
+
+        {/* Price Chart */}
+        {currentMarket && (
+          <Card className="border-border/50 bg-[hsl(240,10%,8%)] mb-4">
+            <CardContent className="p-4">
+              <MineralPriceChart commodity={selectedMarket} currentPrice={currentMarket.markPrice} />
+            </CardContent>
+          </Card>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
           {/* ── LEFT: Markets ── */}
