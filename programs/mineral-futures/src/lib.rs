@@ -16,8 +16,14 @@ pub const MAX_POSITION_VAULT_BPS: u64 = 2000;
 
 // Funding rate interval: 8 hours in seconds
 pub const FUNDING_INTERVAL: i64 = 28800;
-// Max funding rate per interval: 0.1% (10 bps) — prevents runaway rates
+// Max funding rate per interval: 0.1% (10 bps)
 pub const MAX_FUNDING_RATE_BPS: i64 = 10;
+
+// Minimum collateral: 0.01 SOL (prevents dust positions nobody will liquidate)
+pub const MIN_COLLATERAL: u64 = 10_000_000;
+
+// Max price staleness: 6 hours in seconds
+pub const MAX_PRICE_AGE: i64 = 21600;
 
 // URIM token mint: F8W15WcpXHDthW2TyyiZJ2wMLazGc8CQ4poMNpXQpump
 pub const URIM_MINT: [u8; 32] = [
@@ -64,12 +70,6 @@ pub mod mineral_futures {
         market.funding_rate_cumulative = 0;
         market.last_funding_time = Clock::get()?.unix_timestamp;
         market.is_paused = false;
-
-        emit!(MarketInitialized {
-            commodity: commodity.clone(),
-            initial_price,
-            authority: ctx.accounts.authority.key(),
-        });
         Ok(())
     }
 
@@ -77,20 +77,12 @@ pub mod mineral_futures {
         require!(new_price > 0, FuturesError::InvalidPrice);
 
         let market = &mut ctx.accounts.market;
-        let old_price = market.mark_price;
         market.mark_price = new_price;
         market.last_price_update = Clock::get()?.unix_timestamp;
-
-        emit!(PriceUpdated {
-            commodity: market.commodity,
-            old_price,
-            new_price,
-            timestamp: market.last_price_update,
-        });
         Ok(())
     }
 
-    /// Open a leveraged long/short position. Fee on open (0.05%, or 0.045% w/ URIM).
+    /// Open a leveraged long/short position.
     pub fn open_position(
         ctx: Context<OpenPosition>,
         direction: u8,
@@ -101,11 +93,18 @@ pub mod mineral_futures {
     ) -> Result<()> {
         let market = &ctx.accounts.market;
         require!(!market.is_paused, FuturesError::MarketPaused);
-        require!(direction == 0 || direction == 1, FuturesError::InvalidDirection);
-        require!(collateral_lamports > 0, FuturesError::ZeroCollateral);
+        require!(direction <= 1, FuturesError::InvalidDirection);
+        require!(collateral_lamports >= MIN_COLLATERAL, FuturesError::CollateralTooSmall);
         require!(leverage >= 1 && leverage <= MAX_LEVERAGE, FuturesError::InvalidLeverage);
 
-        // Position size limit: notional can't exceed 20% of vault (only enforced when OI exists)
+        // Stale price check
+        let now = Clock::get()?.unix_timestamp;
+        require!(
+            now - market.last_price_update <= MAX_PRICE_AGE,
+            FuturesError::StalePrice
+        );
+
+        // Position size limit (only when OI exists)
         let total_oi = market.open_interest_long.saturating_add(market.open_interest_short);
         if total_oi > 0 {
             let vault_balance = ctx.accounts.vault.to_account_info().lamports();
@@ -126,14 +125,16 @@ pub mod mineral_futures {
         };
 
         // Transfer collateral → vault
-        let cpi_ctx = CpiContext::new(
-            ctx.accounts.system_program.to_account_info(),
-            anchor_lang::system_program::Transfer {
-                from: ctx.accounts.trader.to_account_info(),
-                to: ctx.accounts.vault.to_account_info(),
-            },
-        );
-        anchor_lang::system_program::transfer(cpi_ctx, collateral_lamports)?;
+        anchor_lang::system_program::transfer(
+            CpiContext::new(
+                ctx.accounts.system_program.to_account_info(),
+                anchor_lang::system_program::Transfer {
+                    from: ctx.accounts.trader.to_account_info(),
+                    to: ctx.accounts.vault.to_account_info(),
+                },
+            ),
+            collateral_lamports,
+        )?;
 
         // Fee: 0.05% standard, 0.045% with verified URIM
         let base_fee = collateral_lamports
@@ -157,11 +158,7 @@ pub mod mineral_futures {
         // Fee → authority treasury
         if fee > 0 {
             **ctx.accounts.vault.to_account_info().try_borrow_mut_lamports()? -= fee;
-            **ctx
-                .accounts
-                .authority
-                .to_account_info()
-                .try_borrow_mut_lamports()? += fee;
+            **ctx.accounts.authority.to_account_info().try_borrow_mut_lamports()? += fee;
         }
 
         let position = &mut ctx.accounts.position;
@@ -177,7 +174,6 @@ pub mod mineral_futures {
         position.bump = ctx.bumps.position;
         position.entry_funding_rate = market.funding_rate_cumulative;
 
-        let market_key = ctx.accounts.market.key();
         let market = &mut ctx.accounts.market;
         if direction == 0 {
             market.open_interest_long = market.open_interest_long.saturating_add(net_collateral);
@@ -185,21 +181,10 @@ pub mod mineral_futures {
             market.open_interest_short = market.open_interest_short.saturating_add(net_collateral);
         }
         market.total_fees_collected = market.total_fees_collected.saturating_add(fee);
-
-        emit!(PositionOpened {
-            trader: ctx.accounts.trader.key(),
-            market: market_key,
-            direction,
-            collateral: net_collateral,
-            entry_price: position.entry_price,
-            fee_paid: fee,
-            leverage,
-            urim_discount: verified_urim,
-        });
         Ok(())
     }
 
-    /// Close position. Fee on close (0.05%). Funding rate settlement included.
+    /// Close position. Includes funding settlement + close fee.
     pub fn close_position(ctx: Context<ClosePosition>) -> Result<()> {
         let position = &ctx.accounts.position;
         let market = &ctx.accounts.market;
@@ -216,39 +201,15 @@ pub mod mineral_futures {
         let leverage = position.leverage as u64;
 
         // PnL with leverage
-        let pnl: i64 = if position.direction == 0 {
-            let price_change = (current_price as i64).saturating_sub(entry_price as i64);
-            price_change
-                .saturating_mul(collateral as i64)
-                .checked_div(entry_price as i64)
-                .unwrap_or(0)
-                .saturating_mul(leverage as i64)
-        } else {
-            let price_change = (entry_price as i64).saturating_sub(current_price as i64);
-            price_change
-                .saturating_mul(collateral as i64)
-                .checked_div(entry_price as i64)
-                .unwrap_or(0)
-                .saturating_mul(leverage as i64)
-        };
+        let pnl = calc_pnl(position.direction, current_price, entry_price, collateral, leverage);
 
-        // Funding rate settlement: difference between current cumulative and entry
-        let funding_delta =
-            market.funding_rate_cumulative - position.entry_funding_rate;
-        // Longs pay positive funding, shorts receive it (and vice versa)
-        let funding_payment: i64 = if position.direction == 0 {
-            // Long pays funding_delta * collateral / BPS_DENOMINATOR
-            -(funding_delta
-                .saturating_mul(collateral as i64)
-                .checked_div(BPS_DENOMINATOR as i64)
-                .unwrap_or(0))
-        } else {
-            // Short receives funding_delta
-            funding_delta
-                .saturating_mul(collateral as i64)
-                .checked_div(BPS_DENOMINATOR as i64)
-                .unwrap_or(0)
-        };
+        // Funding settlement
+        let funding_payment = calc_funding_payment(
+            position.direction,
+            market.funding_rate_cumulative,
+            position.entry_funding_rate,
+            collateral,
+        );
 
         let total_pnl = pnl.saturating_add(funding_payment);
 
@@ -275,19 +236,9 @@ pub mod mineral_futures {
         let actual_payout = payout.min(available);
 
         if actual_payout > 0 {
-            **ctx
-                .accounts
-                .vault
-                .to_account_info()
-                .try_borrow_mut_lamports()? -= actual_payout;
-            **ctx
-                .accounts
-                .trader
-                .to_account_info()
-                .try_borrow_mut_lamports()? += actual_payout;
+            **ctx.accounts.vault.to_account_info().try_borrow_mut_lamports()? -= actual_payout;
+            **ctx.accounts.trader.to_account_info().try_borrow_mut_lamports()? += actual_payout;
         }
-
-        // Close fee stays in vault (part of protocol revenue, withdrawable by authority)
 
         // Update OI
         let market = &mut ctx.accounts.market;
@@ -304,19 +255,14 @@ pub mod mineral_futures {
         emit!(PositionClosed {
             trader: ctx.accounts.trader.key(),
             market: ctx.accounts.market.key(),
-            direction: position.direction,
-            collateral,
-            entry_price,
-            exit_price: current_price,
             pnl: total_pnl,
             payout: actual_payout,
-            leverage: position.leverage,
             close_fee,
         });
         Ok(())
     }
 
-    /// Liquidate underwater position. Permissionless. 2% reward to liquidator.
+    /// Liquidate underwater position. Accounts for BOTH price move AND funding.
     pub fn liquidate(ctx: Context<Liquidate>) -> Result<()> {
         let position = &ctx.accounts.position;
         let market = &ctx.accounts.market;
@@ -328,32 +274,26 @@ pub mod mineral_futures {
         let collateral = position.collateral;
         let leverage = position.leverage as u64;
 
-        let threshold_bps = 9000u64.checked_div(leverage).unwrap_or(9000);
+        // Calculate total loss including funding
+        let pnl = calc_pnl(position.direction, current_price, entry_price, collateral, leverage);
+        let funding_payment = calc_funding_payment(
+            position.direction,
+            market.funding_rate_cumulative,
+            position.entry_funding_rate,
+            collateral,
+        );
+        let total_pnl = pnl.saturating_add(funding_payment);
 
-        let price_move_bps: u64 = if position.direction == 0 {
-            if current_price >= entry_price {
-                return err!(FuturesError::NotLiquidatable);
-            }
-            entry_price
-                .saturating_sub(current_price)
-                .checked_mul(BPS_DENOMINATOR)
-                .unwrap_or(u64::MAX)
-                .checked_div(entry_price)
-                .unwrap_or(u64::MAX)
-        } else {
-            if current_price <= entry_price {
-                return err!(FuturesError::NotLiquidatable);
-            }
-            current_price
-                .saturating_sub(entry_price)
-                .checked_mul(BPS_DENOMINATOR)
-                .unwrap_or(u64::MAX)
-                .checked_div(entry_price)
-                .unwrap_or(u64::MAX)
-        };
+        // Liquidatable when loss >= 90% of collateral (adjusted by leverage via PnL calc)
+        let threshold = (collateral as i64)
+            .checked_mul(9000)
+            .unwrap_or(i64::MAX)
+            .checked_div(BPS_DENOMINATOR as i64)
+            .unwrap_or(i64::MAX);
 
-        require!(price_move_bps >= threshold_bps, FuturesError::NotLiquidatable);
+        require!(total_pnl <= -threshold, FuturesError::NotLiquidatable);
 
+        // Liquidator reward: 2% of collateral from vault
         let liquidator_reward = collateral
             .checked_mul(LIQUIDATOR_REWARD_BPS)
             .unwrap_or(0)
@@ -366,16 +306,8 @@ pub mod mineral_futures {
         let actual_reward = liquidator_reward.min(available);
 
         if actual_reward > 0 {
-            **ctx
-                .accounts
-                .vault
-                .to_account_info()
-                .try_borrow_mut_lamports()? -= actual_reward;
-            **ctx
-                .accounts
-                .liquidator
-                .to_account_info()
-                .try_borrow_mut_lamports()? += actual_reward;
+            **ctx.accounts.vault.to_account_info().try_borrow_mut_lamports()? -= actual_reward;
+            **ctx.accounts.liquidator.to_account_info().try_borrow_mut_lamports()? += actual_reward;
         }
 
         let market = &mut ctx.accounts.market;
@@ -393,15 +325,12 @@ pub mod mineral_futures {
             market: ctx.accounts.market.key(),
             liquidator: ctx.accounts.liquidator.key(),
             collateral,
-            price_move_bps,
-            leverage: position.leverage,
             liquidator_reward: actual_reward,
         });
         Ok(())
     }
 
-    /// Apply funding rate. Permissionless — anyone can crank every 8 hours.
-    /// Rate based on OI imbalance: longs pay shorts if more longs, vice versa.
+    /// Apply funding rate. Permissionless crank every 8 hours.
     pub fn apply_funding(ctx: Context<ApplyFunding>) -> Result<()> {
         let market = &mut ctx.accounts.market;
         let now = Clock::get()?.unix_timestamp;
@@ -416,8 +345,8 @@ pub mod mineral_futures {
         let total_oi = oi_long + oi_short;
 
         let rate: i64 = if total_oi > 0 {
-            let imbalance = oi_long.saturating_sub(oi_short);
-            imbalance
+            oi_long
+                .saturating_sub(oi_short)
                 .saturating_mul(MAX_FUNDING_RATE_BPS)
                 .checked_div(total_oi)
                 .unwrap_or(0)
@@ -427,104 +356,94 @@ pub mod mineral_futures {
 
         market.funding_rate_cumulative = market.funding_rate_cumulative.saturating_add(rate);
         market.last_funding_time = now;
-
-        let market_key = market.key();
-        let cumulative = market.funding_rate_cumulative;
-
-        emit!(FundingApplied {
-            market: market_key,
-            rate,
-            cumulative,
-            timestamp: now,
-        });
         Ok(())
     }
 
-    /// Pause market — authority only. Blocks new positions.
     pub fn pause_market(ctx: Context<PauseMarket>) -> Result<()> {
         ctx.accounts.market.is_paused = true;
-        msg!("Market paused");
         Ok(())
     }
 
-    /// Unpause market — authority only.
     pub fn unpause_market(ctx: Context<PauseMarket>) -> Result<()> {
         ctx.accounts.market.is_paused = false;
-        msg!("Market unpaused");
         Ok(())
     }
 
-    /// Withdraw accumulated fees/profits from vault. Authority only.
-    /// Cannot withdraw below total open interest + rent-exempt minimum.
+    /// Withdraw fees from vault. Cannot withdraw below 2x total OI + rent (safety buffer).
     pub fn withdraw_fees(ctx: Context<WithdrawFees>, amount: u64) -> Result<()> {
         let market = &ctx.accounts.market;
         let vault_balance = ctx.accounts.vault.to_account_info().lamports();
         let rent_min = Rent::get()?.minimum_balance(8);
 
-        // Safety: vault must retain enough to cover all open positions + rent
+        // Safety: vault must retain 2x OI + rent to cover leveraged payouts
         let total_oi = market
             .open_interest_long
             .saturating_add(market.open_interest_short);
-        let min_vault = total_oi.saturating_add(rent_min);
+        let min_vault = total_oi
+            .saturating_mul(2)
+            .saturating_add(rent_min);
         let withdrawable = vault_balance.saturating_sub(min_vault);
 
         require!(amount > 0 && amount <= withdrawable, FuturesError::NothingToWithdraw);
 
-        **ctx
-            .accounts
-            .vault
-            .to_account_info()
-            .try_borrow_mut_lamports()? -= amount;
-        **ctx
-            .accounts
-            .authority
-            .to_account_info()
-            .try_borrow_mut_lamports()? += amount;
+        **ctx.accounts.vault.to_account_info().try_borrow_mut_lamports()? -= amount;
+        **ctx.accounts.authority.to_account_info().try_borrow_mut_lamports()? += amount;
+        Ok(())
+    }
 
-        emit!(FeesWithdrawn {
-            market: ctx.accounts.market.key(),
-            authority: ctx.accounts.authority.key(),
-            amount,
-            vault_remaining: vault_balance - amount,
-        });
+    /// Transfer market authority to a new keypair.
+    pub fn transfer_authority(ctx: Context<TransferAuthority>) -> Result<()> {
+        ctx.accounts.market.authority = ctx.accounts.new_authority.key();
+        Ok(())
+    }
+
+    /// Reclaim rent from a closed position account.
+    pub fn close_position_account(ctx: Context<ClosePositionAccount>) -> Result<()> {
+        // Anchor's close constraint handles the lamport transfer
         Ok(())
     }
 }
 
-// ─── URIM verification helper ───────────────────────────────────────────────
+// ─── Shared helpers ─────────────────────────────────────────────────────────
 
-/// Verify trader holds >= 1 URIM token by deserializing their SPL token account.
-/// The token account must be passed in remaining_accounts[0].
+fn calc_pnl(direction: u8, current_price: u64, entry_price: u64, collateral: u64, leverage: u64) -> i64 {
+    let price_change = if direction == 0 {
+        (current_price as i64).saturating_sub(entry_price as i64)
+    } else {
+        (entry_price as i64).saturating_sub(current_price as i64)
+    };
+    price_change
+        .saturating_mul(collateral as i64)
+        .checked_div(entry_price as i64)
+        .unwrap_or(0)
+        .saturating_mul(leverage as i64)
+}
+
+fn calc_funding_payment(direction: u8, cumulative: i64, entry_rate: i64, collateral: u64) -> i64 {
+    let delta = cumulative - entry_rate;
+    let raw = delta
+        .saturating_mul(collateral as i64)
+        .checked_div(BPS_DENOMINATOR as i64)
+        .unwrap_or(0);
+    // Longs pay positive funding, shorts receive it
+    if direction == 0 { -raw } else { raw }
+}
+
 fn verify_urim_balance(remaining_accounts: &[AccountInfo], trader: &Pubkey) -> Result<bool> {
     if remaining_accounts.is_empty() {
         return Ok(false);
     }
-
-    let token_account = &remaining_accounts[0];
-
-    // Must be owned by SPL Token program
-    if token_account.owner.to_bytes() != SPL_TOKEN_PROGRAM {
+    let acct = &remaining_accounts[0];
+    if acct.owner.to_bytes() != SPL_TOKEN_PROGRAM {
         return Ok(false);
     }
-
-    let data = token_account.try_borrow_data()?;
-    // SPL Token account layout: 165 bytes
-    // [0..32] = mint, [32..64] = owner, [64..72] = amount (little-endian u64)
+    let data = acct.try_borrow_data()?;
     if data.len() < 72 {
         return Ok(false);
     }
-
-    // Check mint matches URIM
-    if data[0..32] != URIM_MINT {
+    if data[0..32] != URIM_MINT || data[32..64] != trader.to_bytes() {
         return Ok(false);
     }
-
-    // Check owner matches trader
-    if data[32..64] != trader.to_bytes() {
-        return Ok(false);
-    }
-
-    // Check balance >= 1 URIM
     let amount = u64::from_le_bytes(data[64..72].try_into().unwrap());
     Ok(amount >= MIN_URIM_BALANCE)
 }
@@ -548,8 +467,7 @@ pub struct Market {
 }
 
 impl Market {
-    // 8 + 16 + 8 + 8 + 8 + 8 + 8 + 32 + 1 + 1 + 8 + 8 + 1 = 115
-    pub const SIZE: usize = 8 + 16 + 8 + 8 + 8 + 8 + 8 + 32 + 1 + 1 + 8 + 8 + 1;
+    pub const SIZE: usize = 8 + 16 + 8 + 8 + 8 + 8 + 8 + 32 + 1 + 1 + 8 + 8 + 1; // 115
 }
 
 #[account]
@@ -568,8 +486,7 @@ pub struct Position {
 }
 
 impl Position {
-    // 8 + 32 + 32 + 1 + 8 + 8 + 8 + 8 + 1 + 1 + 1 + 8 = 116
-    pub const SIZE: usize = 8 + 32 + 32 + 1 + 8 + 8 + 8 + 8 + 1 + 1 + 1 + 8;
+    pub const SIZE: usize = 8 + 32 + 32 + 1 + 8 + 8 + 8 + 8 + 1 + 1 + 1 + 8; // 116
 }
 
 #[account]
@@ -581,35 +498,25 @@ pub struct VaultAccount {}
 #[instruction(commodity: String)]
 pub struct InitializeMarket<'info> {
     #[account(
-        init,
-        payer = authority,
-        space = Market::SIZE,
-        seeds = [b"market", commodity.as_bytes()],
-        bump,
+        init, payer = authority, space = Market::SIZE,
+        seeds = [b"market", commodity.as_bytes()], bump,
     )]
     pub market: Account<'info, Market>,
 
     #[account(
-        init,
-        payer = authority,
-        space = 8,
-        seeds = [b"vault", market.key().as_ref()],
-        bump,
+        init, payer = authority, space = 8,
+        seeds = [b"vault", market.key().as_ref()], bump,
     )]
     pub vault: Account<'info, VaultAccount>,
 
     #[account(mut)]
     pub authority: Signer<'info>,
-
     pub system_program: Program<'info, System>,
 }
 
 #[derive(Accounts)]
 pub struct UpdatePrice<'info> {
-    #[account(
-        mut,
-        has_one = authority @ FuturesError::Unauthorized,
-    )]
+    #[account(mut, has_one = authority @ FuturesError::Unauthorized)]
     pub market: Account<'info, Market>,
     pub authority: Signer<'info>,
 }
@@ -621,36 +528,21 @@ pub struct OpenPosition<'info> {
     pub market: Account<'info, Market>,
 
     #[account(
-        init,
-        payer = trader,
-        space = Position::SIZE,
-        seeds = [
-            b"position",
-            trader.key().as_ref(),
-            market.key().as_ref(),
-            &nonce.to_le_bytes(),
-        ],
+        init, payer = trader, space = Position::SIZE,
+        seeds = [b"position", trader.key().as_ref(), market.key().as_ref(), &nonce.to_le_bytes()],
         bump,
     )]
     pub position: Account<'info, Position>,
 
-    #[account(
-        mut,
-        seeds = [b"vault", market.key().as_ref()],
-        bump = market.vault_bump,
-    )]
+    #[account(mut, seeds = [b"vault", market.key().as_ref()], bump = market.vault_bump)]
     pub vault: Account<'info, VaultAccount>,
 
     /// CHECK: Market authority / fee collector
-    #[account(
-        mut,
-        constraint = authority.key() == market.authority @ FuturesError::Unauthorized
-    )]
+    #[account(mut, constraint = authority.key() == market.authority @ FuturesError::Unauthorized)]
     pub authority: AccountInfo<'info>,
 
     #[account(mut)]
     pub trader: Signer<'info>,
-
     pub system_program: Program<'info, System>,
 }
 
@@ -661,27 +553,17 @@ pub struct ClosePosition<'info> {
 
     #[account(
         mut,
-        seeds = [
-            b"position",
-            trader.key().as_ref(),
-            market.key().as_ref(),
-            &position.opened_at.to_le_bytes(),
-        ],
+        seeds = [b"position", trader.key().as_ref(), market.key().as_ref(), &position.opened_at.to_le_bytes()],
         bump = position.bump,
         has_one = market @ FuturesError::InvalidMarket,
     )]
     pub position: Account<'info, Position>,
 
-    #[account(
-        mut,
-        seeds = [b"vault", market.key().as_ref()],
-        bump = market.vault_bump,
-    )]
+    #[account(mut, seeds = [b"vault", market.key().as_ref()], bump = market.vault_bump)]
     pub vault: Account<'info, VaultAccount>,
 
     #[account(mut)]
     pub trader: Signer<'info>,
-
     pub system_program: Program<'info, System>,
 }
 
@@ -692,27 +574,17 @@ pub struct Liquidate<'info> {
 
     #[account(
         mut,
-        seeds = [
-            b"position",
-            position.owner.as_ref(),
-            market.key().as_ref(),
-            &position.opened_at.to_le_bytes(),
-        ],
+        seeds = [b"position", position.owner.as_ref(), market.key().as_ref(), &position.opened_at.to_le_bytes()],
         bump = position.bump,
         has_one = market @ FuturesError::InvalidMarket,
     )]
     pub position: Account<'info, Position>,
 
-    #[account(
-        mut,
-        seeds = [b"vault", market.key().as_ref()],
-        bump = market.vault_bump,
-    )]
+    #[account(mut, seeds = [b"vault", market.key().as_ref()], bump = market.vault_bump)]
     pub vault: Account<'info, VaultAccount>,
 
     #[account(mut)]
     pub liquidator: Signer<'info>,
-
     pub system_program: Program<'info, System>,
 }
 
@@ -724,74 +596,56 @@ pub struct ApplyFunding<'info> {
 
 #[derive(Accounts)]
 pub struct PauseMarket<'info> {
-    #[account(
-        mut,
-        has_one = authority @ FuturesError::Unauthorized,
-    )]
+    #[account(mut, has_one = authority @ FuturesError::Unauthorized)]
     pub market: Account<'info, Market>,
     pub authority: Signer<'info>,
 }
 
 #[derive(Accounts)]
 pub struct WithdrawFees<'info> {
-    #[account(
-        has_one = authority @ FuturesError::Unauthorized,
-    )]
+    #[account(has_one = authority @ FuturesError::Unauthorized)]
     pub market: Account<'info, Market>,
 
-    #[account(
-        mut,
-        seeds = [b"vault", market.key().as_ref()],
-        bump = market.vault_bump,
-    )]
+    #[account(mut, seeds = [b"vault", market.key().as_ref()], bump = market.vault_bump)]
     pub vault: Account<'info, VaultAccount>,
 
     #[account(mut)]
     pub authority: Signer<'info>,
-
     pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct TransferAuthority<'info> {
+    #[account(mut, has_one = authority @ FuturesError::Unauthorized)]
+    pub market: Account<'info, Market>,
+    pub authority: Signer<'info>,
+    /// CHECK: New authority — any valid pubkey
+    pub new_authority: AccountInfo<'info>,
+}
+
+#[derive(Accounts)]
+pub struct ClosePositionAccount<'info> {
+    #[account(
+        mut,
+        close = owner,
+        constraint = !position.is_open @ FuturesError::PositionStillOpen,
+        constraint = position.owner == owner.key() @ FuturesError::Unauthorized,
+    )]
+    pub position: Account<'info, Position>,
+
+    /// CHECK: Original position owner — receives rent refund
+    #[account(mut)]
+    pub owner: AccountInfo<'info>,
 }
 
 // ─── Events ─────────────────────────────────────────────────────────────────
 
 #[event]
-pub struct MarketInitialized {
-    pub commodity: String,
-    pub initial_price: u64,
-    pub authority: Pubkey,
-}
-
-#[event]
-pub struct PriceUpdated {
-    pub commodity: [u8; 16],
-    pub old_price: u64,
-    pub new_price: u64,
-    pub timestamp: i64,
-}
-
-#[event]
-pub struct PositionOpened {
-    pub trader: Pubkey,
-    pub market: Pubkey,
-    pub direction: u8,
-    pub collateral: u64,
-    pub entry_price: u64,
-    pub fee_paid: u64,
-    pub leverage: u8,
-    pub urim_discount: bool,
-}
-
-#[event]
 pub struct PositionClosed {
     pub trader: Pubkey,
     pub market: Pubkey,
-    pub direction: u8,
-    pub collateral: u64,
-    pub entry_price: u64,
-    pub exit_price: u64,
     pub pnl: i64,
     pub payout: u64,
-    pub leverage: u8,
     pub close_fee: u64,
 }
 
@@ -801,25 +655,7 @@ pub struct PositionLiquidated {
     pub market: Pubkey,
     pub liquidator: Pubkey,
     pub collateral: u64,
-    pub price_move_bps: u64,
-    pub leverage: u8,
     pub liquidator_reward: u64,
-}
-
-#[event]
-pub struct FundingApplied {
-    pub market: Pubkey,
-    pub rate: i64,
-    pub cumulative: i64,
-    pub timestamp: i64,
-}
-
-#[event]
-pub struct FeesWithdrawn {
-    pub market: Pubkey,
-    pub authority: Pubkey,
-    pub amount: u64,
-    pub vault_remaining: u64,
 }
 
 // ─── Errors ─────────────────────────────────────────────────────────────────
@@ -836,12 +672,12 @@ pub enum FuturesError {
     Unauthorized,
     #[msg("Position already closed")]
     PositionAlreadyClosed,
-    #[msg("Not liquidatable: threshold not reached")]
+    #[msg("Not liquidatable")]
     NotLiquidatable,
     #[msg("Invalid market")]
     InvalidMarket,
-    #[msg("Zero collateral")]
-    ZeroCollateral,
+    #[msg("Collateral below minimum (0.01 SOL)")]
+    CollateralTooSmall,
     #[msg("Invalid leverage: must be 1-10")]
     InvalidLeverage,
     #[msg("Market is paused")]
@@ -852,4 +688,8 @@ pub enum FuturesError {
     FundingTooEarly,
     #[msg("Nothing to withdraw")]
     NothingToWithdraw,
+    #[msg("Price too stale")]
+    StalePrice,
+    #[msg("Position still open")]
+    PositionStillOpen,
 }
